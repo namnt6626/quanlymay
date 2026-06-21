@@ -70,6 +70,8 @@ class PermissionSeeder extends Seeder
             ['ma_quyen' => 'USER_EDIT', 'ten_quyen' => 'Sửa Người dùng', 'module' => 'Tài khoản', 'action' => 'EDIT'],
             ['ma_quyen' => 'USER_DELETE', 'ten_quyen' => 'Xóa Người dùng', 'module' => 'Tài khoản', 'action' => 'DELETE'],
 
+            ['ma_quyen' => 'ACTIVITY_LOG_VIEW', 'ten_quyen' => 'Xem Nhật ký thao tác', 'module' => 'Tài khoản', 'action' => 'VIEW'],
+
             ['ma_quyen' => 'PROFILE_VIEW', 'ten_quyen' => 'Xem Hồ sơ cá nhân', 'module' => 'Tài khoản', 'action' => 'VIEW'],
             ['ma_quyen' => 'PROFILE_EDIT', 'ten_quyen' => 'Sửa Hồ sơ cá nhân', 'module' => 'Tài khoản', 'action' => 'EDIT'],
             ['ma_quyen' => 'CHANGE_PASSWORD', 'ten_quyen' => 'Đổi mật khẩu', 'module' => 'Tài khoản', 'action' => 'CHANGE_PASSWORD'],

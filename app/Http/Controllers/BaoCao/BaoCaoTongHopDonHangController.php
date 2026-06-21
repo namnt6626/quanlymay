@@ -48,7 +48,7 @@ class BaoCaoTongHopDonHangController extends Controller
             ->orderByDesc('ngay_nhan')
             ->orderBy('ma_don')
             ->orderBy('don_hang_chi_tiet_id')
-            ->paginate(20)
+            ->paginate(paginationPerPage())
             ->withQueryString();
 
         $donHangChiTietTable = (new DonHangChiTiet)->getTable();

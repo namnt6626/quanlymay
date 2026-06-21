@@ -26,6 +26,7 @@ class StoreXuatKhoRequest extends FormRequest
 
         $this->merge([
             'items' => $items,
+            'xuat_kho_submit_token' => trim((string) $this->input('xuat_kho_submit_token')),
         ]);
     }
 
@@ -48,6 +49,7 @@ class StoreXuatKhoRequest extends FormRequest
             ],
             'items.*.so_luong_xuat' => ['required', 'numeric', 'min:0.0001'],
             'ghi_chu' => ['nullable', 'string'],
+            'xuat_kho_submit_token' => ['nullable', 'string', 'max:100'],
         ];
     }
 

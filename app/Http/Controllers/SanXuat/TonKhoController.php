@@ -68,7 +68,7 @@ class TonKhoController extends Controller
                 $query->whereRaw('ton_kho < 0');
             })
             ->orderByRaw('CASE WHEN ma_don IS NULL THEN 1 ELSE 0 END, COALESCE(ma_don, ""), ma_hang, ten_mau, ten_size')
-            ->paginate(10)
+            ->paginate(paginationPerPage())
             ->withQueryString();
 
         return view('content.san-xuat.ton-kho.index', [

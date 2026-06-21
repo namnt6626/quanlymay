@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\RolePermission\UpdateRolePermissionRequest;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Support\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -25,7 +26,7 @@ class RolePermissionController extends Controller
         });
       })
       ->latest('id')
-      ->paginate(10)
+      ->paginate(paginationPerPage())
       ->withQueryString();
 
     return view('content.tai-khoan.role-permission.index', compact('roles', 'keyword'));
@@ -68,7 +69,19 @@ class RolePermissionController extends Controller
 
   public function update(UpdateRolePermissionRequest $request, Role $role): RedirectResponse
   {
+    $oldPermissions = $role->permissions()->pluck('ma_quyen')->values()->all();
     $role->permissions()->sync($request->validated()['permissions'] ?? []);
+    $newPermissions = $role->fresh('permissions')->permissions->pluck('ma_quyen')->values()->all();
+
+    ActivityLogger::log([
+      'action' => 'ASSIGN_PERMISSION',
+      'module' => 'Phân quyền',
+      'model_type' => Role::class,
+      'model_id' => $role->id,
+      'description' => 'Cập nhật phân quyền vai trò '.$role->ma_vai_tro,
+      'old_values' => ['permissions' => $oldPermissions],
+      'new_values' => ['permissions' => $newPermissions],
+    ]);
 
     return redirect()
       ->route('role-permission.index')

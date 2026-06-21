@@ -24,7 +24,7 @@ class MauController extends Controller
                 });
             })
             ->latest('id')
-            ->paginate(10)
+            ->paginate(paginationPerPage())
             ->withQueryString();
 
         return view('content.danh-muc.mau.index', compact('maus', 'keyword'));

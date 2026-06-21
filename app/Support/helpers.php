@@ -14,6 +14,25 @@ if (! function_exists('formatPhanBoNumber')) {
     }
 }
 
+if (! function_exists('paginationPerPageOptions')) {
+    /**
+     * @return array<int, int>
+     */
+    function paginationPerPageOptions(): array
+    {
+        return [10, 20, 50, 100];
+    }
+}
+
+if (! function_exists('paginationPerPage')) {
+    function paginationPerPage(int $default = 10): int
+    {
+        $perPage = (int) request()->input('per_page', $default);
+
+        return in_array($perPage, paginationPerPageOptions(), true) ? $perPage : $default;
+    }
+}
+
 if (! function_exists('hasPermission')) {
     function hasPermission(string $permissionCode): bool
     {
@@ -50,6 +69,7 @@ if (! function_exists('menuPermissionCode')) {
             'permission.index', 'permission.create', 'permission.edit', 'permission.destroy' => 'PERMISSION_VIEW',
             'role-permission.index', 'role-permission.edit' => 'ROLE_PERMISSION_VIEW',
             'user.index', 'user.create', 'user.edit', 'user.destroy' => 'USER_VIEW',
+            'activity-logs.index', 'activity-logs.show' => 'ACTIVITY_LOG_VIEW',
             'profile.index' => 'PROFILE_VIEW',
             'profile.update' => 'PROFILE_EDIT',
             'profile.change-password', 'profile.update-password' => 'CHANGE_PASSWORD',

@@ -11,10 +11,12 @@ use App\Models\NhapKho;
 use App\Models\PhanBoMay;
 use App\Models\PhieuXuatKhoChiTiet;
 use App\Models\Qc;
+use App\Support\ActivityLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -66,7 +68,7 @@ class QcController extends Controller
                 });
             })
             ->latest('id')
-            ->paginate(10)
+            ->paginate(paginationPerPage())
             ->withQueryString();
 
         $sourceGroups = $this->buildSourceGroups();
@@ -97,16 +99,29 @@ class QcController extends Controller
     public function store(StoreQcRequest $request): RedirectResponse
     {
         $data = $request->validated();
+        $submitToken = (string) ($data['qc_submit_token'] ?? '');
 
-        if (($data['qc_mode'] ?? 'from_allocation') === 'manual') {
-            $this->storeManualQcGroups($data);
-
-            return $this->redirectToIndex('Thêm QC thành công.');
+        if ($submitToken !== '' && ! Cache::add($this->submitTokenCacheKey($submitToken), true, now()->addMinutes(10))) {
+            return $this->redirectToIndex('Phiếu QC này đã được lưu, hệ thống đã chặn lưu trùng.');
         }
 
-        $this->storeAllocationQcGroups($data);
+        try {
+            if (($data['qc_mode'] ?? 'from_allocation') === 'manual') {
+                $this->storeManualQcGroups($data);
 
-        return $this->redirectToIndex('Thêm QC thành công.');
+                return $this->redirectToIndex('Thêm QC thành công.');
+            }
+
+            $this->storeAllocationQcGroups($data);
+
+            return $this->redirectToIndex('Thêm QC thành công.');
+        } catch (\Throwable $exception) {
+            if ($submitToken !== '') {
+                Cache::forget($this->submitTokenCacheKey($submitToken));
+            }
+
+            throw $exception;
+        }
     }
 
     public function edit(Qc $qc): View
@@ -229,6 +244,8 @@ class QcController extends Controller
             ]);
         }
 
+        $this->ensureUniqueAllocationSourceGroups($groups);
+
         DB::transaction(function () use ($data, $groups): void {
             foreach ($groups as $group) {
                 $phanBoMay = PhanBoMay::query()
@@ -260,6 +277,36 @@ class QcController extends Controller
         });
     }
 
+    private function ensureUniqueAllocationSourceGroups($groups): void
+    {
+        $sources = PhanBoMay::query()
+            ->with('cat')
+            ->whereIn('id', $groups->pluck('phan_bo_may_id')->filter()->map(fn ($id): int => (int) $id)->unique())
+            ->get()
+            ->keyBy('id');
+
+        $seen = [];
+
+        foreach ($groups as $group) {
+            $rowIndex = (int) ($group['row_index'] ?? 0);
+            $phanBoMay = $sources->get((int) ($group['phan_bo_may_id'] ?? 0));
+
+            if (! $phanBoMay) {
+                continue;
+            }
+
+            $sourceKey = $this->sourceGroupKeyFromPhanBoMay($phanBoMay) ?? ('id:'.$phanBoMay->id);
+
+            if (isset($seen[$sourceKey])) {
+                throw ValidationException::withMessages([
+                    "allocation_groups.{$rowIndex}.phan_bo_may_id" => 'Dòng '.($rowIndex + 1).": Nguồn QC này trùng nhóm với dòng {$seen[$sourceKey]}.",
+                ]);
+            }
+
+            $seen[$sourceKey] = $rowIndex + 1;
+        }
+    }
+
     private function storeManualQcGroups(array $data): void
     {
         $items = collect($data['manual_groups'] ?? [])
@@ -277,6 +324,16 @@ class QcController extends Controller
                     ->values()
                     ->all();
             })
+            ->groupBy(fn (array $item): string => (int) $item['mat_hang_id'].':'.(int) $item['mau_id'].':'.(int) $item['size_id'])
+            ->map(fn (Collection $group): array => [
+                'mat_hang_id' => (int) $group->first()['mat_hang_id'],
+                'mau_id' => (int) $group->first()['mau_id'],
+                'size_id' => (int) $group->first()['size_id'],
+                'sl_dat' => $group->sum(fn (array $item): float => (float) ($item['sl_dat'] ?? 0)),
+                'sl_loi' => $group->sum(fn (array $item): float => (float) ($item['sl_loi'] ?? 0)),
+                'sl_hong' => $group->sum(fn (array $item): float => (float) ($item['sl_hong'] ?? 0)),
+                'so_luong_qc' => $group->sum(fn (array $item): float => (float) ($item['so_luong_qc'] ?? 0)),
+            ])
             ->values();
 
         if ($items->isEmpty()) {
@@ -309,6 +366,7 @@ class QcController extends Controller
     private function syncAutoNhapKhoFromQc(Qc $qc): void
     {
         $qc->loadMissing('phanBoMay.cat');
+        $batchId = ActivityLogger::batchId();
 
         $hasAutoNhapKho = NhapKho::withTrashed()
             ->where('qc_id', $qc->id)
@@ -340,7 +398,18 @@ class QcController extends Controller
 
             if ($quantity <= 0) {
                 if ($nhapKho && ! $nhapKho->trashed()) {
+                    $oldValues = ActivityLogger::modelValues($nhapKho);
                     $nhapKho->delete();
+
+                    ActivityLogger::log([
+                        'action' => 'AUTO_IMPORT_FROM_QC',
+                        'module' => 'Nhập kho',
+                        'model_type' => NhapKho::class,
+                        'model_id' => $nhapKho->id,
+                        'description' => 'Xóa dòng nhập kho tự động từ QC #'.$qc->id.' do số lượng về 0',
+                        'old_values' => $oldValues,
+                        'batch_id' => $batchId,
+                    ]);
                 }
 
                 continue;
@@ -351,6 +420,7 @@ class QcController extends Controller
                     $nhapKho->restore();
                 }
 
+                $oldValues = ActivityLogger::modelValues($nhapKho);
                 $nhapKho->update([
                     'don_hang_chi_tiet_id' => $qc->don_hang_chi_tiet_id,
                     'ngay_nhap' => $qc->ngay_qc,
@@ -358,10 +428,21 @@ class QcController extends Controller
                     'ghi_chu' => 'Tự động nhập kho từ QC',
                 ]);
 
+                ActivityLogger::log([
+                    'action' => 'AUTO_IMPORT_FROM_QC',
+                    'module' => 'Nhập kho',
+                    'model_type' => NhapKho::class,
+                    'model_id' => $nhapKho->id,
+                    'description' => 'Cập nhật nhập kho tự động từ QC #'.$qc->id,
+                    'old_values' => $oldValues,
+                    'new_values' => ActivityLogger::modelValues($nhapKho),
+                    'batch_id' => $batchId,
+                ]);
+
                 continue;
             }
 
-            NhapKho::create([
+            $createdNhapKho = NhapKho::create([
                 'qc_id' => $qc->id,
                 'don_hang_chi_tiet_id' => $qc->don_hang_chi_tiet_id,
                 'ngay_nhap' => $qc->ngay_qc,
@@ -369,6 +450,16 @@ class QcController extends Controller
                 'loai_ton' => $loaiTon,
                 'auto_from_qc' => true,
                 'ghi_chu' => 'Tự động nhập kho từ QC',
+            ]);
+
+            ActivityLogger::log([
+                'action' => 'AUTO_IMPORT_FROM_QC',
+                'module' => 'Nhập kho',
+                'model_type' => NhapKho::class,
+                'model_id' => $createdNhapKho->id,
+                'description' => 'Tạo nhập kho tự động từ QC #'.$qc->id,
+                'new_values' => ActivityLogger::modelValues($createdNhapKho),
+                'batch_id' => $batchId,
             ]);
         }
     }
@@ -557,5 +648,10 @@ class QcController extends Controller
         return redirect()
             ->route('qc.index')
             ->with('success', $message);
+    }
+
+    private function submitTokenCacheKey(string $token): string
+    {
+        return 'qc_submit_token:'.$token;
     }
 }

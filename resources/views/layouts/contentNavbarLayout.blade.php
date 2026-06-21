@@ -63,6 +63,12 @@
           @endif
 
           @include('components.ui.breadcrumb')
+          @if (session('warning'))
+            <div class="alert alert-warning alert-dismissible fade show js-auto-alert" role="alert" data-bs-delay="3000">
+              {{ session('warning') }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+            </div>
+          @endif
           @yield('content')
 
         </div>
@@ -83,4 +89,17 @@
   <div class="drag-target"></div>
   <!-- / Layout wrapper -->
   </div>
+@endsection
+
+@section('page-script')
+  @parent
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('.js-auto-alert').forEach(function(alertElement) {
+        window.setTimeout(function() {
+          bootstrap.Alert.getOrCreateInstance(alertElement).close();
+        }, Number(alertElement.dataset.bsDelay || 3000));
+      });
+    });
+  </script>
 @endsection

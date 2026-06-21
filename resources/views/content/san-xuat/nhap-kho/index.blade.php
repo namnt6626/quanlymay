@@ -119,6 +119,8 @@
             <option value="hong" @selected($loaiTon === 'hong')>Hỏng</option>
           </select>
         </div>
+        @include('content.shared._per-page-select')
+
         <div class="col-12 col-xl-auto">
           <div class="d-flex gap-2 flex-wrap">
             <button type="submit" class="btn btn-primary">

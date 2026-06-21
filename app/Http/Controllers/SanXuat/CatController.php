@@ -51,7 +51,7 @@ class CatController extends Controller
                 $query->whereDate('ngay_cat', $ngayCat);
             })
             ->latest('id')
-            ->paginate(10)
+            ->paginate(paginationPerPage())
             ->withQueryString();
 
         return view('content.san-xuat.cat.index', compact('cats', 'keyword', 'ngayCat'));

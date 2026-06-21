@@ -24,7 +24,7 @@ class DonViCatController extends Controller
                 });
             })
             ->latest('id')
-            ->paginate(10)
+            ->paginate(paginationPerPage())
             ->withQueryString();
 
         return view('content.danh-muc.don-vi-cat.index', compact('donViCats', 'keyword'));

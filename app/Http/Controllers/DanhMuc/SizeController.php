@@ -24,7 +24,7 @@ class SizeController extends Controller
                 });
             })
             ->latest('id')
-            ->paginate(10)
+            ->paginate(paginationPerPage())
             ->withQueryString();
 
         return view('content.danh-muc.size.index', compact('sizes', 'keyword'));

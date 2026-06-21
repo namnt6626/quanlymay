@@ -48,6 +48,8 @@
           <label class="form-label" for="ngay_cat">Ngày cắt</label>
           <input type="date" class="form-control" id="ngay_cat" name="ngay_cat" value="{{ $ngayCat }}">
         </div>
+        @include('content.shared._per-page-select')
+
         <div class="col-12 col-xl-auto">
           <div class="d-flex gap-2 flex-wrap">
             <button type="submit" class="btn btn-primary">

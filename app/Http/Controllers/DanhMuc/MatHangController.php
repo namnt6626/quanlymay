@@ -25,7 +25,7 @@ class MatHangController extends Controller
                 });
             })
             ->latest('id')
-            ->paginate(10)
+            ->paginate(paginationPerPage())
             ->withQueryString();
 
         return view('content.danh-muc.mat-hang.index', compact('matHangs', 'keyword'));

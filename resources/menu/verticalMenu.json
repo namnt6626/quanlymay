@@ -116,7 +116,8 @@
         "role",
         "permission",
         "role-permission",
-        "user"
+        "user",
+        "activity-logs"
       ],
       "submenu": [
         {
@@ -138,6 +139,11 @@
           "url": "user",
           "name": "Người dùng",
           "slug": "user.index"
+        },
+        {
+          "url": "activity-logs",
+          "name": "Nhật ký thao tác",
+          "slug": "activity-logs.index"
         }
       ]
     }

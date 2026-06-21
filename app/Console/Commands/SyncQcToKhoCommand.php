@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\NhapKho;
 use App\Models\Qc;
+use App\Support\ActivityLogger;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -56,6 +57,16 @@ class SyncQcToKhoCommand extends Command
         $this->line("Bỏ qua không có số lượng: {$stats['skipped_empty']}");
         $this->line("Số lỗi: {$stats['errors']}");
         $this->info('Hoàn tất sync QC sang kho.');
+
+        ActivityLogger::log([
+            'action' => 'SYNC_QC_TO_KHO',
+            'module' => 'Nhập kho',
+            'description' => 'Chạy đồng bộ QC cũ sang nhập kho tự động',
+            'new_values' => $stats,
+            'method' => 'CLI',
+            'route_name' => null,
+            'url' => null,
+        ]);
 
         return $stats['errors'] > 0 ? self::FAILURE : self::SUCCESS;
     }

@@ -24,7 +24,7 @@ class DonViMayController extends Controller
                 });
             })
             ->latest('id')
-            ->paginate(10)
+            ->paginate(paginationPerPage())
             ->withQueryString();
 
         return view('content.danh-muc.don-vi-may.index', compact('donViMays', 'keyword'));

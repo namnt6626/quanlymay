@@ -57,6 +57,7 @@
   $oldManualGroups = collect(old('manual_groups', []))
       ->filter(fn($group) => is_array($group))
       ->values();
+  $qcSubmitToken = old('qc_submit_token', (string) \Illuminate\Support\Str::uuid());
 @endphp
 
 @section('page-style')
@@ -500,6 +501,11 @@
           form.querySelectorAll('.js-number-format').forEach(input => {
             input.value = normalizeNumber(input.value) || '0';
           });
+
+          form.querySelectorAll('button[type="submit"]').forEach(button => {
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span> Đang lưu';
+          });
         });
       }
 
@@ -545,6 +551,7 @@
 
       <form action="{{ route('qc.store') }}" method="POST" id="qc-form">
         @csrf
+        <input type="hidden" name="qc_submit_token" value="{{ $qcSubmitToken }}">
 
         <div class="row g-4">
           <div class="col-12">

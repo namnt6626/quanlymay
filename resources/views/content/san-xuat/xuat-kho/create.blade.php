@@ -298,6 +298,11 @@
           document.querySelectorAll('.js-xuat-qty').forEach((input) => {
             input.value = normalizeNumber(input.value);
           });
+
+          form.querySelectorAll('button[type="submit"]').forEach((button) => {
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span> Đang lưu';
+          });
         });
       }
 
@@ -310,6 +315,7 @@
   @include('content.danh-muc._toast')
 
   @php
+    $xuatKhoSubmitToken = old('xuat_kho_submit_token', (string) \Illuminate\Support\Str::uuid());
     $formatPhanBoNumber =
         $formatPhanBoNumber ??
         function ($value) {
@@ -333,6 +339,7 @@
 
   <form action="{{ route('xuat-kho.store') }}" method="POST" id="xuat-kho-form">
     @csrf
+    <input type="hidden" name="xuat_kho_submit_token" value="{{ $xuatKhoSubmitToken }}">
 
     <div class="card mb-4">
       <div class="card-header d-flex flex-column flex-md-row gap-3 justify-content-between align-items-md-center">

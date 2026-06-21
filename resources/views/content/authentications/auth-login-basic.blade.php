@@ -46,25 +46,10 @@
                 </div>
               </div>
 
-              <div class="mb-8">
-                <div class="d-flex justify-content-end align-items-center flex-wrap gap-2">
-                  <a href="{{ url('auth/forgot-password-basic') }}">
-                    <span>Quên mật khẩu?</span>
-                  </a>
-                </div>
-              </div>
-
               <div class="mb-6">
                 <button class="btn btn-primary d-grid w-100" type="submit">Đăng nhập</button>
               </div>
             </form>
-
-            <p class="text-center">
-              <span>Chưa có tài khoản?</span>
-              <a href="{{ url('auth/register-basic') }}">
-                <span>Đăng ký</span>
-              </a>
-            </p>
           </div>
         </div>
       </div>

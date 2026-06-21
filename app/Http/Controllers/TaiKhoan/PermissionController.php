@@ -26,7 +26,7 @@ class PermissionController extends Controller
         });
       })
       ->latest('id')
-      ->paginate(10)
+      ->paginate(paginationPerPage())
       ->withQueryString();
 
     return view('content.tai-khoan.permission.index', compact('permissions', 'keyword'));

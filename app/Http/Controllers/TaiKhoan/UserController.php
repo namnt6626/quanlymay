@@ -7,6 +7,7 @@ use App\Http\Requests\User\StoreUserRequest;
 use App\Http\Requests\User\UpdateUserRequest;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -33,7 +34,7 @@ class UserController extends Controller
         });
       })
       ->latest('id')
-      ->paginate(10)
+      ->paginate(paginationPerPage())
       ->withQueryString();
 
     return view('content.tai-khoan.user.index', compact('users', 'keyword'));
@@ -81,13 +82,39 @@ class UserController extends Controller
       return back()->withInput()->with('error', 'Không thể khóa tài khoản đang đăng nhập.');
     }
 
-    if (blank($data['password'] ?? null)) {
+    $passwordChanged = ! blank($data['password'] ?? null);
+    $oldStatus = (bool) $user->status;
+
+    if (! $passwordChanged) {
       unset($data['password']);
     } else {
       $data['password'] = Hash::make($data['password']);
     }
 
     $user->update($data);
+
+    if ($passwordChanged) {
+      ActivityLogger::log([
+        'action' => 'RESET_PASSWORD',
+        'module' => 'Tài khoản',
+        'model_type' => User::class,
+        'model_id' => $user->id,
+        'description' => 'Đặt lại mật khẩu tài khoản '.$user->username,
+        'new_values' => ['username' => $user->username],
+      ]);
+    }
+
+    if ($oldStatus !== (bool) $user->status) {
+      ActivityLogger::log([
+        'action' => 'CHANGE_STATUS',
+        'module' => 'Tài khoản',
+        'model_type' => User::class,
+        'model_id' => $user->id,
+        'description' => 'Đổi trạng thái tài khoản '.$user->username,
+        'old_values' => ['status' => $oldStatus],
+        'new_values' => ['status' => (bool) $user->status],
+      ]);
+    }
 
     return redirect()
       ->route('user.index')

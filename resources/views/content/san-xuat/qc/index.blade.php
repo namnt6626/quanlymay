@@ -44,6 +44,8 @@
           <input type="text" class="form-control" id="q" name="q" value="{{ $keyword }}"
             placeholder="Nhập mã đơn, mã KH, mã hàng, tên hàng, màu, size hoặc đơn vị may">
         </div>
+        @include('content.shared._per-page-select')
+
         <div class="col-12 col-xl-auto">
           <div class="d-flex gap-2 flex-wrap">
             <button type="submit" class="btn btn-primary">

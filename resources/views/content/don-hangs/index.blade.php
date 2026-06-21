@@ -39,6 +39,8 @@
           <label class="form-label" for="han_giao_to">Hạn giao đến</label>
           <input type="date" class="form-control" id="han_giao_to" name="han_giao_to" value="{{ $hanGiaoTo }}">
         </div>
+        @include('content.shared._per-page-select')
+
         <div class="col-12 col-xl-auto">
           <div class="d-flex gap-2 flex-wrap">
             <button type="submit" class="btn btn-primary">

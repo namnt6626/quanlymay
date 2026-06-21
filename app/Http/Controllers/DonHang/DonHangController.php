@@ -39,7 +39,7 @@ class DonHangController extends Controller
       ->when($hanGiaoFrom !== '', fn($query) => $query->whereDate('han_giao', '>=', $hanGiaoFrom))
       ->when($hanGiaoTo !== '', fn($query) => $query->whereDate('han_giao', '<=', $hanGiaoTo))
       ->latest('id')
-      ->paginate(10)
+      ->paginate(paginationPerPage())
       ->withQueryString();
 
     return view('content.don-hangs.index', compact('donHangs', 'keyword', 'ngayNhanFrom', 'ngayNhanTo', 'hanGiaoFrom', 'hanGiaoTo'));

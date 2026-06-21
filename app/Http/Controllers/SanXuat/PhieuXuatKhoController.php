@@ -8,10 +8,12 @@ use App\Http\Requests\XuatKho\UpdateXuatKhoRequest;
 use App\Models\NhapKho;
 use App\Models\PhieuXuatKho;
 use App\Models\PhieuXuatKhoChiTiet;
+use App\Support\ActivityLogger;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -78,7 +80,7 @@ class PhieuXuatKhoController extends Controller
                 });
             })
             ->latest('id')
-            ->paginate(10)
+            ->paginate(paginationPerPage())
             ->withQueryString();
 
         $chiTiets->getCollection()->transform(function (PhieuXuatKhoChiTiet $chiTiet) use ($sourceGroupMap) {
@@ -115,42 +117,60 @@ class PhieuXuatKhoController extends Controller
     public function store(StoreXuatKhoRequest $request): RedirectResponse
     {
         $data = $request->validated();
+        $submitToken = (string) ($data['xuat_kho_submit_token'] ?? '');
+
+        if ($submitToken !== '' && ! Cache::add($this->submitTokenCacheKey($submitToken), true, now()->addMinutes(10))) {
+            return $this->redirectToIndex('Phiếu xuất kho này đã được lưu, hệ thống đã chặn lưu trùng.');
+        }
+
         $items = collect($data['items'] ?? [])
             ->filter(fn (array $item): bool => (float) ($item['so_luong_xuat'] ?? 0) > 0)
             ->values();
 
-        if ($items->isEmpty()) {
-            throw ValidationException::withMessages([
-                'items' => 'Vui lòng chọn ít nhất một nguồn hàng để xuất.',
-            ]);
-        }
-
-        $sourceGroups = $this->buildSourceGroups()->keyBy('id');
-        $selectedRows = [];
-        $seen = [];
-
-        foreach ($items as $index => $item) {
-            $rowNumber = $index + 1;
-            $nhapKhoId = (int) $item['nhap_kho_id'];
-            $soLuongXuat = (float) $item['so_luong_xuat'];
-
-            if (isset($seen[$nhapKhoId])) {
+        try {
+            if ($items->isEmpty()) {
                 throw ValidationException::withMessages([
-                    "items.{$index}.nhap_kho_id" => "Dòng {$rowNumber}: Nguồn xuất này đã được chọn ở dòng {$seen[$nhapKhoId]}.",
+                    'items' => 'Vui lòng chọn ít nhất một nguồn hàng để xuất.',
                 ]);
             }
 
-            $seen[$nhapKhoId] = $rowNumber;
+            $sourceGroups = $this->buildSourceGroups()->keyBy('id');
+            $selectedRows = [];
+            $seen = [];
 
-            /** @var NhapKho|null $nhapKho */
-            $nhapKho = $sourceGroups->get($nhapKhoId);
+            foreach ($items as $index => $item) {
+                $rowNumber = $index + 1;
+                $nhapKhoId = (int) $item['nhap_kho_id'];
+                $soLuongXuat = (float) $item['so_luong_xuat'];
 
-            if (! $nhapKho) {
-                $nhapKho = NhapKho::query()->find($nhapKhoId);
+                if (isset($seen[$nhapKhoId])) {
+                    throw ValidationException::withMessages([
+                        "items.{$index}.nhap_kho_id" => "Dòng {$rowNumber}: Nguồn xuất này đã được chọn ở dòng {$seen[$nhapKhoId]}.",
+                    ]);
+                }
+
+                $seen[$nhapKhoId] = $rowNumber;
+
+                /** @var NhapKho|null $nhapKho */
+                $nhapKho = $sourceGroups->get($nhapKhoId);
 
                 if (! $nhapKho) {
+                    $nhapKho = NhapKho::query()->find($nhapKhoId);
+
+                    if (! $nhapKho) {
+                        throw ValidationException::withMessages([
+                            "items.{$index}.nhap_kho_id" => "Dòng {$rowNumber}: Nguồn xuất không tồn tại.",
+                        ]);
+                    }
+
+                    if (($nhapKho->loai_ton ?? 'dat') !== 'dat') {
+                        throw ValidationException::withMessages([
+                            "items.{$index}.nhap_kho_id" => "Dòng {$rowNumber}: Chỉ được xuất hàng đạt.",
+                        ]);
+                    }
+
                     throw ValidationException::withMessages([
-                        "items.{$index}.nhap_kho_id" => "Dòng {$rowNumber}: Nguồn xuất không tồn tại.",
+                        "items.{$index}.nhap_kho_id" => "Dòng {$rowNumber}: Nguồn xuất đã hết tồn đạt.",
                     ]);
                 }
 
@@ -160,51 +180,66 @@ class PhieuXuatKhoController extends Controller
                     ]);
                 }
 
-                throw ValidationException::withMessages([
-                    "items.{$index}.nhap_kho_id" => "Dòng {$rowNumber}: Nguồn xuất đã hết tồn đạt.",
-                ]);
+                if ($soLuongXuat > (float) $nhapKho->source_total_remaining) {
+                    throw ValidationException::withMessages([
+                        "items.{$index}.so_luong_xuat" => "Dòng {$rowNumber}: SL xuất vượt tồn còn lại.",
+                    ]);
+                }
+
+                $selectedRows[] = [
+                    'nhap_kho' => $nhapKho,
+                    'so_luong_xuat' => $soLuongXuat,
+                ];
             }
 
-            if (($nhapKho->loai_ton ?? 'dat') !== 'dat') {
-                throw ValidationException::withMessages([
-                    "items.{$index}.nhap_kho_id" => "Dòng {$rowNumber}: Chỉ được xuất hàng đạt.",
-                ]);
-            }
+            $batchId = ActivityLogger::batchId();
 
-            if ($soLuongXuat > (float) $nhapKho->source_total_remaining) {
-                throw ValidationException::withMessages([
-                    "items.{$index}.so_luong_xuat" => "Dòng {$rowNumber}: SL xuất vượt tồn còn lại.",
-                ]);
-            }
-
-            $selectedRows[] = [
-                'nhap_kho' => $nhapKho,
-                'so_luong_xuat' => $soLuongXuat,
-            ];
-        }
-
-        DB::transaction(function () use ($data, $selectedRows) {
-            $phieuXuatKho = PhieuXuatKho::create([
-                'so_phieu' => $data['so_phieu'],
-                'ngay_xuat' => $data['ngay_xuat'],
-                'kenh_ban' => $data['kenh_ban'],
-                'ghi_chu' => $data['ghi_chu'] ?? null,
-            ]);
-
-            foreach ($selectedRows as $row) {
-                /** @var NhapKho $nhapKho */
-                $nhapKho = $row['nhap_kho'];
-
-                $phieuXuatKho->chiTiets()->create([
-                    'nhap_kho_id' => $nhapKho->id,
-                    'don_hang_chi_tiet_id' => $nhapKho->don_hang_chi_tiet_id,
-                    'so_luong_xuat' => $row['so_luong_xuat'],
+            DB::transaction(function () use ($data, $selectedRows, $batchId) {
+                $phieuXuatKho = PhieuXuatKho::create([
+                    'so_phieu' => $data['so_phieu'],
+                    'ngay_xuat' => $data['ngay_xuat'],
+                    'kenh_ban' => $data['kenh_ban'],
                     'ghi_chu' => $data['ghi_chu'] ?? null,
                 ]);
-            }
-        });
 
-        return $this->redirectToIndex('Thêm xuất kho thành công.');
+                foreach ($selectedRows as $row) {
+                    /** @var NhapKho $nhapKho */
+                    $nhapKho = $row['nhap_kho'];
+
+                    $phieuXuatKho->chiTiets()->create([
+                        'nhap_kho_id' => $nhapKho->id,
+                        'don_hang_chi_tiet_id' => $nhapKho->don_hang_chi_tiet_id,
+                        'so_luong_xuat' => $row['so_luong_xuat'],
+                        'ghi_chu' => $data['ghi_chu'] ?? null,
+                    ]);
+                }
+
+                ActivityLogger::log([
+                    'action' => count($selectedRows) > 1 ? 'BULK_EXPORT_KHO' : 'EXPORT',
+                    'module' => 'Xuất kho',
+                    'model_type' => PhieuXuatKho::class,
+                    'model_id' => $phieuXuatKho->id,
+                    'description' => 'Tạo phiếu xuất kho '.$phieuXuatKho->so_phieu,
+                    'new_values' => [
+                        'phieu' => ActivityLogger::modelValues($phieuXuatKho),
+                        'items' => collect($selectedRows)->map(fn (array $row): array => [
+                            'nhap_kho_id' => $row['nhap_kho']->id,
+                            'so_luong_xuat' => $row['so_luong_xuat'],
+                        ])->values()->all(),
+                        'tong_so_luong_xuat' => collect($selectedRows)->sum('so_luong_xuat'),
+                    ],
+                    'batch_id' => $batchId,
+                ]);
+            });
+
+            return $this->redirectToIndex('Thêm xuất kho thành công.');
+        } catch (\Throwable $exception) {
+            if ($submitToken !== '') {
+                Cache::forget($this->submitTokenCacheKey($submitToken));
+            }
+
+            throw $exception;
+        }
     }
 
     public function edit(PhieuXuatKho $phieu_xuat_kho): View
@@ -506,5 +541,10 @@ class PhieuXuatKhoController extends Controller
         return redirect()
             ->route('xuat-kho.index')
             ->with('success', $message);
+    }
+
+    private function submitTokenCacheKey(string $token): string
+    {
+        return 'xuat_kho_submit_token:'.$token;
     }
 }

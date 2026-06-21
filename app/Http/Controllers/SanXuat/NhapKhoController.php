@@ -135,7 +135,7 @@ class NhapKhoController extends Controller
                 });
             })
             ->latest('id')
-            ->paginate(10)
+            ->paginate(paginationPerPage())
             ->withQueryString();
 
         $nhapKhos->getCollection()->transform(function (NhapKho $nhapKho) use ($sourceGroupMap) {

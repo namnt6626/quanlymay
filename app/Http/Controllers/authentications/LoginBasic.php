@@ -5,6 +5,8 @@ namespace App\Http\Controllers\authentications;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\User;
+use App\Support\AccessRedirect;
+use App\Support\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,7 +17,13 @@ class LoginBasic extends Controller
     public function index()
     {
         if (Auth::check()) {
-            return redirect()->route('dashboard-analytics');
+            $routeName = app(AccessRedirect::class)->firstAccessibleRoute(Auth::user());
+
+            if ($routeName) {
+                return redirect()->route($routeName);
+            }
+
+            abort(403, 'Tài khoản này chưa được cấp quyền truy cập hệ thống. Vui lòng liên hệ quản trị viên.');
         }
 
         return view('content.authentications.auth-login-basic');
@@ -46,11 +54,45 @@ class LoginBasic extends Controller
             'last_login_at' => now(),
         ])->saveQuietly();
 
-        return redirect()->intended(route('dashboard-analytics'));
+        ActivityLogger::log([
+            'action' => 'LOGIN',
+            'module' => 'Tài khoản',
+            'model_type' => User::class,
+            'model_id' => $user->id,
+            'description' => 'Đăng nhập tài khoản '.$user->username,
+            'new_values' => [
+                'username' => $user->username,
+                'name' => $user->name,
+            ],
+        ]);
+
+        $routeName = app(AccessRedirect::class)->firstAccessibleRoute($user);
+
+        if (! $routeName) {
+            abort(403, 'Tài khoản này chưa được cấp quyền truy cập hệ thống. Vui lòng liên hệ quản trị viên.');
+        }
+
+        return redirect()->intended(route($routeName));
     }
 
     public function destroy(Request $request): RedirectResponse
     {
+        $user = $request->user();
+
+        if ($user) {
+            ActivityLogger::log([
+                'action' => 'LOGOUT',
+                'module' => 'Tài khoản',
+                'model_type' => User::class,
+                'model_id' => $user->id,
+                'description' => 'Đăng xuất tài khoản '.$user->username,
+                'old_values' => [
+                    'username' => $user->username,
+                    'name' => $user->name,
+                ],
+            ]);
+        }
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

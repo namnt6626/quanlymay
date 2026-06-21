@@ -29,6 +29,7 @@ class StoreQcRequest extends FormRequest
             'qc_mode' => $mode,
             'allocation_groups' => $allocationGroups,
             'manual_groups' => $manualGroups,
+            'qc_submit_token' => trim((string) $this->input('qc_submit_token')),
         ]);
     }
 
@@ -41,6 +42,7 @@ class StoreQcRequest extends FormRequest
             'qc_mode' => ['required', Rule::in(['from_allocation', 'manual'])],
             'ngay_qc' => ['required', 'date'],
             'ghi_chu' => ['nullable', 'string'],
+            'qc_submit_token' => ['nullable', 'string', 'max:100'],
 
             'allocation_groups' => [$isFromAllocation ? 'required' : 'nullable', 'array'],
             'allocation_groups.*.phan_bo_may_id' => ['nullable', 'integer', Rule::exists('phan_bo_may', 'id')->whereNull('deleted_at')],

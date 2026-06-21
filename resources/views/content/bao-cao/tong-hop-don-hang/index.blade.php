@@ -2,6 +2,29 @@
 
 @section('title', 'Tổng hợp đơn hàng')
 
+@section('page-style')
+  <style>
+    .order-summary-table-wrap {
+      max-height: calc(100vh - 260px);
+      min-height: 360px;
+      overflow: auto;
+    }
+
+    .order-summary-table {
+      min-width: 1320px;
+    }
+
+    .order-summary-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background-color: var(--bs-card-bg, #fff);
+      box-shadow: inset 0 -1px 0 var(--bs-border-color);
+      white-space: nowrap;
+    }
+  </style>
+@endsection
+
 @php
   $formatNumber = $formatNumber ?? function ($value) {
       if ($value === null || $value === '') {
@@ -85,6 +108,8 @@
           <label class="form-label" for="han_giao_den">Hạn giao đến</label>
           <input type="date" class="form-control" id="han_giao_den" name="han_giao_den" value="{{ $hanGiaoDen }}">
         </div>
+        @include('content.shared._per-page-select')
+
         <div class="col-12 col-xl-auto">
           <div class="d-flex gap-2 flex-wrap">
             <button type="submit" class="btn btn-primary">
@@ -98,8 +123,8 @@
   </div>
 
   <div class="card">
-    <div class="table-responsive">
-      <table class="table align-middle">
+    <div class="table-responsive order-summary-table-wrap">
+      <table class="table align-middle order-summary-table">
         <thead>
           <tr>
             <th>Mã đơn</th>

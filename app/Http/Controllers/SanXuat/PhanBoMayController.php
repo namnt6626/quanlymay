@@ -54,7 +54,7 @@ class PhanBoMayController extends Controller
                 });
             })
             ->latest('id')
-            ->paginate(10)
+            ->paginate(paginationPerPage())
             ->withQueryString();
 
         $sourceGroups = $this->buildSourceGroups();

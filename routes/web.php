@@ -31,6 +31,7 @@ use App\Http\Controllers\SanXuat\TonKhoController;
 use App\Http\Controllers\TaiKhoan\RolePermissionController;
 use App\Http\Controllers\TaiKhoan\PermissionController;
 use App\Http\Controllers\TaiKhoan\RoleController;
+use App\Http\Controllers\TaiKhoan\ActivityLogController;
 use App\Http\Controllers\form_elements\BasicInput;
 use App\Http\Controllers\form_elements\InputGroups;
 use App\Http\Controllers\form_layouts\VerticalForm;
@@ -179,6 +180,8 @@ $registerCrudRoutes('user', \App\Http\Controllers\TaiKhoan\UserController::class
 Route::get('role-permission', [\App\Http\Controllers\TaiKhoan\RolePermissionController::class, 'index'])->middleware(['auth', 'permission:ROLE_PERMISSION_VIEW'])->name('role-permission.index');
 Route::get('role-permission/{role}/edit', [\App\Http\Controllers\TaiKhoan\RolePermissionController::class, 'edit'])->middleware(['auth', 'permission:ROLE_PERMISSION_EDIT'])->name('role-permission.edit');
 Route::put('role-permission/{role}', [\App\Http\Controllers\TaiKhoan\RolePermissionController::class, 'update'])->middleware(['auth', 'permission:ROLE_PERMISSION_EDIT'])->name('role-permission.update');
+Route::get('activity-logs', [ActivityLogController::class, 'index'])->middleware(['auth', 'permission:ACTIVITY_LOG_VIEW'])->name('activity-logs.index');
+Route::get('activity-logs/{activityLog}', [ActivityLogController::class, 'show'])->middleware(['auth', 'permission:ACTIVITY_LOG_VIEW'])->name('activity-logs.show');
 
 Route::middleware('guest')->group(function () {
   Route::get('/login', [LoginBasic::class, 'index'])->name('login');
