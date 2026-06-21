@@ -2,6 +2,138 @@
 
 @section('title', 'Dashboard')
 
+@section('page-style')
+  <style>
+    @media (max-width: 575.98px) {
+      .dashboard-section {
+        margin-bottom: 1rem !important;
+      }
+
+      .dashboard-section > .card-header {
+        padding: 0.875rem 1rem;
+      }
+
+      .dashboard-section > .card-header h5 {
+        font-size: 1rem;
+      }
+
+      .dashboard-section > .card-body {
+        padding: 1rem;
+      }
+
+      .dashboard-section .form-label {
+        margin-bottom: 0.35rem;
+        font-size: 0.8125rem;
+        font-weight: 600;
+      }
+
+      .dashboard-filter-actions {
+        width: 100%;
+      }
+
+      .dashboard-filter-actions .btn {
+        flex: 1 1 0;
+        justify-content: center;
+        white-space: nowrap;
+      }
+
+      .dashboard-stat-card .card-body {
+        min-height: 118px;
+        padding: 0.875rem;
+        align-items: flex-start !important;
+      }
+
+      .dashboard-stat-card .avatar {
+        width: 32px;
+        height: 32px;
+        flex: 0 0 32px;
+      }
+
+      .dashboard-stat-card .icon-lg {
+        font-size: 1.15rem !important;
+      }
+
+      .dashboard-stat-card .text-muted.small {
+        line-height: 1.2;
+        min-height: 2.05em;
+      }
+
+      .dashboard-stat-card .h4 {
+        margin-top: 0.25rem;
+        font-size: clamp(1.2rem, 6vw, 1.65rem);
+        line-height: 1.05;
+        white-space: nowrap;
+        letter-spacing: 0;
+      }
+
+      .dashboard-stat-card .card-body.text-center {
+        display: block;
+        text-align: left !important;
+      }
+
+      .dashboard-stat-card .card-body.text-center .avatar {
+        margin: 0 0 0.65rem !important;
+      }
+
+      .dashboard-stat-card .min-w-0 {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+
+      .dashboard-daily-table-wrap {
+        overflow-x: visible;
+      }
+
+      .dashboard-daily-table thead {
+        display: none;
+      }
+
+      .dashboard-daily-table,
+      .dashboard-daily-table tbody,
+      .dashboard-daily-table tr,
+      .dashboard-daily-table td {
+        display: block;
+        width: 100%;
+      }
+
+      .dashboard-daily-table tbody tr:not(.dashboard-empty-row) {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem 0.65rem;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.5rem;
+        margin: 0 1rem 0.875rem;
+        padding: 0.75rem;
+        background-color: var(--bs-card-bg, #fff);
+      }
+
+      .dashboard-daily-table tbody tr:not(.dashboard-empty-row) td {
+        border: 0;
+        border-radius: 0.375rem;
+        padding: 0.5rem;
+        background-color: #fafbfc;
+        text-align: left !important;
+        white-space: normal;
+      }
+
+      .dashboard-daily-table tbody tr:not(.dashboard-empty-row) td::before {
+        display: block;
+        content: attr(data-label);
+        color: var(--bs-secondary-color);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        margin-bottom: 0.15rem;
+        opacity: 0.85;
+      }
+
+      .dashboard-daily-table .dashboard-daily-date {
+        grid-column: 1 / -1;
+        font-weight: 700;
+      }
+    }
+  </style>
+@endsection
+
 @php
   $formatNumber = $formatNumber ?? function ($value) {
       if ($value === null || $value === '') {
@@ -84,7 +216,7 @@
 @endphp
 
 @section('content')
-  <div class="card mb-5">
+  <div class="card mb-5 dashboard-section">
     <div class="card-header">
       <h5 class="mb-0">Bảng tổng nhanh</h5>
     </div>
@@ -168,7 +300,7 @@
             value="{{ $quickFilters['han_giao_den'] ?? '' }}">
         </div>
         <div class="col-12 col-xl-4">
-          <div class="d-flex gap-2">
+          <div class="d-flex gap-2 dashboard-filter-actions">
             <button type="submit" class="btn btn-primary">
               <i class="icon-base bx bx-filter-alt me-1"></i> Lọc
             </button>
@@ -179,8 +311,8 @@
 
       <div class="row g-4 mt-1">
         @foreach ($quickCards as $card)
-          <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card h-100 shadow-none border">
+          <div class="col-6 col-sm-6 col-xl-3">
+            <div class="card h-100 shadow-none border dashboard-stat-card">
               <div class="card-body d-flex align-items-center gap-3">
                 <span class="avatar rounded bg-label-{{ $card['class'] }}">
                   <i class="icon-base bx {{ $card['icon'] }} icon-lg"></i>
@@ -197,7 +329,7 @@
     </div>
   </div>
 
-  <div class="card mb-5">
+  <div class="card mb-5 dashboard-section">
     <div class="card-header">
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
         <h5 class="mb-0">Tổng sản lượng theo thời gian</h5>
@@ -266,7 +398,7 @@
           </select>
         </div>
         <div class="col-12">
-          <div class="d-flex gap-2">
+          <div class="d-flex gap-2 dashboard-filter-actions">
             <button type="submit" class="btn btn-primary">
               <i class="icon-base bx bx-filter-alt me-1"></i> Lọc
             </button>
@@ -277,8 +409,8 @@
 
       <div class="row g-4 mt-1">
         @foreach ($timeCards as $card)
-          <div class="col-12 col-sm-6 col-lg-4 col-xxl">
-            <div class="card h-100 shadow-none border">
+          <div class="col-6 col-sm-6 col-lg-4 col-xxl">
+            <div class="card h-100 shadow-none border dashboard-stat-card">
               <div class="card-body text-center">
                 <div class="avatar mx-auto mb-3 rounded bg-label-{{ $card['class'] }}">
                   <i class="icon-base bx {{ $card['icon'] }} icon-lg"></i>
@@ -293,15 +425,15 @@
     </div>
   </div>
 
-  <div class="card mb-5">
+  <div class="card mb-5 dashboard-section">
     <div class="card-header">
       <h5 class="mb-0">Chỉ số hôm nay</h5>
     </div>
     <div class="card-body border-top">
       <div class="row g-4">
         @foreach ($todayCards as $card)
-          <div class="col-12 col-sm-6 col-lg-4 col-xxl-2">
-            <div class="card h-100 shadow-none border">
+          <div class="col-6 col-sm-6 col-lg-4 col-xxl-2">
+            <div class="card h-100 shadow-none border dashboard-stat-card">
               <div class="card-body text-center">
                 <div class="avatar mx-auto mb-3 rounded bg-label-{{ $card['class'] }}">
                   <i class="icon-base bx {{ $card['icon'] }} icon-lg"></i>
@@ -316,7 +448,7 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card dashboard-section">
     <div class="card-header">
       <h5 class="mb-0">Sản lượng theo ngày</h5>
     </div>
@@ -336,7 +468,7 @@
             value="{{ $dailyFilters['date_to'] ?? '' }}">
         </div>
         <div class="col-12 col-xl-6">
-          <div class="d-flex gap-2">
+          <div class="d-flex gap-2 dashboard-filter-actions">
             <button type="submit" class="btn btn-primary">
               <i class="icon-base bx bx-filter-alt me-1"></i> Lọc
             </button>
@@ -345,8 +477,8 @@
         </div>
       </form>
     </div>
-    <div class="table-responsive mt-3">
-      <table class="table align-middle">
+    <div class="table-responsive mt-3 dashboard-daily-table-wrap">
+      <table class="table align-middle dashboard-daily-table">
         <thead>
           <tr>
             <th>Ngày</th>
@@ -361,16 +493,16 @@
         <tbody class="table-border-bottom-0">
           @forelse ($dailyProduction as $row)
             <tr>
-              <td>{{ \Carbon\Carbon::parse($row['date'])->format('d/m/Y') }}</td>
-              <td class="text-end">{{ $formatNumber($row['cat']) }}</td>
-              <td class="text-end">{{ $formatNumber($row['giao_may']) }}</td>
-              <td class="text-end">{{ $formatNumber($row['qc_dat']) }}</td>
-              <td class="text-end">{{ $formatNumber($row['qc_loi']) }}</td>
-              <td class="text-end">{{ $formatNumber($row['nhap_kho']) }}</td>
-              <td class="text-end">{{ $formatNumber($row['xuat_hang']) }}</td>
+              <td class="dashboard-daily-date" data-label="Ngày">{{ \Carbon\Carbon::parse($row['date'])->format('d/m/Y') }}</td>
+              <td class="text-end" data-label="Cắt">{{ $formatNumber($row['cat']) }}</td>
+              <td class="text-end" data-label="Giao may">{{ $formatNumber($row['giao_may']) }}</td>
+              <td class="text-end" data-label="QC đạt">{{ $formatNumber($row['qc_dat']) }}</td>
+              <td class="text-end" data-label="QC lỗi">{{ $formatNumber($row['qc_loi']) }}</td>
+              <td class="text-end" data-label="Nhập kho">{{ $formatNumber($row['nhap_kho']) }}</td>
+              <td class="text-end" data-label="Xuất hàng">{{ $formatNumber($row['xuat_hang']) }}</td>
             </tr>
           @empty
-            <tr>
+            <tr class="dashboard-empty-row">
               <td colspan="7" class="text-center py-4">Chưa có dữ liệu sản lượng.</td>
             </tr>
           @endforelse

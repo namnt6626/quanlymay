@@ -54,6 +54,113 @@
       text-align: right;
       width: 100%;
     }
+
+    @media (max-width: 575.98px) {
+      .xuat-lines-responsive {
+        overflow-x: visible;
+      }
+
+      .xuat-lines-table {
+        min-width: 0;
+      }
+
+      .xuat-lines-table thead {
+        display: none;
+      }
+
+      .xuat-lines-table,
+      .xuat-lines-table tbody,
+      .xuat-lines-table tr,
+      .xuat-lines-table td {
+        width: 100%;
+      }
+
+      .xuat-lines-table tbody tr[data-source-row="1"] {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem 0.65rem;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.5rem;
+        margin-bottom: 0.875rem;
+        padding: 0.75rem;
+        background-color: var(--bs-card-bg, #fff);
+      }
+
+      .xuat-lines-table tbody tr[data-source-row="1"] td {
+        display: block;
+        border: 0;
+        padding: 0.5rem;
+        border-radius: 0.375rem;
+        background-color: #fafbfc;
+        color: var(--bs-body-color);
+        white-space: normal;
+        text-align: left !important;
+      }
+
+      .xuat-lines-table tbody tr[data-source-row="1"] td::before {
+        display: block;
+        content: attr(data-label);
+        color: var(--bs-secondary-color);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        margin-bottom: 0.15rem;
+        opacity: 0.85;
+      }
+
+      .xuat-lines-table .xuat-mobile-product {
+        min-width: 0;
+      }
+
+      .xuat-lines-table .xuat-mobile-product strong,
+      .xuat-lines-table .xuat-mobile-product .small {
+        display: block;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+
+      .xuat-lines-table .xuat-mobile-product .small {
+        margin-top: 0.15rem;
+        line-height: 1.25;
+      }
+
+      .xuat-lines-table .xuat-mobile-qty {
+        grid-column: 1 / -1;
+        display: flex !important;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.55rem 0 !important;
+        background-color: transparent !important;
+      }
+
+      .xuat-lines-table .xuat-mobile-qty::before {
+        flex: 0 0 70px;
+        margin-bottom: 0 !important;
+      }
+
+      .xuat-lines-table .xuat-mobile-remove {
+        grid-column: 1 / -1;
+        padding: 0 !important;
+        background-color: transparent !important;
+      }
+
+      .xuat-lines-table .xuat-mobile-remove::before {
+        display: none !important;
+      }
+
+      .xuat-lines-table .xuat-mobile-remove .btn {
+        width: 100%;
+      }
+
+      .xuat-qty-input {
+        min-width: 0;
+        width: 100%;
+        height: 48px;
+        padding: 0.65rem 0.85rem;
+        font-size: 1.05rem;
+        text-align: right;
+      }
+    }
   </style>
 @endsection
 
@@ -221,29 +328,29 @@
           tr.dataset.sourceRow = '1';
           tr.dataset.sourceId = row.id;
           tr.innerHTML = `
-            <td>${index + 1}</td>
-            <td>${row.order_number || '-'}</td>
-            <td>${row.customer_number || '-'}</td>
-            <td class="col-product">
+            <td data-label="STT">${index + 1}</td>
+            <td data-label="Mã đơn">${row.order_number || '-'}</td>
+            <td data-label="Mã KH">${row.customer_number || '-'}</td>
+            <td class="col-product xuat-mobile-product" data-label="Mã hàng">
               <strong>${row.product_code || '-'}</strong>
               <div class="text-muted small">${row.product_name || '-'}</div>
             </td>
-            <td>${row.color || '-'}</td>
-            <td>${row.size || '-'}</td>
-            <td class="text-end col-number">${row.order_quantity !== null && row.order_quantity !== '' ? formatDisplayNumber(row.order_quantity) : '-'}</td>
-            <td class="text-end col-number">${formatDisplayNumber(row.imported)}</td>
-            <td class="text-end col-number">${formatDisplayNumber(row.exported)}</td>
-            <td class="text-end col-number fw-semibold">${formatDisplayNumber(row.remaining)}</td>
-            <td class="col-number">
+            <td data-label="Màu">${row.color || '-'}</td>
+            <td data-label="Size">${row.size || '-'}</td>
+            <td class="text-end col-number" data-label="SL đặt">${row.order_quantity !== null && row.order_quantity !== '' ? formatDisplayNumber(row.order_quantity) : '-'}</td>
+            <td class="text-end col-number" data-label="Nhập đạt">${formatDisplayNumber(row.imported)}</td>
+            <td class="text-end col-number" data-label="Đã xuất">${formatDisplayNumber(row.exported)}</td>
+            <td class="text-end col-number fw-semibold" data-label="Còn lại">${formatDisplayNumber(row.remaining)}</td>
+            <td class="col-number xuat-mobile-qty" data-label="SL xuất">
               <input type="hidden" name="items[${index}][nhap_kho_id]" value="${row.id}">
               <input type="text" inputmode="decimal" autocomplete="off"
                 class="form-control xuat-qty-input js-xuat-qty"
                 name="items[${index}][so_luong_xuat]"
                 value="${row.quantity ? formatDisplayNumber(row.quantity) : ''}">
             </td>
-            <td class="text-center">
-              <button type="button" class="btn btn-sm btn-icon btn-outline-danger" data-remove-source="${row.id}" title="Xóa">
-                <i class="icon-base bx bx-trash"></i>
+            <td class="text-center xuat-mobile-remove">
+              <button type="button" class="btn btn-sm btn-outline-danger" data-remove-source="${row.id}" title="Xóa">
+                <i class="icon-base bx bx-trash me-1"></i> Xóa
               </button>
             </td>
           `;
@@ -417,7 +524,7 @@
           @enderror
         </div>
 
-        <div class="table-responsive">
+        <div class="table-responsive xuat-lines-responsive">
           <table class="table table-hover align-middle mb-0 xuat-lines-table">
             <thead>
               <tr>

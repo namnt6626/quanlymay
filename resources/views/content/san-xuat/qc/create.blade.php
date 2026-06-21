@@ -136,6 +136,107 @@
       padding-right: .75rem;
       text-align: right;
     }
+
+    @media (max-width: 575.98px) {
+      .js-source-table,
+      .js-product-table {
+        overflow-x: visible;
+      }
+
+      .qc-source-table,
+      .qc-manual-table {
+        min-width: 0;
+      }
+
+      .qc-source-table thead,
+      .qc-manual-table thead {
+        display: none;
+      }
+
+      .qc-source-table,
+      .qc-source-table tbody,
+      .qc-source-table tr,
+      .qc-source-table td,
+      .qc-manual-table,
+      .qc-manual-table tbody,
+      .qc-manual-table tr,
+      .qc-manual-table td {
+        width: 100%;
+      }
+
+      .qc-source-table tbody tr,
+      .qc-manual-table tbody tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem 0.65rem;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.5rem;
+        margin-bottom: 0.875rem;
+        padding: 0.75rem;
+        background-color: var(--bs-card-bg, #fff);
+      }
+
+      .qc-source-table tbody td,
+      .qc-manual-table tbody td {
+        display: block;
+        border: 0;
+        padding: 0.5rem;
+        border-radius: 0.375rem;
+        background-color: #fafbfc;
+        color: var(--bs-body-color);
+        white-space: normal;
+      }
+
+      .qc-source-table tbody td.text-end {
+        text-align: left !important;
+      }
+
+      .qc-source-table tbody td::before,
+      .qc-manual-table tbody td::before {
+        display: block;
+        content: attr(data-label);
+        color: var(--bs-secondary-color);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        margin-bottom: 0.15rem;
+        opacity: 0.85;
+      }
+
+      .qc-source-table .qc-source-name {
+        grid-column: 1 / -1;
+        max-width: none;
+        min-width: 0;
+      }
+
+      .qc-source-table .qc-mobile-input-cell,
+      .qc-manual-table .qc-mobile-input-cell {
+        grid-column: auto;
+        display: block;
+        min-width: 0;
+        padding: 0;
+        background-color: transparent;
+      }
+
+      .qc-source-table .qc-mobile-input-cell::before,
+      .qc-manual-table .qc-mobile-input-cell::before {
+        margin-bottom: 0.35rem;
+      }
+
+      .qc-source-table .qc-col-diff {
+        grid-column: auto;
+      }
+
+      .qc-number-input,
+      .qc-manual-table .js-qc-part,
+      .qc-manual-table .js-qc-total {
+        min-width: 0;
+        width: 100%;
+        height: 48px;
+        padding: 0.65rem 0.85rem;
+        font-size: 1.05rem;
+        text-align: right;
+      }
+    }
   </style>
 @endsection
 
@@ -342,19 +443,19 @@
         block.querySelector('.js-source-table').classList.remove('d-none');
         body.innerHTML = `
           <tr>
-            <td class="small qc-source-name" title="${source.label}">${source.label}</td>
-            <td>${source.ma_don || '-'}</td>
-            <td><strong>${source.ma_hang || '-'}</strong><div class="text-muted small">${source.ten_hang || '-'}</div></td>
-            <td>${source.ten_mau || '-'}</td>
-            <td>${source.ten_size || '-'}</td>
-            <td>${source.don_vi_may || '-'}</td>
-            <td class="text-end qc-col-delivered">${formatDisplayNumber(source.sl_giao)}</td>
-            <td class="text-end qc-col-remaining">${formatDisplayNumber(source.sl_chua_qc)}</td>
-            <td class="qc-col-number"><input type="text" inputmode="decimal" autocomplete="off" class="form-control qc-number-input js-number-format js-qc-part" name="allocation_groups[${index}][sl_dat]" value="${formatDisplayNumber(values.sl_dat || '')}"></td>
-            <td class="qc-col-number"><input type="text" inputmode="decimal" autocomplete="off" class="form-control qc-number-input js-number-format js-qc-part" name="allocation_groups[${index}][sl_loi]" value="${formatDisplayNumber(values.sl_loi || '')}"></td>
-            <td class="qc-col-number"><input type="text" inputmode="decimal" autocomplete="off" class="form-control qc-number-input js-number-format js-qc-part" name="allocation_groups[${index}][sl_hong]" value="${formatDisplayNumber(values.sl_hong || '')}"></td>
-            <td class="qc-col-number"><input type="text" class="form-control qc-number-input js-qc-total" readonly tabindex="-1"></td>
-            <td class="qc-col-diff js-qc-diff" data-remaining="${source.sl_chua_qc || 0}"></td>
+            <td class="small qc-source-name" data-label="Nguồn QC" title="${source.label}">${source.label}</td>
+            <td data-label="Mã đơn">${source.ma_don || '-'}</td>
+            <td data-label="Mã hàng"><strong>${source.ma_hang || '-'}</strong><div class="text-muted small">${source.ten_hang || '-'}</div></td>
+            <td data-label="Màu">${source.ten_mau || '-'}</td>
+            <td data-label="Size">${source.ten_size || '-'}</td>
+            <td data-label="Đơn vị may">${source.don_vi_may || '-'}</td>
+            <td class="text-end qc-col-delivered" data-label="SL giao">${formatDisplayNumber(source.sl_giao)}</td>
+            <td class="text-end qc-col-remaining" data-label="SL chưa QC">${formatDisplayNumber(source.sl_chua_qc)}</td>
+            <td class="qc-col-number qc-mobile-input-cell" data-label="SL đạt"><input type="text" inputmode="decimal" autocomplete="off" class="form-control qc-number-input js-number-format js-qc-part" name="allocation_groups[${index}][sl_dat]" value="${formatDisplayNumber(values.sl_dat || '')}"></td>
+            <td class="qc-col-number qc-mobile-input-cell" data-label="SL lỗi"><input type="text" inputmode="decimal" autocomplete="off" class="form-control qc-number-input js-number-format js-qc-part" name="allocation_groups[${index}][sl_loi]" value="${formatDisplayNumber(values.sl_loi || '')}"></td>
+            <td class="qc-col-number qc-mobile-input-cell" data-label="SL hỏng"><input type="text" inputmode="decimal" autocomplete="off" class="form-control qc-number-input js-number-format js-qc-part" name="allocation_groups[${index}][sl_hong]" value="${formatDisplayNumber(values.sl_hong || '')}"></td>
+            <td class="qc-col-number qc-mobile-input-cell" data-label="Tổng QC"><input type="text" class="form-control qc-number-input js-qc-total" readonly tabindex="-1"></td>
+            <td class="qc-col-diff js-qc-diff" data-label="Chênh lệch" data-remaining="${source.sl_chua_qc || 0}"></td>
           </tr>
         `;
         body.querySelectorAll('.js-number-format').forEach(input => wireNumberInput(input, () => updateTotal(body)));
@@ -407,7 +508,7 @@
             <div class="qc-combobox-menu d-none js-product-menu"></div>
           </div>
           <div class="table-responsive d-none js-product-table">
-            <table class="table align-middle mb-0">
+            <table class="table align-middle mb-0 qc-manual-table">
               <thead>
                 <tr>
                   <th>Màu</th>
@@ -437,16 +538,16 @@
           }) || {};
           const tr = document.createElement('tr');
           tr.innerHTML = `
-            <td>
+            <td data-label="Màu">
               ${item.ten_mau || '-'}
               <input type="hidden" name="manual_groups[${groupIndex}][items][${itemIndex}][mau_id]" value="${item.mau_id || ''}">
               <input type="hidden" name="manual_groups[${groupIndex}][items][${itemIndex}][size_id]" value="${item.size_id || ''}">
             </td>
-            <td>${item.ten_size || '-'}</td>
-            <td><input type="text" inputmode="decimal" autocomplete="off" class="form-control js-number-format js-qc-part" name="manual_groups[${groupIndex}][items][${itemIndex}][sl_dat]" value="${formatDisplayNumber(oldItem.sl_dat || '')}"></td>
-            <td><input type="text" inputmode="decimal" autocomplete="off" class="form-control js-number-format js-qc-part" name="manual_groups[${groupIndex}][items][${itemIndex}][sl_loi]" value="${formatDisplayNumber(oldItem.sl_loi || '')}"></td>
-            <td><input type="text" inputmode="decimal" autocomplete="off" class="form-control js-number-format js-qc-part" name="manual_groups[${groupIndex}][items][${itemIndex}][sl_hong]" value="${formatDisplayNumber(oldItem.sl_hong || '')}"></td>
-            <td><input type="text" class="form-control js-qc-total" readonly tabindex="-1"></td>
+            <td data-label="Size">${item.ten_size || '-'}</td>
+            <td class="qc-mobile-input-cell" data-label="SL đạt"><input type="text" inputmode="decimal" autocomplete="off" class="form-control js-number-format js-qc-part" name="manual_groups[${groupIndex}][items][${itemIndex}][sl_dat]" value="${formatDisplayNumber(oldItem.sl_dat || '')}"></td>
+            <td class="qc-mobile-input-cell" data-label="SL lỗi"><input type="text" inputmode="decimal" autocomplete="off" class="form-control js-number-format js-qc-part" name="manual_groups[${groupIndex}][items][${itemIndex}][sl_loi]" value="${formatDisplayNumber(oldItem.sl_loi || '')}"></td>
+            <td class="qc-mobile-input-cell" data-label="SL hỏng"><input type="text" inputmode="decimal" autocomplete="off" class="form-control js-number-format js-qc-part" name="manual_groups[${groupIndex}][items][${itemIndex}][sl_hong]" value="${formatDisplayNumber(oldItem.sl_hong || '')}"></td>
+            <td class="qc-mobile-input-cell" data-label="Tổng QC"><input type="text" class="form-control js-qc-total" readonly tabindex="-1"></td>
           `;
           body.appendChild(tr);
           tr.querySelectorAll('.js-number-format').forEach(input => wireNumberInput(input, () => updateTotal(tr)));

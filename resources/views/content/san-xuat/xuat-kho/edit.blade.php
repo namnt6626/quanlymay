@@ -2,6 +2,32 @@
 
 @section('title', 'Cập nhật xuất kho')
 
+@section('page-style')
+  <style>
+    @media (max-width: 575.98px) {
+      .xuat-edit-source-card {
+        background-color: var(--bs-card-bg, #fff) !important;
+      }
+
+      .xuat-edit-source-card .row.g-3 > [class*="col-"] {
+        width: 50%;
+      }
+
+      .xuat-edit-source-card .row.g-3 > [class*="col-"] > .text-muted.small {
+        font-weight: 600;
+        opacity: 0.85;
+      }
+
+      #so_luong_xuat {
+        height: 48px;
+        padding: 0.65rem 0.85rem;
+        font-size: 1.05rem;
+        text-align: right;
+      }
+    }
+  </style>
+@endsection
+
 @section('page-script')
   @parent
   <script>
@@ -249,7 +275,7 @@
           </div>
 
           <div class="col-12">
-            <div class="border rounded p-3 bg-light">
+            <div class="border rounded p-3 bg-light xuat-edit-source-card">
               <div class="row g-3 mb-3">
                 <div class="col-md-3">
                   <div class="text-muted small">Mã đơn</div>

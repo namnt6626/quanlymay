@@ -2,6 +2,125 @@
 
 @section('title', 'Thêm phân bổ may')
 
+@section('page-style')
+  <style>
+    .allocation-table-scroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .allocation-entry-table {
+      min-width: 760px;
+    }
+
+    .allocation-entry-table th,
+    .allocation-entry-table td {
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+
+    .allocation-entry-table .allocation-quantity-cell {
+      min-width: 180px;
+      width: 180px;
+    }
+
+    .allocation-quantity-input {
+      min-width: 150px;
+      width: 100%;
+      height: 44px;
+      padding: 0.55rem 0.75rem;
+      font-size: 1rem;
+      text-align: right;
+    }
+
+    @media (max-width: 575.98px) {
+      .allocation-table-scroll {
+        margin-inline: 0;
+        padding-inline: 0;
+        overflow-x: visible;
+      }
+
+      .allocation-entry-table {
+        min-width: 0;
+      }
+
+      .allocation-entry-table thead {
+        display: none;
+      }
+
+      .allocation-entry-table,
+      .allocation-entry-table tbody,
+      .allocation-entry-table tr,
+      .allocation-entry-table td {
+        width: 100%;
+      }
+
+      .allocation-entry-table tbody tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem 0.65rem;
+        border: 1px solid var(--bs-border-color);
+        border-radius: 0.5rem;
+        margin-bottom: 0.875rem;
+        padding: 0.75rem;
+        background-color: var(--bs-card-bg, #fff);
+      }
+
+      .allocation-entry-table tbody td {
+        display: block;
+        border: 0;
+        padding: 0.5rem;
+        white-space: normal;
+        border-radius: 0.375rem;
+        background-color: #fafbfc;
+        color: var(--bs-body-color);
+      }
+
+      .allocation-entry-table tbody td:not(.allocation-quantity-cell) {
+        min-height: 58px;
+      }
+
+      .allocation-entry-table tbody td::before {
+        display: block;
+        content: attr(data-label);
+        color: var(--bs-secondary-color);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        margin-bottom: 0.15rem;
+        opacity: 0.85;
+      }
+
+      .allocation-entry-table tbody td.allocation-quantity-cell {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        min-height: 0;
+        padding: 0.55rem 0;
+        background-color: transparent;
+      }
+
+      .allocation-entry-table tbody td.allocation-quantity-cell::before {
+        flex: 0 0 70px;
+        margin-bottom: 0;
+      }
+
+      .allocation-entry-table .allocation-quantity-cell {
+        min-width: 0;
+        width: 100%;
+      }
+
+      .allocation-quantity-input {
+        min-width: 0;
+        width: 100%;
+        height: 48px;
+        font-size: 1.1rem;
+        padding: 0.65rem 0.85rem;
+      }
+    }
+  </style>
+@endsection
+
 @php
   $initialState = [
       'don_hang_id' => old('don_hang_id'),
@@ -295,8 +414,8 @@
           const row = document.createElement('tr');
 
           row.innerHTML = `
-            <td>${item.ten_mau || '-'}</td>
-            <td>
+            <td data-label="Màu">${item.ten_mau || '-'}</td>
+            <td data-label="Size">
               ${item.ten_size || '-'}
               <input type="hidden" name="allocations[${index}][group_key]" value="${item.key || ''}">
               <input type="hidden" name="allocations[${index}][don_hang_chi_tiet_id]" value="${item.don_hang_chi_tiet_id || ''}">
@@ -304,12 +423,12 @@
               <input type="hidden" name="allocations[${index}][mau_id]" value="${item.mau_id || ''}">
               <input type="hidden" name="allocations[${index}][size_id]" value="${item.size_id || ''}">
             </td>
-            <td>${formatDisplayNumber(item.sl_cat)}</td>
-            <td>${formatDisplayNumber(item.allocated)}</td>
-            <td>${formatDisplayNumber(item.remaining)}</td>
-            <td>
+            <td data-label="SL cắt">${formatDisplayNumber(item.sl_cat)}</td>
+            <td data-label="Đã phân bổ">${formatDisplayNumber(item.allocated)}</td>
+            <td data-label="Còn lại">${formatDisplayNumber(item.remaining)}</td>
+            <td class="allocation-quantity-cell" data-label="SL giao">
               <input type="text" inputmode="decimal" autocomplete="off"
-                class="form-control js-number-format"
+                class="form-control js-number-format allocation-quantity-input"
                 name="allocations[${index}][so_luong_giao]"
                 value="${formatDisplayNumber(item.remaining)}">
             </td>
@@ -500,8 +619,8 @@
             @error('allocations')
               <div class="alert alert-danger py-2">{{ $message }}</div>
             @enderror
-            <div class="table-responsive">
-              <table class="table align-middle">
+            <div class="table-responsive allocation-table-scroll">
+              <table class="table align-middle allocation-entry-table">
                 <thead>
                   <tr>
                     <th>Màu</th>
@@ -509,7 +628,7 @@
                     <th>SL cắt</th>
                     <th>Đã phân bổ</th>
                     <th>Còn lại</th>
-                    <th style="width: 180px;">SL giao</th>
+                    <th class="allocation-quantity-cell">SL giao</th>
                   </tr>
                 </thead>
                 <tbody id="allocation-body"></tbody>
