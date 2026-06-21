@@ -1,0 +1,145 @@
+{
+  "menu": [
+    {
+      "url": "/",
+      "name": "Dashboard",
+      "icon": "menu-icon icon-base bx bx-home-smile",
+      "slug": "dashboard-analytics"
+    },
+    {
+      "name": "Danh mục",
+      "icon": "menu-icon icon-base bx bx-category",
+      "slug": [
+        "mat-hang",
+        "mau",
+        "size",
+        "don-vi-cat",
+        "don-vi-may",
+        "kho"
+      ],
+      "submenu": [
+        {
+          "url": "mat-hang",
+          "name": "Mã hàng",
+          "slug": "mat-hang.index"
+        },
+        {
+          "url": "mau",
+          "name": "Màu sắc",
+          "slug": "mau.index"
+        },
+        {
+          "url": "size",
+          "name": "Size",
+          "slug": "size.index"
+        },
+        {
+          "url": "don-vi-cat",
+          "name": "Đơn vị cắt",
+          "slug": "don-vi-cat.index"
+        },
+        {
+          "url": "don-vi-may",
+          "name": "Đơn vị may",
+          "slug": "don-vi-may.index"
+        }
+      ]
+    },
+    {
+      "name": "Đơn hàng",
+      "url": "don-hangs",
+      "icon": "menu-icon icon-base bx bx-receipt",
+      "slug": "don-hangs"
+    },
+    {
+      "name": "Sản xuất",
+      "icon": "menu-icon icon-base bx bx-cog",
+      "slug": [
+        "cat",
+        "phan-bo-may",
+        "qc",
+        "nhap-kho",
+        "xuat-kho",
+        "ton-kho"
+      ],
+      "submenu": [
+        {
+          "url": "cat",
+          "name": "Cắt",
+          "slug": "cat.index"
+        },
+        {
+          "url": "phan-bo-may",
+          "name": "Phân bổ may",
+          "slug": "phan-bo-may.index"
+        },
+        {
+          "url": "qc",
+          "name": "QC",
+          "slug": "qc.index"
+        },
+        {
+          "url": "nhap-kho",
+          "name": "Nhập kho",
+          "slug": "nhap-kho.index"
+        },
+        {
+          "url": "xuat-kho",
+          "name": "Xuất kho",
+          "slug": "xuat-kho.index"
+        },
+        {
+          "url": "ton-kho",
+          "name": "Tồn kho",
+          "slug": "ton-kho.index"
+        }
+      ]
+    },
+    {
+      "name": "Báo cáo",
+      "icon": "menu-icon icon-base bx bx-bar-chart-alt-2",
+      "slug": [
+        "bao-cao"
+      ],
+      "submenu": [
+        {
+          "url": "bao-cao/tong-hop-don-hang",
+          "name": "Tổng hợp đơn hàng",
+          "slug": "bao-cao.tong-hop-don-hang"
+        }
+      ]
+    },
+    {
+      "name": "Tài khoản",
+      "icon": "menu-icon icon-base bx bx-dock-top",
+      "slug": [
+        "role",
+        "permission",
+        "role-permission",
+        "user"
+      ],
+      "submenu": [
+        {
+          "url": "role",
+          "name": "Vai trò",
+          "slug": "role.index"
+        },
+        {
+          "url": "permission",
+          "name": "Quyền",
+          "slug": "permission.index"
+        },
+        {
+          "url": "role-permission",
+          "name": "Phân quyền",
+          "slug": "role-permission.index"
+        },
+        {
+          "url": "user",
+          "name": "Người dùng",
+          "slug": "user.index"
+        }
+      ]
+    }
+  ]
+}

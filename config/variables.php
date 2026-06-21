@@ -1,0 +1,32 @@
+<?php
+
+// Variables
+return [
+    'creatorName' => 'Hệ thống quản trị sản xuất may mặc',
+    'creatorUrl' => '',
+    'templateName' => 'Sản xuất may mặc',
+    'templateSuffix' => 'Quản trị sản xuất',
+    'templateVersion' => '2.0.0',
+    'templateFree' => true,
+    'templateDescription' => 'Hệ thống quản trị sản xuất may mặc',
+    'templateKeyword' => 'sản xuất may mặc, quản trị sản xuất, dashboard',
+    'licenseUrl' => '',
+    'livePreview' => '',
+    'productPage' => '',
+    'support' => '',
+    'adminTemplates' => '',
+    'bootstrapDashboard' => '',
+    'ogTitle' => 'Hệ thống quản trị sản xuất may mặc',
+    'ogImage' => '',
+    'ogType' => 'website',
+    'documentation' => '',
+    'repository' => '',
+    'gitRepo' => '',
+    'gitRepoAccess' => '',
+    'githubFreeUrl' => '',
+    'facebookUrl' => '',
+    'twitterUrl' => '',
+    'githubUrl' => '',
+    'dribbbleUrl' => '',
+    'instagramUrl' => '',
+];
