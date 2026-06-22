@@ -38,9 +38,10 @@
       }
 
       .dashboard-stat-card .card-body {
+        display: block !important;
         min-height: 118px;
         padding: 0.875rem;
-        align-items: flex-start !important;
+        text-align: left !important;
       }
 
       .dashboard-stat-card .avatar {
@@ -66,11 +67,7 @@
         letter-spacing: 0;
       }
 
-      .dashboard-stat-card .card-body.text-center {
-        display: block;
-        text-align: left !important;
-      }
-
+      .dashboard-stat-card .card-body .avatar,
       .dashboard-stat-card .card-body.text-center .avatar {
         margin: 0 0 0.65rem !important;
       }
