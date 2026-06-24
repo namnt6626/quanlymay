@@ -127,6 +127,29 @@ class StoreCatRequest extends FormRequest
 
                 if ($missingRequiredValue) {
                     $validator->errors()->add('items', 'Vui lòng chọn đầy đủ màu và size cho các dòng có số lượng cắt.');
+
+                    return;
+                }
+
+                $matHangId = (int) $this->input('mat_hang_id');
+                $submittedKeys = $items
+                    ->map(fn (array $item): string => (int) $item['mau_id'].':'.(int) $item['size_id'])
+                    ->unique()
+                    ->values();
+
+                $validKeys = DonHangChiTiet::query()
+                    ->where('mat_hang_id', $matHangId)
+                    ->get(['mau_id', 'size_id'])
+                    ->concat(
+                        Cat::query()
+                            ->where('mat_hang_id', $matHangId)
+                            ->get(['mau_id', 'size_id'])
+                    )
+                    ->map(fn ($item): string => (int) $item->mau_id.':'.(int) $item->size_id)
+                    ->unique();
+
+                if ($submittedKeys->diff($validKeys)->isNotEmpty()) {
+                    $validator->errors()->add('items', 'Chi tiết màu và size không thuộc mặt hàng đã chọn.');
                 }
 
                 return;

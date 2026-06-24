@@ -221,6 +221,34 @@ class CatController extends Controller
             });
         });
 
+        $fixedItemOptions = DonHangChiTiet::query()
+            ->with(['mau:id,ten_mau', 'size:id,ten_size'])
+            ->whereNotNull('mat_hang_id')
+            ->whereNotNull('mau_id')
+            ->whereNotNull('size_id')
+            ->get(['mat_hang_id', 'mau_id', 'size_id'])
+            ->concat(
+                Cat::query()
+                    ->with(['mau:id,ten_mau', 'size:id,ten_size'])
+                    ->whereNotNull('mat_hang_id')
+                    ->whereNotNull('mau_id')
+                    ->whereNotNull('size_id')
+                    ->get(['mat_hang_id', 'mau_id', 'size_id'])
+            )
+            ->unique(fn ($item): string => $item->mat_hang_id.':'.$item->mau_id.':'.$item->size_id)
+            ->groupBy('mat_hang_id')
+            ->map(fn ($items) => $items
+                ->sortBy(fn ($item): string => ($item->mau?->ten_mau ?? '').'|'.($item->size?->ten_size ?? ''))
+                ->map(fn ($item): array => [
+                    'mau_id' => (int) $item->mau_id,
+                    'ten_mau' => $item->mau?->ten_mau ?? '-',
+                    'size_id' => (int) $item->size_id,
+                    'ten_size' => $item->size?->ten_size ?? '-',
+                ])
+                ->values()
+                ->all())
+            ->all();
+
         return [
             'donHangChiTiets' => DonHangChiTiet::query()
                 ->with(['donHang', 'matHang', 'mau', 'size'])
@@ -244,6 +272,7 @@ class CatController extends Controller
                 ->where('trang_thai', true)
                 ->orderBy('ten_don_vi')
                 ->get(),
+            'fixedItemOptions' => $fixedItemOptions,
         ];
     }
 

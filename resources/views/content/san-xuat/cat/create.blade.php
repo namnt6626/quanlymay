@@ -16,22 +16,7 @@
   $selectedDonHangId = old('don_hang_id');
   $catSubmitToken = old('cat_submit_token', (string) Str::uuid());
   $oldFixedItems = old('items', []);
-  if (empty($oldFixedItems)) {
-      $oldFixedItems = [[
-          'mau_id' => old('mau_id'),
-          'size_id' => old('size_id'),
-          'so_luong_cat' => old('so_luong_cat'),
-      ]];
-  }
-
-  $mauOptions = $maus
-      ->map(fn($mau) => ['id' => $mau->id, 'ten_mau' => $mau->ten_mau])
-      ->values()
-      ->all();
-  $sizeOptions = $sizes
-      ->map(fn($size) => ['id' => $size->id, 'ten_size' => $size->ten_size])
-      ->values()
-      ->all();
+  $selectedMatHangId = old('mat_hang_id');
 
   $oldChiTiets = collect(old('chi_tiets', []))
       ->filter(fn($item) => is_array($item) && isset($item['don_hang_chi_tiet_id']))
@@ -85,12 +70,12 @@
       const dinhMucInput = document.getElementById('dinh_muc');
       const previewInput = document.getElementById('vai_tieu_hao_display');
       const fixedDetailBody = document.getElementById('fixed-detail-body');
-      const addFixedRowButton = document.getElementById('add-fixed-item-row');
+      const fixedEmptyMessage = document.getElementById('fixed-empty-message');
+      const matHangSelect = document.getElementById('mat_hang_id');
       const orderData = @json($donHangData);
       const fixedItems = @json($oldFixedItems);
-      const mauOptions = @json($mauOptions);
-      const sizeOptions = @json($sizeOptions);
-      let fixedItemIndex = 0;
+      const fixedItemOptions = @json($fixedItemOptions);
+      const initialMatHangId = @json((string) $selectedMatHangId);
 
       function normalizeNumber(value) {
         let text = String(value || '').trim();
@@ -162,20 +147,6 @@
         return normalized.replace('.', ',');
       }
 
-      function optionHtml(items, valueKey, labelKey, selectedValue, placeholder) {
-        const options = [`<option value="">${placeholder}</option>`];
-
-        items.forEach(function(item) {
-          const value = item[valueKey];
-          const label = item[labelKey] || '-';
-          const selected = String(value) === String(selectedValue || '') ? 'selected' : '';
-
-          options.push(`<option value="${value}" ${selected}>${label}</option>`);
-        });
-
-        return options.join('');
-      }
-
       function updateFixedRowFabric(row) {
         if (!row) {
           return;
@@ -197,57 +168,54 @@
         hiddenInput.value = fabric > 0 ? String(fabric) : '0';
       }
 
-      function updateFixedRemoveButtons() {
-        const rows = fixedDetailBody ? fixedDetailBody.querySelectorAll('tr') : [];
-
-        rows.forEach(function(row) {
-          const button = row.querySelector('.js-remove-fixed-row');
-          if (button) {
-            button.disabled = rows.length <= 1;
-          }
-        });
-      }
-
-      function addFixedRow(item = {}) {
+      function renderFixedRows() {
         if (!fixedDetailBody) {
           return;
         }
 
-        const row = document.createElement('tr');
-        const index = fixedItemIndex++;
+        const matHangId = matHangSelect?.value || '';
+        const rows = fixedItemOptions[matHangId] || [];
+        const oldValues = String(matHangId) === initialMatHangId ?
+          new Map(
+            fixedItems.map(function(item) {
+              return [`${item.mau_id}:${item.size_id}`, item.so_luong_cat || ''];
+            })
+          ) :
+          new Map();
 
-        row.innerHTML = `
-          <td>
-            <select class="form-select" name="items[${index}][mau_id]">
-              ${optionHtml(mauOptions, 'id', 'ten_mau', item.mau_id, '-- Chọn màu --')}
-            </select>
-          </td>
-          <td>
-            <select class="form-select" name="items[${index}][size_id]">
-              ${optionHtml(sizeOptions, 'id', 'ten_size', item.size_id, '-- Chọn size --')}
-            </select>
-          </td>
-          <td>
-            <input type="text" inputmode="decimal" autocomplete="off"
-              class="form-control js-number-format js-fixed-cut-quantity"
-              name="items[${index}][so_luong_cat]"
-              value="${formatDisplayNumber(item.so_luong_cat || '')}">
-          </td>
-          <td>
-            <input type="text" class="form-control js-fixed-fabric-display" value="0" readonly>
-            <input type="hidden" class="js-fixed-fabric-hidden" name="items[${index}][vai_tieu_hao]" value="0">
-          </td>
-          <td class="text-center">
-            <button type="button" class="btn btn-sm btn-outline-danger js-remove-fixed-row">
-              <i class="icon-base bx bx-trash"></i>
-            </button>
-          </td>
-        `;
+        fixedDetailBody.innerHTML = '';
+        fixedEmptyMessage?.classList.toggle('d-none', rows.length > 0 || !matHangId);
 
-        fixedDetailBody.appendChild(row);
-        wireNumberInput(row.querySelector('.js-number-format'));
-        updateFixedRowFabric(row);
-        updateFixedRemoveButtons();
+        rows.forEach(function(item, index) {
+          const row = document.createElement('tr');
+          const oldValue = oldValues.get(`${item.mau_id}:${item.size_id}`) || '';
+
+          row.innerHTML = `
+            <td>
+              ${item.ten_mau || '-'}
+              <input type="hidden" name="items[${index}][mau_id]" value="${item.mau_id}">
+            </td>
+            <td>
+              ${item.ten_size || '-'}
+              <input type="hidden" name="items[${index}][size_id]" value="${item.size_id}">
+            </td>
+            <td>
+              <input type="text" inputmode="decimal" autocomplete="off"
+                class="form-control js-number-format js-fixed-cut-quantity"
+                name="items[${index}][so_luong_cat]"
+                value="${formatDisplayNumber(oldValue)}"
+                placeholder="Nhập số lượng">
+            </td>
+            <td>
+              <input type="text" class="form-control js-fixed-fabric-display" value="0" readonly>
+              <input type="hidden" class="js-fixed-fabric-hidden" name="items[${index}][vai_tieu_hao]" value="0">
+            </td>
+          `;
+
+          fixedDetailBody.appendChild(row);
+          wireNumberInput(row.querySelector('.js-number-format'));
+          updateFixedRowFabric(row);
+        });
       }
 
       function updateOrderRowDiff(row) {
@@ -398,31 +366,9 @@
 
       document.querySelectorAll('.js-number-format').forEach(wireNumberInput);
 
-      fixedItems.forEach(function(item) {
-        addFixedRow(item || {});
-      });
-
-      if (fixedDetailBody && fixedDetailBody.children.length === 0) {
-        addFixedRow();
-      }
-
-      if (addFixedRowButton) {
-        addFixedRowButton.addEventListener('click', function() {
-          addFixedRow();
-        });
-      }
-
-      if (fixedDetailBody) {
-        fixedDetailBody.addEventListener('click', function(event) {
-          const button = event.target.closest('.js-remove-fixed-row');
-
-          if (!button || fixedDetailBody.querySelectorAll('tr').length <= 1) {
-            return;
-          }
-
-          button.closest('tr')?.remove();
-          updateFixedRemoveButtons();
-        });
+      if (matHangSelect) {
+        matHangSelect.addEventListener('change', renderFixedRows);
+        renderFixedRows();
       }
 
       if (dinhMucInput) {
@@ -597,8 +543,8 @@
                   name="mat_hang_id" required>
                   <option value="">-- Chọn mặt hàng --</option>
                   @foreach ($matHangs as $matHang)
-                    <option value="{{ $matHang->id }}" @selected(old('mat_hang_id') == $matHang->id)>
-                      {{ $matHang->ten_hang }}
+                    <option value="{{ $matHang->id }}" @selected((string) $selectedMatHangId === (string) $matHang->id)>
+                      {{ $matHang->ma_hang }} - {{ $matHang->ten_hang }}
                     </option>
                   @endforeach
                 </select>
@@ -615,6 +561,10 @@
                     <div class="alert alert-danger py-2">{{ $message }}</div>
                   @enderror
 
+                  <div class="alert alert-info py-2 d-none" id="fixed-empty-message">
+                    Mặt hàng này chưa có thông tin màu và size.
+                  </div>
+
                   <div class="table-responsive">
                     <table class="table align-middle mb-0">
                       <thead>
@@ -623,16 +573,11 @@
                           <th style="min-width: 160px;">Size</th>
                           <th style="min-width: 160px;">Số lượng cắt</th>
                           <th style="min-width: 160px;">Vải tiêu hao</th>
-                          <th class="text-center" style="width: 90px;">Xóa</th>
                         </tr>
                       </thead>
                       <tbody id="fixed-detail-body"></tbody>
                     </table>
                   </div>
-
-                  <button type="button" class="btn btn-outline-primary mt-3" id="add-fixed-item-row">
-                    <i class="icon-base bx bx-plus me-1"></i> Thêm dòng
-                  </button>
                 </div>
               </div>
             </div>
