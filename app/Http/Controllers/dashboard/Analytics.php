@@ -5,6 +5,7 @@ namespace App\Http\Controllers\dashboard;
 use App\Http\Controllers\Controller;
 use App\Models\DonHang;
 use App\Services\Dashboard\DashboardService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -26,9 +27,26 @@ class Analytics extends Controller
             'han_giao_den' => trim((string) $request->input('quick_han_giao_den')),
         ];
 
+        $selectedMonth = trim((string) $request->input('time_month'));
+        if (! preg_match('/^\d{4}-\d{2}$/', $selectedMonth)) {
+            $selectedMonth = now()->format('Y-m');
+        }
+
+        $monthDate = Carbon::createFromFormat('Y-m', $selectedMonth)->startOfMonth();
+        if ($monthDate->gt(now()->startOfMonth())) {
+            $monthDate = now()->startOfMonth();
+            $selectedMonth = $monthDate->format('Y-m');
+        }
+
+        $lastAvailableDay = $monthDate->isSameMonth(now())
+            ? now()->day
+            : $monthDate->daysInMonth;
+        $maxWeekOfMonth = (int) ceil($lastAvailableDay / 7);
+        $selectedWeek = max(1, min($request->integer('time_week') ?: (int) ceil(now()->day / 7), $maxWeekOfMonth));
+
         $timeFilters = [
-            'date_from' => trim((string) $request->input('time_date_from')),
-            'date_to' => trim((string) $request->input('time_date_to')),
+            'month' => $selectedMonth,
+            'week' => $selectedWeek,
             'ma_don' => trim((string) $request->input('time_ma_don')),
             'ma_kh' => trim((string) $request->input('time_ma_kh')),
             'mat_hang_id' => $request->integer('time_mat_hang_id') ?: null,
@@ -45,6 +63,7 @@ class Analytics extends Controller
             'quickFilters' => $quickFilters,
             'timeFilters' => $timeFilters,
             'dailyFilters' => $dailyFilters,
+            'maxWeekOfMonth' => $maxWeekOfMonth,
             'quickSummary' => $service->getQuickSummary($quickFilters),
             'timeProductionSummary' => $service->getTimeProductionSummary($timeFilters),
             'todayProduction' => $service->getTodayProduction(),

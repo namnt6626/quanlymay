@@ -2,6 +2,54 @@
 
 @section('title', 'Dashboard')
 
+@section('page-script')
+  @parent
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const monthInput = document.getElementById('time_month');
+      const weekSelect = document.getElementById('time_week');
+
+      function formatDayMonth(date) {
+        return new Intl.DateTimeFormat('vi-VN', {
+          day: '2-digit',
+          month: '2-digit',
+        }).format(date);
+      }
+
+      function rebuildMonthWeeks() {
+        if (!monthInput?.value || !weekSelect) {
+          return;
+        }
+
+        const [year, month] = monthInput.value.split('-').map(Number);
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const today = new Date();
+        const isCurrentMonth = year === today.getFullYear() && month === today.getMonth() + 1;
+        const lastAvailableDay = isCurrentMonth ? today.getDate() : daysInMonth;
+        const maxWeek = Math.ceil(lastAvailableDay / 7);
+        const previousWeek = Math.min(Number(weekSelect.value || 1), maxWeek);
+
+        weekSelect.innerHTML = '';
+
+        for (let week = 1; week <= maxWeek; week++) {
+          const fromDay = ((week - 1) * 7) + 1;
+          const toDay = Math.min(fromDay + 6, lastAvailableDay);
+          const from = new Date(year, month - 1, fromDay);
+          const to = new Date(year, month - 1, toDay);
+          const option = document.createElement('option');
+
+          option.value = String(week);
+          option.textContent = `Tuần ${week} (${formatDayMonth(from)} - ${formatDayMonth(to)})`;
+          option.selected = week === previousWeek;
+          weekSelect.appendChild(option);
+        }
+      }
+
+      monthInput?.addEventListener('change', rebuildMonthWeeks);
+    });
+  </script>
+@endsection
+
 @section('page-style')
   <style>
     @media (max-width: 575.98px) {
@@ -159,8 +207,8 @@
       'quick_han_giao_den',
   ];
   $timeKeys = [
-      'time_date_from',
-      'time_date_to',
+      'time_month',
+      'time_week',
       'time_ma_don',
       'time_ma_kh',
       'time_mat_hang_id',
@@ -342,14 +390,28 @@
           <input type="hidden" name="{{ $name }}" value="{{ $value }}">
         @endforeach
         <div class="col-12 col-md-6 col-xl-2">
-          <label class="form-label" for="time_date_from">Từ ngày</label>
-          <input type="date" class="form-control" id="time_date_from" name="time_date_from"
-            value="{{ $timeFilters['date_from'] ?? '' }}">
+          <label class="form-label" for="time_month">Tháng</label>
+          <input type="month" class="form-control" id="time_month" name="time_month"
+            value="{{ $timeFilters['month'] }}" max="{{ now()->format('Y-m') }}">
         </div>
         <div class="col-12 col-md-6 col-xl-2">
-          <label class="form-label" for="time_date_to">Đến ngày</label>
-          <input type="date" class="form-control" id="time_date_to" name="time_date_to"
-            value="{{ $timeFilters['date_to'] ?? '' }}">
+          <label class="form-label" for="time_week">Tuần trong tháng</label>
+          <select class="form-select" id="time_week" name="time_week">
+            @for ($week = 1; $week <= $maxWeekOfMonth; $week++)
+              @php
+                $weekFrom = \Carbon\Carbon::createFromFormat('Y-m', $timeFilters['month'])
+                    ->startOfMonth()
+                    ->addDays(($week - 1) * 7);
+                $weekTo = $weekFrom->copy()->addDays(6)->min($weekFrom->copy()->endOfMonth());
+                if ($weekFrom->isSameMonth(now())) {
+                    $weekTo = $weekTo->min(now()->startOfDay());
+                }
+              @endphp
+              <option value="{{ $week }}" @selected((int) $timeFilters['week'] === $week)>
+                Tuần {{ $week }} ({{ $weekFrom->format('d/m') }} - {{ $weekTo->format('d/m') }})
+              </option>
+            @endfor
+          </select>
         </div>
         <div class="col-12 col-md-6 col-xl-2">
           <label class="form-label" for="time_ma_don">Mã đơn</label>

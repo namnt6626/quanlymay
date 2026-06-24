@@ -361,6 +361,20 @@ class DashboardService
 
     private function dateRange(array $filters): array
     {
+        if (filled($filters['month'] ?? null)) {
+            $month = Carbon::createFromFormat('Y-m', (string) $filters['month'])->startOfMonth();
+            $maxWeek = (int) ceil($month->daysInMonth / 7);
+            $week = max(1, min((int) ($filters['week'] ?? 1), $maxWeek));
+            $from = $month->copy()->addDays(($week - 1) * 7);
+            $to = $from->copy()->addDays(6)->min($month->copy()->endOfMonth());
+
+            if ($month->isSameMonth(now())) {
+                $to = $to->min(now()->startOfDay());
+            }
+
+            return [$from->toDateString(), $to->toDateString()];
+        }
+
         $to = filled($filters['date_to'] ?? null)
             ? Carbon::parse($filters['date_to'])->startOfDay()
             : now()->startOfDay();
