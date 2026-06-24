@@ -29,8 +29,8 @@ class BaoCaoTongHopDonHangService
             ->groupByRaw('COALESCE(pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id)');
 
         $qcTotals = DB::table('qc')
-            ->join('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
-            ->join('cat as c', 'c.id', '=', 'pbm.cat_id')
+            ->leftJoin('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
+            ->leftJoin('cat as c', 'c.id', '=', 'pbm.cat_id')
             ->selectRaw('
                 COALESCE(qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id) as don_hang_chi_tiet_id,
                 COALESCE(SUM(qc.so_luong_dat), 0) as qc_dat,
@@ -39,36 +39,36 @@ class BaoCaoTongHopDonHangService
             ')
             ->whereRaw('COALESCE(qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id) is not null')
             ->whereNull('qc.deleted_at')
-            ->whereNull('pbm.deleted_at')
-            ->whereNull('c.deleted_at')
+            ->where(fn (Builder $query) => $query->whereNull('pbm.id')->orWhereNull('pbm.deleted_at'))
+            ->where(fn (Builder $query) => $query->whereNull('c.id')->orWhereNull('c.deleted_at'))
             ->groupByRaw('COALESCE(qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id)');
 
         $nhapTotals = DB::table('nhap_kho as nk')
             ->join('qc', 'qc.id', '=', 'nk.qc_id')
-            ->join('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
-            ->join('cat as c', 'c.id', '=', 'pbm.cat_id')
+            ->leftJoin('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
+            ->leftJoin('cat as c', 'c.id', '=', 'pbm.cat_id')
             ->selectRaw('COALESCE(nk.don_hang_chi_tiet_id, qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id) as don_hang_chi_tiet_id, COALESCE(SUM(nk.so_luong_nhap), 0) as nhap_kho')
             ->whereRaw('COALESCE(nk.don_hang_chi_tiet_id, qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id) is not null')
             ->whereNull('nk.deleted_at')
             ->whereNull('qc.deleted_at')
-            ->whereNull('pbm.deleted_at')
-            ->whereNull('c.deleted_at')
+            ->where(fn (Builder $query) => $query->whereNull('pbm.id')->orWhereNull('pbm.deleted_at'))
+            ->where(fn (Builder $query) => $query->whereNull('c.id')->orWhereNull('c.deleted_at'))
             ->groupByRaw('COALESCE(nk.don_hang_chi_tiet_id, qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id)');
 
         $xuatTotals = DB::table('phieu_xuat_kho_chi_tiet as pxct')
             ->join('phieu_xuat_kho as px', 'px.id', '=', 'pxct.phieu_xuat_kho_id')
             ->join('nhap_kho as nk', 'nk.id', '=', 'pxct.nhap_kho_id')
             ->join('qc', 'qc.id', '=', 'nk.qc_id')
-            ->join('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
-            ->join('cat as c', 'c.id', '=', 'pbm.cat_id')
+            ->leftJoin('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
+            ->leftJoin('cat as c', 'c.id', '=', 'pbm.cat_id')
             ->selectRaw('COALESCE(pxct.don_hang_chi_tiet_id, nk.don_hang_chi_tiet_id, qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id) as don_hang_chi_tiet_id, COALESCE(SUM(pxct.so_luong_xuat), 0) as da_xuat')
             ->whereRaw('COALESCE(pxct.don_hang_chi_tiet_id, nk.don_hang_chi_tiet_id, qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id) is not null')
             ->whereNull('pxct.deleted_at')
             ->whereNull('px.deleted_at')
             ->whereNull('nk.deleted_at')
             ->whereNull('qc.deleted_at')
-            ->whereNull('pbm.deleted_at')
-            ->whereNull('c.deleted_at')
+            ->where(fn (Builder $query) => $query->whereNull('pbm.id')->orWhereNull('pbm.deleted_at'))
+            ->where(fn (Builder $query) => $query->whereNull('c.id')->orWhereNull('c.deleted_at'))
             ->groupByRaw('COALESCE(pxct.don_hang_chi_tiet_id, nk.don_hang_chi_tiet_id, qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id)');
 
         return DB::table($donHangChiTietTable.' as dct')

@@ -14,37 +14,47 @@ class DashboardService
 {
     public function getQuickSummary(array $filters = []): array
     {
-        $rows = DB::query()
+        $orderRows = DB::query()
             ->fromSub($this->orderLineProgressQuery($filters), 'progress')
             ->selectRaw('
                 COALESCE(SUM(so_luong_dat), 0) as tong_sl_dat,
-                COALESCE(SUM(da_cat), 0) as da_cat,
-                COALESCE(SUM(da_giao_may), 0) as da_giao_may,
-                COALESCE(SUM(qc_dat), 0) as qc_dat,
-                COALESCE(SUM(qc_loi), 0) as qc_loi,
-                COALESCE(SUM(nhap_kho), 0) as nhap_kho,
-                COALESCE(SUM(da_xuat), 0) as da_xuat,
-                COALESCE(SUM(ton_kho), 0) as ton_kho,
                 COALESCE(SUM(con_cat), 0) as con_cat,
                 COALESCE(SUM(con_giao), 0) as con_giao,
                 COALESCE(SUM(CASE WHEN da_cat < so_luong_dat THEN 1 ELSE 0 END), 0) as dong_thieu_cat,
-                COALESCE(SUM(CASE WHEN nhap_kho < so_luong_dat THEN 1 ELSE 0 END), 0) as dong_thieu_hang_kho
+                COALESCE(SUM(CASE WHEN nhap_dat < so_luong_dat THEN 1 ELSE 0 END), 0) as dong_thieu_hang_kho
             ')
             ->first();
+        $productionRows = $this->getCumulativeProductionSummary($filters);
 
         return [
-            'tong_sl_dat' => (float) ($rows->tong_sl_dat ?? 0),
-            'da_cat' => (float) ($rows->da_cat ?? 0),
-            'da_giao_may' => (float) ($rows->da_giao_may ?? 0),
-            'qc_dat' => (float) ($rows->qc_dat ?? 0),
-            'qc_loi' => (float) ($rows->qc_loi ?? 0),
-            'nhap_kho' => (float) ($rows->nhap_kho ?? 0),
-            'da_xuat' => (float) ($rows->da_xuat ?? 0),
-            'ton_kho' => (float) ($rows->ton_kho ?? 0),
-            'con_cat' => (float) ($rows->con_cat ?? 0),
-            'con_giao' => (float) ($rows->con_giao ?? 0),
-            'dong_thieu_cat' => (int) ($rows->dong_thieu_cat ?? 0),
-            'dong_thieu_hang_kho' => (int) ($rows->dong_thieu_hang_kho ?? 0),
+            'tong_sl_dat' => (float) ($orderRows->tong_sl_dat ?? 0),
+            'da_cat' => $productionRows['da_cat'],
+            'da_giao_may' => $productionRows['da_giao_may'],
+            'qc_dat' => $productionRows['qc_dat'],
+            'qc_loi' => $productionRows['qc_loi'],
+            'nhap_kho' => $productionRows['nhap_kho'],
+            'da_xuat' => $productionRows['da_xuat'],
+            'ton_kho' => $productionRows['ton_kho'],
+            'con_cat' => (float) ($orderRows->con_cat ?? 0),
+            'con_giao' => (float) ($orderRows->con_giao ?? 0),
+            'dong_thieu_cat' => (int) ($orderRows->dong_thieu_cat ?? 0),
+            'dong_thieu_hang_kho' => (int) ($orderRows->dong_thieu_hang_kho ?? 0),
+        ];
+    }
+
+    private function getCumulativeProductionSummary(array $filters): array
+    {
+        $from = '1000-01-01';
+        $to = now()->toDateString();
+
+        return [
+            'da_cat' => $this->productionSum('cat', $from, $to, $filters),
+            'da_giao_may' => $this->productionSum('phan_bo_may', $from, $to, $filters),
+            'qc_dat' => $this->productionSum('qc_dat', $from, $to, $filters),
+            'qc_loi' => $this->productionSum('qc_loi', $from, $to, $filters),
+            'nhap_kho' => $this->productionSum('nhap_kho', $from, $to, $filters),
+            'da_xuat' => $this->productionSum('xuat_hang', $from, $to, $filters),
+            'ton_kho' => $this->inventoryBalanceAt($to, $filters),
         ];
     }
 
@@ -58,6 +68,7 @@ class DashboardService
         $qcLoi = $this->productionSum('qc_loi', $from, $to, $filters);
         $nhapKho = $this->productionSum('nhap_kho', $from, $to, $filters);
         $xuatHang = $this->productionSum('xuat_hang', $from, $to, $filters);
+        $tonCuoiKy = $this->inventoryBalanceAt($to, $filters);
 
         return [
             'date_from' => $from,
@@ -68,7 +79,7 @@ class DashboardService
             'qc_loi' => $qcLoi,
             'nhap_kho' => $nhapKho,
             'da_xuat' => $xuatHang,
-            'ton_kho' => $nhapKho - $xuatHang,
+            'ton_kho' => $tonCuoiKy,
         ];
     }
 
@@ -77,12 +88,12 @@ class DashboardService
         $today = now()->toDateString();
 
         return [
-            'cat' => $this->sumByDate('cat', 'ngay_cat', 'so_luong_cat', $today),
-            'giao_may' => $this->sumByDate('phan_bo_may', 'ngay_phan_bo', 'so_luong_giao', $today),
-            'qc_dat' => $this->sumByDate('qc', 'ngay_qc', 'so_luong_dat', $today),
-            'qc_loi' => $this->sumQcErrorByDate($today),
-            'nhap_kho' => $this->sumByDate('nhap_kho', 'ngay_nhap', 'so_luong_nhap', $today),
-            'xuat_hang' => $this->sumXuatByDate($today),
+            'cat' => $this->productionSum('cat', $today, $today, []),
+            'giao_may' => $this->productionSum('phan_bo_may', $today, $today, []),
+            'qc_dat' => $this->productionSum('qc_dat', $today, $today, []),
+            'qc_loi' => $this->productionSum('qc_loi', $today, $today, []),
+            'nhap_kho' => $this->productionSum('nhap_kho', $today, $today, []),
+            'xuat_hang' => $this->productionSum('xuat_hang', $today, $today, []),
         ];
     }
 
@@ -92,12 +103,12 @@ class DashboardService
         $dates = collect(CarbonPeriod::create($from, $to))
             ->map(fn (Carbon $date) => $date->toDateString());
 
-        $cat = $this->dailyTotals('cat', 'ngay_cat', 'so_luong_cat', $from, $to);
-        $giaoMay = $this->dailyTotals('phan_bo_may', 'ngay_phan_bo', 'so_luong_giao', $from, $to);
-        $qcDat = $this->dailyTotals('qc', 'ngay_qc', 'so_luong_dat', $from, $to);
-        $qcLoi = $this->dailyQcErrorTotals($from, $to);
-        $nhapKho = $this->dailyTotals('nhap_kho', 'ngay_nhap', 'so_luong_nhap', $from, $to);
-        $xuatHang = $this->dailyXuatTotals($from, $to);
+        $cat = $this->dailyProductionTotals('cat', $from, $to);
+        $giaoMay = $this->dailyProductionTotals('phan_bo_may', $from, $to);
+        $qcDat = $this->dailyProductionTotals('qc_dat', $from, $to);
+        $qcLoi = $this->dailyProductionTotals('qc_loi', $from, $to);
+        $nhapKho = $this->dailyProductionTotals('nhap_kho', $from, $to);
+        $xuatHang = $this->dailyProductionTotals('xuat_hang', $from, $to);
 
         return $dates->map(fn (string $date) => [
             'date' => $date,
@@ -147,7 +158,11 @@ class DashboardService
             ->leftJoin('qc', 'qc.id', '=', 'nk.qc_id')
             ->leftJoin('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
             ->leftJoin('cat as c', 'c.id', '=', 'pbm.cat_id')
-            ->selectRaw('COALESCE(nk.don_hang_chi_tiet_id, qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id) as don_hang_chi_tiet_id, COALESCE(SUM(nk.so_luong_nhap), 0) as nhap_kho')
+            ->selectRaw("
+                COALESCE(nk.don_hang_chi_tiet_id, qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id) as don_hang_chi_tiet_id,
+                COALESCE(SUM(nk.so_luong_nhap), 0) as nhap_kho,
+                COALESCE(SUM(CASE WHEN COALESCE(nk.loai_ton, 'dat') = 'dat' THEN nk.so_luong_nhap ELSE 0 END), 0) as nhap_dat
+            ")
             ->whereRaw('COALESCE(nk.don_hang_chi_tiet_id, qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id) is not null')
             ->whereNull('nk.deleted_at')
             ->where(fn (Builder $query) => $query->whereNull('qc.id')->orWhereNull('qc.deleted_at'))
@@ -198,6 +213,7 @@ class DashboardService
                 COALESCE(qc_totals.qc_dat, 0) as qc_dat,
                 COALESCE(qc_totals.qc_loi, 0) as qc_loi,
                 COALESCE(nhap_totals.nhap_kho, 0) as nhap_kho,
+                COALESCE(nhap_totals.nhap_dat, 0) as nhap_dat,
                 COALESCE(xuat_totals.da_xuat, 0) as da_xuat,
                 (COALESCE(nhap_totals.nhap_kho, 0) - COALESCE(xuat_totals.da_xuat, 0)) as ton_kho,
                 (dct.so_luong_dat - COALESCE(cat_totals.da_cat, 0)) as con_cat,
@@ -223,43 +239,43 @@ class DashboardService
                 ->whereNull('c.deleted_at')
                 ->selectRaw('COALESCE(SUM(pbm.so_luong_giao), 0) as total'),
             'qc_dat' => DB::table('qc')
-                ->join('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
-                ->join('cat as c', 'c.id', '=', 'pbm.cat_id')
+                ->leftJoin('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
+                ->leftJoin('cat as c', 'c.id', '=', 'pbm.cat_id')
                 ->leftJoin('don_hang_chi_tiets as dct', 'dct.id', '=', DB::raw('COALESCE(qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id)'))
                 ->leftJoin('don_hangs as dh', 'dh.id', '=', 'dct.don_hang_id')
                 ->whereBetween('qc.ngay_qc', [$from, $to])
                 ->whereNull('qc.deleted_at')
-                ->whereNull('pbm.deleted_at')
-                ->whereNull('c.deleted_at')
+                ->where(fn (Builder $query) => $query->whereNull('pbm.id')->orWhereNull('pbm.deleted_at'))
+                ->where(fn (Builder $query) => $query->whereNull('c.id')->orWhereNull('c.deleted_at'))
                 ->selectRaw('COALESCE(SUM(qc.so_luong_dat), 0) as total'),
             'qc_loi' => DB::table('qc')
-                ->join('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
-                ->join('cat as c', 'c.id', '=', 'pbm.cat_id')
+                ->leftJoin('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
+                ->leftJoin('cat as c', 'c.id', '=', 'pbm.cat_id')
                 ->leftJoin('don_hang_chi_tiets as dct', 'dct.id', '=', DB::raw('COALESCE(qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id)'))
                 ->leftJoin('don_hangs as dh', 'dh.id', '=', 'dct.don_hang_id')
                 ->whereBetween('qc.ngay_qc', [$from, $to])
                 ->whereNull('qc.deleted_at')
-                ->whereNull('pbm.deleted_at')
-                ->whereNull('c.deleted_at')
+                ->where(fn (Builder $query) => $query->whereNull('pbm.id')->orWhereNull('pbm.deleted_at'))
+                ->where(fn (Builder $query) => $query->whereNull('c.id')->orWhereNull('c.deleted_at'))
                 ->selectRaw('COALESCE(SUM(qc.so_luong_loi), 0) + COALESCE(SUM(qc.so_luong_hong), 0) as total'),
             'nhap_kho' => DB::table('nhap_kho as nk')
                 ->join('qc', 'qc.id', '=', 'nk.qc_id')
-                ->join('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
-                ->join('cat as c', 'c.id', '=', 'pbm.cat_id')
+                ->leftJoin('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
+                ->leftJoin('cat as c', 'c.id', '=', 'pbm.cat_id')
                 ->leftJoin('don_hang_chi_tiets as dct', 'dct.id', '=', DB::raw('COALESCE(nk.don_hang_chi_tiet_id, qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id)'))
                 ->leftJoin('don_hangs as dh', 'dh.id', '=', 'dct.don_hang_id')
                 ->whereBetween('nk.ngay_nhap', [$from, $to])
                 ->whereNull('nk.deleted_at')
                 ->whereNull('qc.deleted_at')
-                ->whereNull('pbm.deleted_at')
-                ->whereNull('c.deleted_at')
+                ->where(fn (Builder $query) => $query->whereNull('pbm.id')->orWhereNull('pbm.deleted_at'))
+                ->where(fn (Builder $query) => $query->whereNull('c.id')->orWhereNull('c.deleted_at'))
                 ->selectRaw('COALESCE(SUM(nk.so_luong_nhap), 0) as total'),
             'xuat_hang' => DB::table('phieu_xuat_kho_chi_tiet as pxct')
                 ->join('phieu_xuat_kho as px', 'px.id', '=', 'pxct.phieu_xuat_kho_id')
                 ->join('nhap_kho as nk', 'nk.id', '=', 'pxct.nhap_kho_id')
                 ->join('qc', 'qc.id', '=', 'nk.qc_id')
-                ->join('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
-                ->join('cat as c', 'c.id', '=', 'pbm.cat_id')
+                ->leftJoin('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
+                ->leftJoin('cat as c', 'c.id', '=', 'pbm.cat_id')
                 ->leftJoin('don_hang_chi_tiets as dct', 'dct.id', '=', DB::raw('COALESCE(pxct.don_hang_chi_tiet_id, nk.don_hang_chi_tiet_id, qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id)'))
                 ->leftJoin('don_hangs as dh', 'dh.id', '=', 'dct.don_hang_id')
                 ->whereBetween('px.ngay_xuat', [$from, $to])
@@ -267,29 +283,80 @@ class DashboardService
                 ->whereNull('px.deleted_at')
                 ->whereNull('nk.deleted_at')
                 ->whereNull('qc.deleted_at')
-                ->whereNull('pbm.deleted_at')
-                ->whereNull('c.deleted_at')
+                ->where(fn (Builder $query) => $query->whereNull('pbm.id')->orWhereNull('pbm.deleted_at'))
+                ->where(fn (Builder $query) => $query->whereNull('c.id')->orWhereNull('c.deleted_at'))
                 ->selectRaw('COALESCE(SUM(pxct.so_luong_xuat), 0) as total'),
         };
 
-        $this->applyProductionFilters($query, $filters);
+        $this->applyProductionFilters(
+            $query,
+            $filters,
+            in_array($module, ['qc_dat', 'qc_loi', 'nhap_kho', 'xuat_hang'], true)
+        );
 
         return (float) ($query->first()->total ?? 0);
     }
 
-    private function applyProductionFilters(Builder $query, array $filters): void
+    private function applyProductionFilters(Builder $query, array $filters, bool $supportsManualQc = false): void
     {
         $maDon = trim((string) ($filters['ma_don'] ?? ''));
         $maKh = trim((string) ($filters['ma_kh'] ?? ''));
+        $kenhBan = trim((string) ($filters['kenh_ban'] ?? ''));
+        $matHangColumn = $supportsManualQc ? 'COALESCE(c.mat_hang_id, qc.mat_hang_id)' : 'c.mat_hang_id';
+        $mauColumn = $supportsManualQc ? 'COALESCE(c.mau_id, qc.mau_id)' : 'c.mau_id';
+        $sizeColumn = $supportsManualQc ? 'COALESCE(c.size_id, qc.size_id)' : 'c.size_id';
 
         $query
             ->where(fn (Builder $query) => $query->whereNull('dct.id')->orWhereNull('dct.deleted_at'))
             ->where(fn (Builder $query) => $query->whereNull('dh.id')->orWhereNull('dh.deleted_at'))
             ->when($maDon !== '', fn (Builder $query) => $query->where('dh.ma_don', 'like', "%{$maDon}%"))
             ->when($maKh !== '', fn (Builder $query) => $query->where('dh.ma_kh', 'like', "%{$maKh}%"))
-            ->when(filled($filters['mat_hang_id'] ?? null), fn (Builder $query) => $query->where('c.mat_hang_id', (int) $filters['mat_hang_id']))
-            ->when(filled($filters['mau_id'] ?? null), fn (Builder $query) => $query->where('c.mau_id', (int) $filters['mau_id']))
-            ->when(filled($filters['size_id'] ?? null), fn (Builder $query) => $query->where('c.size_id', (int) $filters['size_id']));
+            ->when($kenhBan !== '', fn (Builder $query) => $query->where('dh.kenh_ban', $kenhBan))
+            ->when(filled($filters['ngay_nhan_tu'] ?? null), fn (Builder $query) => $query->whereDate('dh.ngay_nhan', '>=', $filters['ngay_nhan_tu']))
+            ->when(filled($filters['ngay_nhan_den'] ?? null), fn (Builder $query) => $query->whereDate('dh.ngay_nhan', '<=', $filters['ngay_nhan_den']))
+            ->when(filled($filters['han_giao_tu'] ?? null), fn (Builder $query) => $query->whereDate('dh.han_giao', '>=', $filters['han_giao_tu']))
+            ->when(filled($filters['han_giao_den'] ?? null), fn (Builder $query) => $query->whereDate('dh.han_giao', '<=', $filters['han_giao_den']))
+            ->when(filled($filters['mat_hang_id'] ?? null), fn (Builder $query) => $query->whereRaw($matHangColumn.' = ?', [(int) $filters['mat_hang_id']]))
+            ->when(filled($filters['mau_id'] ?? null), fn (Builder $query) => $query->whereRaw($mauColumn.' = ?', [(int) $filters['mau_id']]))
+            ->when(filled($filters['size_id'] ?? null), fn (Builder $query) => $query->whereRaw($sizeColumn.' = ?', [(int) $filters['size_id']]));
+    }
+
+    private function inventoryBalanceAt(string $to, array $filters): float
+    {
+        $nhapKho = DB::table('nhap_kho as nk')
+            ->join('qc', 'qc.id', '=', 'nk.qc_id')
+            ->leftJoin('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
+            ->leftJoin('cat as c', 'c.id', '=', 'pbm.cat_id')
+            ->leftJoin('don_hang_chi_tiets as dct', 'dct.id', '=', DB::raw('COALESCE(nk.don_hang_chi_tiet_id, qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id)'))
+            ->leftJoin('don_hangs as dh', 'dh.id', '=', 'dct.don_hang_id')
+            ->whereDate('nk.ngay_nhap', '<=', $to)
+            ->whereNull('nk.deleted_at')
+            ->whereNull('qc.deleted_at')
+            ->where(fn (Builder $query) => $query->whereNull('pbm.id')->orWhereNull('pbm.deleted_at'))
+            ->where(fn (Builder $query) => $query->whereNull('c.id')->orWhereNull('c.deleted_at'))
+            ->selectRaw('COALESCE(SUM(nk.so_luong_nhap), 0) as total');
+
+        $xuatKho = DB::table('phieu_xuat_kho_chi_tiet as pxct')
+            ->join('phieu_xuat_kho as px', 'px.id', '=', 'pxct.phieu_xuat_kho_id')
+            ->join('nhap_kho as nk', 'nk.id', '=', 'pxct.nhap_kho_id')
+            ->join('qc', 'qc.id', '=', 'nk.qc_id')
+            ->leftJoin('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
+            ->leftJoin('cat as c', 'c.id', '=', 'pbm.cat_id')
+            ->leftJoin('don_hang_chi_tiets as dct', 'dct.id', '=', DB::raw('COALESCE(pxct.don_hang_chi_tiet_id, nk.don_hang_chi_tiet_id, qc.don_hang_chi_tiet_id, pbm.don_hang_chi_tiet_id, c.don_hang_chi_tiet_id)'))
+            ->leftJoin('don_hangs as dh', 'dh.id', '=', 'dct.don_hang_id')
+            ->whereDate('px.ngay_xuat', '<=', $to)
+            ->whereNull('pxct.deleted_at')
+            ->whereNull('px.deleted_at')
+            ->whereNull('nk.deleted_at')
+            ->whereNull('qc.deleted_at')
+            ->where(fn (Builder $query) => $query->whereNull('pbm.id')->orWhereNull('pbm.deleted_at'))
+            ->where(fn (Builder $query) => $query->whereNull('c.id')->orWhereNull('c.deleted_at'))
+            ->selectRaw('COALESCE(SUM(pxct.so_luong_xuat), 0) as total');
+
+        $this->applyProductionFilters($nhapKho, $filters, true);
+        $this->applyProductionFilters($xuatKho, $filters, true);
+
+        return (float) ($nhapKho->first()->total ?? 0) - (float) ($xuatKho->first()->total ?? 0);
     }
 
     private function dateRange(array $filters): array
@@ -309,64 +376,63 @@ class DashboardService
         return [$from->toDateString(), $to->toDateString()];
     }
 
-    private function sumByDate(string $table, string $dateColumn, string $quantityColumn, string $date): float
+    private function dailyProductionTotals(string $module, string $from, string $to): Collection
     {
-        return (float) DB::table($table)
-            ->whereDate($dateColumn, $date)
-            ->whereNull('deleted_at')
-            ->sum($quantityColumn);
-    }
+        $query = match ($module) {
+            'cat' => DB::table('cat as c')
+                ->selectRaw('DATE(c.ngay_cat) as production_date, COALESCE(SUM(c.so_luong_cat), 0) as total')
+                ->whereBetween('c.ngay_cat', [$from, $to])
+                ->whereNull('c.deleted_at'),
+            'phan_bo_may' => DB::table('phan_bo_may as pbm')
+                ->join('cat as c', 'c.id', '=', 'pbm.cat_id')
+                ->selectRaw('DATE(pbm.ngay_phan_bo) as production_date, COALESCE(SUM(pbm.so_luong_giao), 0) as total')
+                ->whereBetween('pbm.ngay_phan_bo', [$from, $to])
+                ->whereNull('pbm.deleted_at')
+                ->whereNull('c.deleted_at'),
+            'qc_dat' => DB::table('qc')
+                ->leftJoin('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
+                ->leftJoin('cat as c', 'c.id', '=', 'pbm.cat_id')
+                ->selectRaw('DATE(qc.ngay_qc) as production_date, COALESCE(SUM(qc.so_luong_dat), 0) as total')
+                ->whereBetween('qc.ngay_qc', [$from, $to])
+                ->whereNull('qc.deleted_at')
+                ->where(fn (Builder $query) => $query->whereNull('pbm.id')->orWhereNull('pbm.deleted_at'))
+                ->where(fn (Builder $query) => $query->whereNull('c.id')->orWhereNull('c.deleted_at')),
+            'qc_loi' => DB::table('qc')
+                ->leftJoin('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
+                ->leftJoin('cat as c', 'c.id', '=', 'pbm.cat_id')
+                ->selectRaw('DATE(qc.ngay_qc) as production_date, COALESCE(SUM(qc.so_luong_loi), 0) + COALESCE(SUM(qc.so_luong_hong), 0) as total')
+                ->whereBetween('qc.ngay_qc', [$from, $to])
+                ->whereNull('qc.deleted_at')
+                ->where(fn (Builder $query) => $query->whereNull('pbm.id')->orWhereNull('pbm.deleted_at'))
+                ->where(fn (Builder $query) => $query->whereNull('c.id')->orWhereNull('c.deleted_at')),
+            'nhap_kho' => DB::table('nhap_kho as nk')
+                ->join('qc', 'qc.id', '=', 'nk.qc_id')
+                ->leftJoin('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
+                ->leftJoin('cat as c', 'c.id', '=', 'pbm.cat_id')
+                ->selectRaw('DATE(nk.ngay_nhap) as production_date, COALESCE(SUM(nk.so_luong_nhap), 0) as total')
+                ->whereBetween('nk.ngay_nhap', [$from, $to])
+                ->whereNull('nk.deleted_at')
+                ->whereNull('qc.deleted_at')
+                ->where(fn (Builder $query) => $query->whereNull('pbm.id')->orWhereNull('pbm.deleted_at'))
+                ->where(fn (Builder $query) => $query->whereNull('c.id')->orWhereNull('c.deleted_at')),
+            'xuat_hang' => DB::table('phieu_xuat_kho_chi_tiet as pxct')
+                ->join('phieu_xuat_kho as px', 'px.id', '=', 'pxct.phieu_xuat_kho_id')
+                ->join('nhap_kho as nk', 'nk.id', '=', 'pxct.nhap_kho_id')
+                ->join('qc', 'qc.id', '=', 'nk.qc_id')
+                ->leftJoin('phan_bo_may as pbm', 'pbm.id', '=', 'qc.phan_bo_may_id')
+                ->leftJoin('cat as c', 'c.id', '=', 'pbm.cat_id')
+                ->selectRaw('DATE(px.ngay_xuat) as production_date, COALESCE(SUM(pxct.so_luong_xuat), 0) as total')
+                ->whereBetween('px.ngay_xuat', [$from, $to])
+                ->whereNull('pxct.deleted_at')
+                ->whereNull('px.deleted_at')
+                ->whereNull('nk.deleted_at')
+                ->whereNull('qc.deleted_at')
+                ->where(fn (Builder $query) => $query->whereNull('pbm.id')->orWhereNull('pbm.deleted_at'))
+                ->where(fn (Builder $query) => $query->whereNull('c.id')->orWhereNull('c.deleted_at')),
+        };
 
-    private function sumQcErrorByDate(string $date): float
-    {
-        $row = DB::table('qc')
-            ->whereDate('ngay_qc', $date)
-            ->whereNull('deleted_at')
-            ->selectRaw('COALESCE(SUM(so_luong_loi), 0) + COALESCE(SUM(so_luong_hong), 0) as total')
-            ->first();
-
-        return (float) ($row->total ?? 0);
-    }
-
-    private function sumXuatByDate(string $date): float
-    {
-        return (float) DB::table('phieu_xuat_kho_chi_tiet as pxct')
-            ->join('phieu_xuat_kho as px', 'px.id', '=', 'pxct.phieu_xuat_kho_id')
-            ->whereDate('px.ngay_xuat', $date)
-            ->whereNull('pxct.deleted_at')
-            ->whereNull('px.deleted_at')
-            ->sum('pxct.so_luong_xuat');
-    }
-
-    private function dailyTotals(string $table, string $dateColumn, string $quantityColumn, string $from, string $to): Collection
-    {
-        return DB::table($table)
-            ->selectRaw("DATE({$dateColumn}) as production_date, COALESCE(SUM({$quantityColumn}), 0) as total")
-            ->whereBetween($dateColumn, [$from, $to])
-            ->whereNull('deleted_at')
-            ->groupByRaw("DATE({$dateColumn})")
-            ->pluck('total', 'production_date');
-    }
-
-    private function dailyQcErrorTotals(string $from, string $to): Collection
-    {
-        return DB::table('qc')
-            ->selectRaw('DATE(ngay_qc) as production_date, COALESCE(SUM(so_luong_loi), 0) + COALESCE(SUM(so_luong_hong), 0) as total')
-            ->whereBetween('ngay_qc', [$from, $to])
-            ->whereNull('deleted_at')
-            ->groupByRaw('DATE(ngay_qc)')
-            ->pluck('total', 'production_date');
-    }
-
-    private function dailyXuatTotals(string $from, string $to): Collection
-    {
-        return DB::table('phieu_xuat_kho_chi_tiet as pxct')
-            ->join('phieu_xuat_kho as px', 'px.id', '=', 'pxct.phieu_xuat_kho_id')
-            ->selectRaw('DATE(px.ngay_xuat) as production_date, COALESCE(SUM(pxct.so_luong_xuat), 0) as total')
-            ->whereBetween('px.ngay_xuat', [$from, $to])
-            ->whereNull('pxct.deleted_at')
-            ->whereNull('px.deleted_at')
-            ->groupByRaw('DATE(px.ngay_xuat)')
+        return $query
+            ->groupByRaw('production_date')
             ->pluck('total', 'production_date');
     }
 }

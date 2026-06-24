@@ -2,6 +2,25 @@
 
 @section('title', 'Thêm lần cắt')
 
+@section('page-style')
+  <style>
+    .cut-filter-menu {
+      max-height: 260px;
+      min-width: 240px;
+      overflow-y: auto;
+    }
+
+    .cut-filter-menu .form-check {
+      margin-bottom: 0;
+      padding: 0.45rem 1rem 0.45rem 2.5rem;
+    }
+
+    .cut-filter-menu .form-check:hover {
+      background: var(--bs-gray-100);
+    }
+  </style>
+@endsection
+
 @php
   $formatCatNumber = function ($value) {
       if ($value === null || $value === '') {
@@ -71,6 +90,11 @@
       const previewInput = document.getElementById('vai_tieu_hao_display');
       const fixedDetailBody = document.getElementById('fixed-detail-body');
       const fixedEmptyMessage = document.getElementById('fixed-empty-message');
+      const fixedFilterEmptyMessage = document.getElementById('fixed-filter-empty-message');
+      const fixedColorFilters = document.querySelectorAll('.js-fixed-color-filter');
+      const fixedSizeFilters = document.querySelectorAll('.js-fixed-size-filter');
+      const fixedColorFilterLabel = document.getElementById('fixed-color-filter-label');
+      const fixedSizeFilterLabel = document.getElementById('fixed-size-filter-label');
       const matHangSelect = document.getElementById('mat_hang_id');
       const orderData = @json($donHangData);
       const fixedItems = @json($oldFixedItems);
@@ -174,7 +198,7 @@
         }
 
         const matHangId = matHangSelect?.value || '';
-        const rows = fixedItemOptions[matHangId] || [];
+        const rows = matHangId ? fixedItemOptions : [];
         const oldValues = String(matHangId) === initialMatHangId ?
           new Map(
             fixedItems.map(function(item) {
@@ -191,7 +215,7 @@
           const oldValue = oldValues.get(`${item.mau_id}:${item.size_id}`) || '';
 
           row.innerHTML = `
-            <td>
+            <td data-label="Màu">
               ${item.ten_mau || '-'}
               <input type="hidden" name="items[${index}][mau_id]" value="${item.mau_id}">
             </td>
@@ -212,10 +236,72 @@
             </td>
           `;
 
+          row.dataset.colorId = String(item.mau_id);
+          row.dataset.sizeId = String(item.size_id);
           fixedDetailBody.appendChild(row);
           wireNumberInput(row.querySelector('.js-number-format'));
           updateFixedRowFabric(row);
         });
+
+        applyFixedFilters();
+      }
+
+      function checkedFilterValues(inputs) {
+        return Array.from(inputs)
+          .filter(input => input.checked)
+          .map(input => input.value);
+      }
+
+      function updateFixedFilterLabels(selectedColorIds, selectedSizeIds) {
+        if (fixedColorFilterLabel) {
+          fixedColorFilterLabel.textContent = selectedColorIds.length ?
+            `Đã chọn ${selectedColorIds.length} màu` :
+            'Tất cả màu';
+        }
+
+        if (fixedSizeFilterLabel) {
+          fixedSizeFilterLabel.textContent = selectedSizeIds.length ?
+            `Đã chọn ${selectedSizeIds.length} size` :
+            'Tất cả size';
+        }
+      }
+
+      function applyFixedFilters() {
+        if (!fixedDetailBody) {
+          return;
+        }
+
+        const selectedColorIds = checkedFilterValues(fixedColorFilters);
+        const selectedSizeIds = checkedFilterValues(fixedSizeFilters);
+        let visibleCount = 0;
+
+        fixedDetailBody.querySelectorAll('tr').forEach(function(row) {
+          const matchesColor = selectedColorIds.length === 0 || selectedColorIds.includes(row.dataset.colorId);
+          const matchesSize = selectedSizeIds.length === 0 || selectedSizeIds.includes(row.dataset.sizeId);
+          const isVisible = matchesColor && matchesSize;
+          row.classList.toggle('d-none', !isVisible);
+
+          if (isVisible) {
+            visibleCount++;
+          }
+        });
+
+        const hasProduct = Boolean(matHangSelect?.value);
+        const hasRows = fixedDetailBody.querySelectorAll('tr').length > 0;
+        fixedFilterEmptyMessage?.classList.toggle(
+          'd-none',
+          !hasProduct || !hasRows || visibleCount > 0
+        );
+
+        updateFixedFilterLabels(selectedColorIds, selectedSizeIds);
+      }
+
+      function clearFixedFilters() {
+        [...fixedColorFilters, ...fixedSizeFilters].forEach(function(input) {
+          input.checked = false;
+        });
+
+        applyFixedFilters();
       }
 
       function updateOrderRowDiff(row) {
@@ -367,9 +453,29 @@
       document.querySelectorAll('.js-number-format').forEach(wireNumberInput);
 
       if (matHangSelect) {
-        matHangSelect.addEventListener('change', renderFixedRows);
+        matHangSelect.addEventListener('change', function() {
+          clearFixedFilters();
+          renderFixedRows();
+        });
         renderFixedRows();
       }
+
+      [...fixedColorFilters, ...fixedSizeFilters].forEach(function(input) {
+        input.addEventListener('change', applyFixedFilters);
+      });
+
+      document.querySelectorAll('.js-clear-fixed-filter').forEach(function(button) {
+        button.addEventListener('click', function() {
+          const filterType = button.dataset.filterType;
+          const inputs = filterType === 'color' ? fixedColorFilters : fixedSizeFilters;
+
+          inputs.forEach(function(input) {
+            input.checked = false;
+          });
+
+          applyFixedFilters();
+        });
+      });
 
       if (dinhMucInput) {
         dinhMucInput.addEventListener('input', updatePreview);
@@ -561,8 +667,63 @@
                     <div class="alert alert-danger py-2">{{ $message }}</div>
                   @enderror
 
+                  <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-4">
+                      <label class="form-label">Lọc theo màu</label>
+                      <div class="dropdown">
+                        <button type="button" class="btn btn-outline-secondary dropdown-toggle w-100 text-start"
+                          data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                          <span id="fixed-color-filter-label">Tất cả màu</span>
+                        </button>
+                        <div class="dropdown-menu cut-filter-menu w-100">
+                          <button type="button"
+                            class="dropdown-item text-primary js-clear-fixed-filter"
+                            data-filter-type="color">
+                            Bỏ chọn tất cả
+                          </button>
+                          <div class="dropdown-divider"></div>
+                          @foreach ($maus as $mau)
+                            <label class="form-check">
+                              <input class="form-check-input js-fixed-color-filter" type="checkbox"
+                                value="{{ $mau->id }}">
+                              <span class="form-check-label">{{ $mau->ten_mau }}</span>
+                            </label>
+                          @endforeach
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                      <label class="form-label">Lọc theo size</label>
+                      <div class="dropdown">
+                        <button type="button" class="btn btn-outline-secondary dropdown-toggle w-100 text-start"
+                          data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                          <span id="fixed-size-filter-label">Tất cả size</span>
+                        </button>
+                        <div class="dropdown-menu cut-filter-menu w-100">
+                          <button type="button"
+                            class="dropdown-item text-primary js-clear-fixed-filter"
+                            data-filter-type="size">
+                            Bỏ chọn tất cả
+                          </button>
+                          <div class="dropdown-divider"></div>
+                          @foreach ($sizes as $size)
+                            <label class="form-check">
+                              <input class="form-check-input js-fixed-size-filter" type="checkbox"
+                                value="{{ $size->id }}">
+                              <span class="form-check-label">{{ $size->ten_size }}</span>
+                            </label>
+                          @endforeach
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div class="alert alert-info py-2 d-none" id="fixed-empty-message">
                     Mặt hàng này chưa có thông tin màu và size.
+                  </div>
+                  <div class="alert alert-info py-2 d-none" id="fixed-filter-empty-message">
+                    Không có chi tiết cắt phù hợp với màu và size đã chọn.
                   </div>
 
                   <div class="table-responsive">

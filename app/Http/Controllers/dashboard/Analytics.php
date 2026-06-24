@@ -4,7 +4,6 @@ namespace App\Http\Controllers\dashboard;
 
 use App\Http\Controllers\Controller;
 use App\Models\DonHang;
-use App\Models\DonHangChiTiet;
 use App\Services\Dashboard\DashboardService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -57,32 +56,25 @@ class Analytics extends Controller
     private function filterOptions(): array
     {
         $donHangTable = (new DonHang)->getTable();
-        $donHangChiTietTable = (new DonHangChiTiet)->getTable();
 
         return [
-            'matHangs' => DB::table($donHangChiTietTable.' as dct')
-                ->join('dm_mat_hang as mh', 'mh.id', '=', 'dct.mat_hang_id')
-                ->whereNull('dct.deleted_at')
-                ->whereNull('mh.deleted_at')
-                ->select('mh.id', 'mh.ma_hang', 'mh.ten_hang')
-                ->distinct()
-                ->orderBy('mh.ma_hang')
+            'matHangs' => DB::table('dm_mat_hang')
+                ->whereNull('deleted_at')
+                ->where('trang_thai', true)
+                ->select('id', 'ma_hang', 'ten_hang')
+                ->orderBy('ma_hang')
                 ->get(),
-            'maus' => DB::table($donHangChiTietTable.' as dct')
-                ->join('dm_mau as mau', 'mau.id', '=', 'dct.mau_id')
-                ->whereNull('dct.deleted_at')
-                ->whereNull('mau.deleted_at')
-                ->select('mau.id', 'mau.ten_mau')
-                ->distinct()
-                ->orderBy('mau.ten_mau')
+            'maus' => DB::table('dm_mau')
+                ->whereNull('deleted_at')
+                ->where('trang_thai', true)
+                ->select('id', 'ten_mau')
+                ->orderBy('ten_mau')
                 ->get(),
-            'sizes' => DB::table($donHangChiTietTable.' as dct')
-                ->join('dm_size as sz', 'sz.id', '=', 'dct.size_id')
-                ->whereNull('dct.deleted_at')
-                ->whereNull('sz.deleted_at')
-                ->select('sz.id', 'sz.ten_size')
-                ->distinct()
-                ->orderBy('sz.ten_size')
+            'sizes' => DB::table('dm_size')
+                ->whereNull('deleted_at')
+                ->where('trang_thai', true)
+                ->select('id', 'ten_size')
+                ->orderBy('ten_size')
                 ->get(),
             'kenhBans' => DB::table($donHangTable)
                 ->whereNull('deleted_at')

@@ -221,32 +221,26 @@ class CatController extends Controller
             });
         });
 
-        $fixedItemOptions = DonHangChiTiet::query()
-            ->with(['mau:id,ten_mau', 'size:id,ten_size'])
-            ->whereNotNull('mat_hang_id')
-            ->whereNotNull('mau_id')
-            ->whereNotNull('size_id')
-            ->get(['mat_hang_id', 'mau_id', 'size_id'])
-            ->concat(
-                Cat::query()
-                    ->with(['mau:id,ten_mau', 'size:id,ten_size'])
-                    ->whereNotNull('mat_hang_id')
-                    ->whereNotNull('mau_id')
-                    ->whereNotNull('size_id')
-                    ->get(['mat_hang_id', 'mau_id', 'size_id'])
-            )
-            ->unique(fn ($item): string => $item->mat_hang_id.':'.$item->mau_id.':'.$item->size_id)
-            ->groupBy('mat_hang_id')
-            ->map(fn ($items) => $items
-                ->sortBy(fn ($item): string => ($item->mau?->ten_mau ?? '').'|'.($item->size?->ten_size ?? ''))
-                ->map(fn ($item): array => [
-                    'mau_id' => (int) $item->mau_id,
-                    'ten_mau' => $item->mau?->ten_mau ?? '-',
-                    'size_id' => (int) $item->size_id,
-                    'ten_size' => $item->size?->ten_size ?? '-',
-                ])
-                ->values()
-                ->all())
+        $matHangs = MatHang::query()
+            ->where('trang_thai', true)
+            ->orderBy('ten_hang')
+            ->get();
+        $maus = Mau::query()
+            ->where('trang_thai', true)
+            ->orderBy('ten_mau')
+            ->get();
+        $sizes = DmSize::query()
+            ->where('trang_thai', true)
+            ->orderBy('ten_size')
+            ->get();
+        $fixedItemOptions = $maus
+            ->flatMap(fn (Mau $mau) => $sizes->map(fn (DmSize $size): array => [
+                'mau_id' => (int) $mau->id,
+                'ten_mau' => $mau->ten_mau,
+                'size_id' => (int) $size->id,
+                'ten_size' => $size->ten_size,
+            ]))
+            ->values()
             ->all();
 
         return [
@@ -256,18 +250,9 @@ class CatController extends Controller
                 ->orderByDesc('id')
                 ->get(),
             'donHangs' => $donHangs,
-            'matHangs' => MatHang::query()
-                ->where('trang_thai', true)
-                ->orderBy('ten_hang')
-                ->get(),
-            'maus' => Mau::query()
-                ->where('trang_thai', true)
-                ->orderBy('ten_mau')
-                ->get(),
-            'sizes' => DmSize::query()
-                ->where('trang_thai', true)
-                ->orderBy('ten_size')
-                ->get(),
+            'matHangs' => $matHangs,
+            'maus' => $maus,
+            'sizes' => $sizes,
             'donViCats' => DmDonViCat::query()
                 ->where('trang_thai', true)
                 ->orderBy('ten_don_vi')

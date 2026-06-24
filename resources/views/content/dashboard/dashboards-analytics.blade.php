@@ -185,7 +185,7 @@
       ['label' => 'QC lỗi', 'value' => $quickSummary['qc_loi'] ?? 0, 'icon' => 'bx-error-circle', 'class' => 'warning'],
       ['label' => 'Nhập kho', 'value' => $quickSummary['nhap_kho'] ?? 0, 'icon' => 'bx-archive-in', 'class' => 'info'],
       ['label' => 'Đã xuất', 'value' => $quickSummary['da_xuat'] ?? 0, 'icon' => 'bx-archive-out', 'class' => 'secondary'],
-      ['label' => 'Tồn kho', 'value' => $quickSummary['ton_kho'] ?? 0, 'icon' => 'bx-package', 'class' => 'primary'],
+      ['label' => 'Tồn tổng', 'value' => $quickSummary['ton_kho'] ?? 0, 'icon' => 'bx-package', 'class' => 'primary'],
       ['label' => 'Còn cắt', 'value' => $quickSummary['con_cat'] ?? 0, 'icon' => 'bx-time-five', 'class' => 'warning'],
       ['label' => 'Còn giao', 'value' => $quickSummary['con_giao'] ?? 0, 'icon' => 'bx-transfer', 'class' => 'warning'],
       ['label' => 'Dòng thiếu cắt', 'value' => $quickSummary['dong_thieu_cat'] ?? 0, 'icon' => 'bx-list-minus', 'class' => 'danger'],
@@ -199,7 +199,7 @@
       ['label' => 'QC lỗi', 'value' => $timeProductionSummary['qc_loi'] ?? 0, 'icon' => 'bx-error-circle', 'class' => 'warning'],
       ['label' => 'Nhập kho', 'value' => $timeProductionSummary['nhap_kho'] ?? 0, 'icon' => 'bx-archive-in', 'class' => 'primary'],
       ['label' => 'Đã xuất', 'value' => $timeProductionSummary['da_xuat'] ?? 0, 'icon' => 'bx-archive-out', 'class' => 'secondary'],
-      ['label' => 'Tồn kho', 'value' => $timeProductionSummary['ton_kho'] ?? 0, 'icon' => 'bx-package', 'class' => 'primary'],
+      ['label' => 'Tồn tổng cuối kỳ', 'value' => $timeProductionSummary['ton_kho'] ?? 0, 'icon' => 'bx-package', 'class' => 'primary'],
   ];
 
   $todayCards = [

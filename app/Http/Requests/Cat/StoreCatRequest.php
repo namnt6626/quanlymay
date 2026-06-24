@@ -100,8 +100,16 @@ class StoreCatRequest extends FormRequest
             'chi_tiets.*.don_hang_chi_tiet_id' => [$donHangId ? 'required' : 'nullable', 'integer', Rule::exists('don_hang_chi_tiets', 'id')->whereNull('deleted_at')],
             'chi_tiets.*.so_luong_cat' => ['nullable', 'numeric', 'min:0'],
             'items' => [$donHangId ? 'nullable' : 'required', 'array'],
-            'items.*.mau_id' => ['nullable', 'integer', Rule::exists('dm_mau', 'id')->whereNull('deleted_at')],
-            'items.*.size_id' => ['nullable', 'integer', Rule::exists('dm_size', 'id')->whereNull('deleted_at')],
+            'items.*.mau_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('dm_mau', 'id')->where(fn ($query) => $query->whereNull('deleted_at')->where('trang_thai', true)),
+            ],
+            'items.*.size_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('dm_size', 'id')->where(fn ($query) => $query->whereNull('deleted_at')->where('trang_thai', true)),
+            ],
             'items.*.so_luong_cat' => ['nullable', 'numeric', 'min:0'],
             'items.*.vai_tieu_hao' => ['nullable', 'numeric', 'min:0'],
         ];
@@ -129,27 +137,6 @@ class StoreCatRequest extends FormRequest
                     $validator->errors()->add('items', 'Vui lòng chọn đầy đủ màu và size cho các dòng có số lượng cắt.');
 
                     return;
-                }
-
-                $matHangId = (int) $this->input('mat_hang_id');
-                $submittedKeys = $items
-                    ->map(fn (array $item): string => (int) $item['mau_id'].':'.(int) $item['size_id'])
-                    ->unique()
-                    ->values();
-
-                $validKeys = DonHangChiTiet::query()
-                    ->where('mat_hang_id', $matHangId)
-                    ->get(['mau_id', 'size_id'])
-                    ->concat(
-                        Cat::query()
-                            ->where('mat_hang_id', $matHangId)
-                            ->get(['mau_id', 'size_id'])
-                    )
-                    ->map(fn ($item): string => (int) $item->mau_id.':'.(int) $item->size_id)
-                    ->unique();
-
-                if ($submittedKeys->diff($validKeys)->isNotEmpty()) {
-                    $validator->errors()->add('items', 'Chi tiết màu và size không thuộc mặt hàng đã chọn.');
                 }
 
                 return;
