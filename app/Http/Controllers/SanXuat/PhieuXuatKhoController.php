@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -492,7 +493,7 @@ class PhieuXuatKhoController extends Controller
         $currentSourceKey = $currentChiTiet?->nhapKho ? $this->sourceGroupKeyFromNhapKho($currentChiTiet->nhapKho) : null;
 
         return $nhapGroups
-            ->map(function (Collection $group, ?string $sourceGroupKey) use ($xuatGroups, $currentSourceKey, $currentChiTiet) {
+            ->map(function (SupportCollection $group, ?string $sourceGroupKey) use ($xuatGroups, $currentSourceKey, $currentChiTiet) {
                 if ($sourceGroupKey === null) {
                     return null;
                 }

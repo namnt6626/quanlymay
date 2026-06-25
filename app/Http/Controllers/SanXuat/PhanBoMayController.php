@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -373,7 +374,7 @@ class PhanBoMayController extends Controller
             ->groupBy(function (Cat $cat): string {
                 return $this->sourceKeyFromCat($cat) ?? 'unknown';
             })
-            ->map(function (Collection $group, string $sourceGroupKey) use ($allocatedByGroup, $currentPhanBoMay, $currentSourceKey) {
+            ->map(function (SupportCollection $group, string $sourceGroupKey) use ($allocatedByGroup, $currentPhanBoMay, $currentSourceKey) {
                 /** @var Cat $representativeCat */
                 $representativeCat = $group->sortByDesc('id')->first();
                 $totalCat = (float) $group->sum('so_luong_cat');

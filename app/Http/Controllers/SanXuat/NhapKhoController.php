@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -336,7 +337,7 @@ class NhapKhoController extends Controller
         $currentSourceKey = $currentNhapKho?->qc ? $this->sourceGroupKeyFromQc($currentNhapKho->qc) : null;
 
         return $qcGroups
-            ->map(function (Collection $group, ?string $sourceGroupKey) use ($nhapGroups, $currentSourceKey, $currentNhapKho) {
+            ->map(function (SupportCollection $group, ?string $sourceGroupKey) use ($nhapGroups, $currentSourceKey, $currentNhapKho) {
                 if ($sourceGroupKey === null) {
                     return null;
                 }

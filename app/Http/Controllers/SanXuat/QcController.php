@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -325,7 +326,7 @@ class QcController extends Controller
                     ->all();
             })
             ->groupBy(fn (array $item): string => (int) $item['mat_hang_id'].':'.(int) $item['mau_id'].':'.(int) $item['size_id'])
-            ->map(fn (Collection $group): array => [
+            ->map(fn (SupportCollection $group): array => [
                 'mat_hang_id' => (int) $group->first()['mat_hang_id'],
                 'mau_id' => (int) $group->first()['mau_id'],
                 'size_id' => (int) $group->first()['size_id'],
@@ -512,7 +513,7 @@ class QcController extends Controller
             ->whereNull('deleted_at')
             ->get()
             ->groupBy(fn (Cat $cat): string => $cat->mat_hang_id.':'.$cat->mau_id.':'.$cat->size_id)
-            ->map(function (Collection $group): array {
+            ->map(function (SupportCollection $group): array {
                 /** @var Cat $cat */
                 $cat = $group->first();
 
@@ -551,7 +552,7 @@ class QcController extends Controller
             ->groupBy(function (PhanBoMay $phanBoMay): string {
                 return $this->sourceGroupKeyFromPhanBoMay($phanBoMay);
             })
-            ->map(function (Collection $group, string $sourceGroupKey) use ($qcTotalsByGroup, $currentSourceKey, $currentQc) {
+            ->map(function (SupportCollection $group, string $sourceGroupKey) use ($qcTotalsByGroup, $currentSourceKey, $currentQc) {
                 /** @var PhanBoMay $representativePhanBoMay */
                 $representativePhanBoMay = $group->sortByDesc('id')->first();
                 $totalCut = (float) $group->sum(function (PhanBoMay $phanBoMay) {
