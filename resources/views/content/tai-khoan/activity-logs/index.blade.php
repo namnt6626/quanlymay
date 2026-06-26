@@ -109,7 +109,7 @@
               <td class="text-wrap">{{ $activityLog->description ?: '-' }}</td>
               <td>{{ $activityLog->ip_address ?: '-' }}</td>
               <td>
-                <a href="{{ route('activity-logs.show', $activityLog) }}" class="btn btn-sm btn-icon btn-outline-info"
+                <a href="{{ route('activity-logs.show', $activityLog->source_key ?? $activityLog->id) }}" class="btn btn-sm btn-icon btn-outline-info"
                   title="Chi tiết">
                   <i class="icon-base bx bx-detail"></i>
                 </a>

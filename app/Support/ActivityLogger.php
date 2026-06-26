@@ -36,7 +36,8 @@ class ActivityLogger
             $request = request();
             $user = $request?->user();
 
-            return ActivityLog::create([
+            $payload = [
+                'id' => 'file_'.(string) Str::uuid(),
                 'user_id' => $data['user_id'] ?? $user?->getKey(),
                 'user_name' => $data['user_name'] ?? ($user?->name ?? $user?->username),
                 'action' => (string) ($data['action'] ?? ''),
@@ -52,7 +53,25 @@ class ActivityLogger
                 'url' => $data['url'] ?? $request?->fullUrl(),
                 'method' => $data['method'] ?? $request?->method(),
                 'batch_id' => $data['batch_id'] ?? null,
-            ]);
+                'created_at' => now()->format('Y-m-d H:i:s'),
+                'updated_at' => now()->format('Y-m-d H:i:s'),
+            ];
+
+            $writeLog = static function () use ($payload): void {
+                try {
+                    ActivityLogFileStore::append($payload);
+                } catch (Throwable) {
+                    //
+                }
+            };
+
+            if (app()->runningInConsole()) {
+                $writeLog();
+            } else {
+                app()->terminating($writeLog);
+            }
+
+            return null;
         } catch (Throwable) {
             return null;
         }
