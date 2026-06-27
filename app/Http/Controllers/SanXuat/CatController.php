@@ -26,35 +26,75 @@ class CatController extends Controller
     public function index(Request $request): View
     {
         $keyword = trim((string) $request->input('q'));
-        $ngayCat = $request->input('ngay_cat');
+        $tuNgay = trim((string) ($request->input('tu_ngay') ?: $request->input('ngay_cat')));
+        $denNgay = trim((string) ($request->input('den_ngay') ?: $request->input('ngay_cat')));
+        $matHangId = $request->integer('mat_hang_id') ?: null;
+        $mauId = $request->integer('mau_id') ?: null;
+        $sizeId = $request->integer('size_id') ?: null;
+        $donViCatId = $request->integer('don_vi_cat_id') ?: null;
+        $kieuCat = trim((string) $request->input('kieu_cat'));
+        $kieuCat = in_array($kieuCat, ['don_hang', 'tu_do'], true) ? $kieuCat : '';
+
+        $filters = [
+            'q' => $keyword,
+            'tu_ngay' => $tuNgay,
+            'den_ngay' => $denNgay,
+            'mat_hang_id' => $matHangId,
+            'mau_id' => $mauId,
+            'size_id' => $sizeId,
+            'don_vi_cat_id' => $donViCatId,
+            'kieu_cat' => $kieuCat,
+            'per_page' => paginationPerPage(),
+        ];
 
         $cats = Cat::query()
             ->with(['matHang', 'mau', 'size', 'banCat', 'donViCat', 'donHangChiTiet.donHang'])
             ->when($keyword !== '', function ($query) use ($keyword) {
                 $query->where(function ($query) use ($keyword) {
                     $query->whereHas('matHang', function ($query) use ($keyword) {
-                        $query->where('ten_hang', 'like', "%{$keyword}%");
+                        $query->where('ma_hang', 'like', "%{$keyword}%")
+                            ->orWhere('ten_hang', 'like', "%{$keyword}%");
                     })
                         ->orWhereHas('mau', function ($query) use ($keyword) {
-                            $query->where('ten_mau', 'like', "%{$keyword}%");
+                            $query->where('ma_mau', 'like', "%{$keyword}%")
+                                ->orWhere('ten_mau', 'like', "%{$keyword}%");
                         })
                         ->orWhereHas('size', function ($query) use ($keyword) {
-                            $query->where('ten_size', 'like', "%{$keyword}%");
+                            $query->where('ma_size', 'like', "%{$keyword}%")
+                                ->orWhere('ten_size', 'like', "%{$keyword}%");
                         })
                         ->orWhereHas('donHangChiTiet.donHang', function ($query) use ($keyword) {
                             $query->where('ma_don', 'like', "%{$keyword}%")
                                 ->orWhere('ma_kh', 'like', "%{$keyword}%");
+                        })
+                        ->orWhereHas('donViCat', function ($query) use ($keyword) {
+                            $query->where('ma_don_vi', 'like', "%{$keyword}%")
+                                ->orWhere('ten_don_vi', 'like', "%{$keyword}%");
                         });
                 });
             })
-            ->when($ngayCat, function ($query) use ($ngayCat) {
-                $query->whereDate('ngay_cat', $ngayCat);
-            })
+            ->when($tuNgay !== '', fn ($query) => $query->whereDate('ngay_cat', '>=', $tuNgay))
+            ->when($denNgay !== '', fn ($query) => $query->whereDate('ngay_cat', '<=', $denNgay))
+            ->when($matHangId, fn ($query) => $query->where('mat_hang_id', $matHangId))
+            ->when($mauId, fn ($query) => $query->where('mau_id', $mauId))
+            ->when($sizeId, fn ($query) => $query->where('size_id', $sizeId))
+            ->when($donViCatId, fn ($query) => $query->where('don_vi_cat_id', $donViCatId))
+            ->when($kieuCat === 'don_hang', fn ($query) => $query->whereNotNull('don_hang_chi_tiet_id'))
+            ->when($kieuCat === 'tu_do', fn ($query) => $query->whereNull('don_hang_chi_tiet_id'))
             ->latest('id')
-            ->paginate(paginationPerPage())
+            ->paginate($filters['per_page'])
             ->withQueryString();
 
-        return view('content.san-xuat.cat.index', compact('cats', 'keyword', 'ngayCat'));
+        return view('content.san-xuat.cat.index', [
+            'cats' => $cats,
+            'filters' => $filters,
+            'keyword' => $keyword,
+            'ngayCat' => $tuNgay === $denNgay ? $tuNgay : '',
+            'matHangs' => MatHang::query()->where('trang_thai', true)->orderBy('ma_hang')->get(['id', 'ma_hang', 'ten_hang']),
+            'maus' => Mau::query()->where('trang_thai', true)->orderBy('ten_mau')->get(['id', 'ma_mau', 'ten_mau']),
+            'sizes' => DmSize::query()->where('trang_thai', true)->orderBy('ten_size')->get(['id', 'ma_size', 'ten_size']),
+            'donViCats' => DmDonViCat::query()->where('trang_thai', true)->orderBy('ten_don_vi')->get(['id', 'ma_don_vi', 'ten_don_vi']),
+        ]);
     }
 
     public function create(): View
@@ -184,7 +224,9 @@ class CatController extends Controller
 
     public function destroy(Cat $cat): RedirectResponse
     {
-        $cat->delete();
+        DB::transaction(function () use ($cat): void {
+            $cat->delete();
+        });
 
         return $this->redirectToIndex('Xóa lần cắt thành công.');
     }

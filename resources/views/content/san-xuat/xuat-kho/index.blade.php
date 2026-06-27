@@ -2,6 +2,10 @@
 
 @section('title', 'Xuất kho')
 
+@section('page-style')
+  @include('content.san-xuat._filter-style')
+@endsection
+
 @section('content')
   @include('content.danh-muc._toast')
 
@@ -38,20 +42,35 @@
     </div>
 
     <div class="card-body">
-      <form action="{{ route('xuat-kho.index') }}" method="GET" class="row g-3 align-items-end">
-        <div class="col-12 col-xl">
+      <form action="{{ route('xuat-kho.index') }}" method="GET" class="row production-filter-form production-filter-grid align-items-end">
+        <div class="col-12 col-lg-3 filter-span-3">
           <label class="form-label" for="q">Tìm kiếm</label>
           <input type="text" class="form-control" id="q" name="q" value="{{ $keyword }}"
             placeholder="Nhập mã đơn, mã KH, kênh bán, mã hàng, tên hàng, màu hoặc size">
         </div>
-        @include('content.shared._per-page-select')
+        <div class="col-6 col-lg-2 filter-span-2">
+          <label class="form-label" for="tu_ngay">Từ ngày</label>
+          <input type="date" class="form-control" id="tu_ngay" name="tu_ngay" value="{{ $filters['tu_ngay'] }}">
+        </div>
+        <div class="col-6 col-lg-2 filter-span-2">
+          <label class="form-label" for="den_ngay">Đến ngày</label>
+          <input type="date" class="form-control" id="den_ngay" name="den_ngay" value="{{ $filters['den_ngay'] }}">
+        </div>
+        <div class="col-12 col-lg-2 filter-span-2">
+          <label class="form-label" for="kenh_ban">Kênh bán</label>
+          <input type="text" class="form-control" id="kenh_ban" name="kenh_ban" value="{{ $filters['kenh_ban'] }}"
+            placeholder="Nhập kênh bán">
+        </div>
+        @include('content.shared._per-page-select', ['perPageColumnClass' => 'col-6 col-lg-1 filter-span-1'])
 
-        <div class="col-12 col-xl-auto">
-          <div class="d-flex gap-2 flex-wrap">
-            <button type="submit" class="btn btn-primary">
+        <div class="col-12 col-lg-2 filter-span-2">
+          <div class="d-flex gap-2 flex-wrap filter-actions">
+            <button type="submit" class="btn btn-primary flex-fill flex-sm-grow-0">
               <i class="icon-base bx bx-search me-1"></i> Tìm kiếm
             </button>
-            <a href="{{ route('xuat-kho.index') }}" class="btn btn-outline-secondary">Làm mới</a>
+            <a href="{{ route('xuat-kho.index') }}" class="btn btn-outline-secondary flex-fill flex-sm-grow-0">
+              <i class="icon-base bx bx-refresh me-1"></i> Làm mới
+            </a>
           </div>
         </div>
       </form>

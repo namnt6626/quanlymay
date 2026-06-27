@@ -7,8 +7,10 @@ use App\Http\Requests\PhanBoMay\StorePhanBoMayRequest;
 use App\Http\Requests\PhanBoMay\UpdatePhanBoMayRequest;
 use App\Models\Cat;
 use App\Models\DmDonViMay;
+use App\Models\DmSize;
 use App\Models\DonHang;
 use App\Models\MatHang;
+use App\Models\Mau;
 use App\Models\PhanBoMay;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -25,7 +27,23 @@ class PhanBoMayController extends Controller
     public function index(Request $request): View
     {
         $keyword = trim((string) $request->input('q'));
+        $tuNgay = trim((string) $request->input('tu_ngay'));
+        $denNgay = trim((string) $request->input('den_ngay'));
         $matHangId = $request->integer('mat_hang_id') ?: null;
+        $mauId = $request->integer('mau_id') ?: null;
+        $sizeId = $request->integer('size_id') ?: null;
+        $donViMayId = $request->integer('don_vi_may_id') ?: null;
+
+        $filters = [
+            'q' => $keyword,
+            'tu_ngay' => $tuNgay,
+            'den_ngay' => $denNgay,
+            'mat_hang_id' => $matHangId,
+            'mau_id' => $mauId,
+            'size_id' => $sizeId,
+            'don_vi_may_id' => $donViMayId,
+            'per_page' => paginationPerPage(),
+        ];
 
         $phanBoMays = PhanBoMay::query()
             ->with(['cat.matHang', 'cat.mau', 'cat.size', 'cat.donHangChiTiet.donHang', 'donViMay'])
@@ -54,8 +72,13 @@ class PhanBoMayController extends Controller
                     $query->where('mat_hang_id', $matHangId);
                 });
             })
+            ->when($tuNgay !== '', fn (Builder $query) => $query->whereDate('ngay_phan_bo', '>=', $tuNgay))
+            ->when($denNgay !== '', fn (Builder $query) => $query->whereDate('ngay_phan_bo', '<=', $denNgay))
+            ->when($mauId, fn (Builder $query) => $query->whereHas('cat', fn (Builder $query) => $query->where('mau_id', $mauId)))
+            ->when($sizeId, fn (Builder $query) => $query->whereHas('cat', fn (Builder $query) => $query->where('size_id', $sizeId)))
+            ->when($donViMayId, fn (Builder $query) => $query->where('don_vi_may_id', $donViMayId))
             ->latest('id')
-            ->paginate(paginationPerPage())
+            ->paginate($filters['per_page'])
             ->withQueryString();
 
         $sourceGroups = $this->buildSourceGroups();
@@ -80,7 +103,12 @@ class PhanBoMayController extends Controller
             'keyword',
             'matHangId',
             'matHangs'
-        ));
+        ) + [
+            'filters' => $filters,
+            'maus' => Mau::query()->where('trang_thai', true)->orderBy('ten_mau')->get(['id', 'ma_mau', 'ten_mau']),
+            'sizes' => DmSize::query()->where('trang_thai', true)->orderBy('ten_size')->get(['id', 'ma_size', 'ten_size']),
+            'donViMays' => DmDonViMay::query()->where('trang_thai', true)->orderBy('ten_don_vi')->get(['id', 'ma_don_vi', 'ten_don_vi']),
+        ]);
     }
 
     public function create(): View
@@ -147,7 +175,9 @@ class PhanBoMayController extends Controller
 
     public function destroy(PhanBoMay $phanBoMay): RedirectResponse
     {
-        $phanBoMay->delete();
+        DB::transaction(function () use ($phanBoMay): void {
+            $phanBoMay->delete();
+        });
 
         return $this->redirectToIndex('Xóa phân bổ may thành công.');
     }

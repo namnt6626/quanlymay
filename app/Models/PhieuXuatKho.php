@@ -30,4 +30,17 @@ class PhieuXuatKho extends Model
     {
         return $this->hasMany(PhieuXuatKhoChiTiet::class, 'phieu_xuat_kho_id');
     }
+
+    protected static function booted(): void
+    {
+        static::deleting(function (PhieuXuatKho $phieuXuatKho): void {
+            $chiTiets = $phieuXuatKho->isForceDeleting()
+                ? $phieuXuatKho->chiTiets()->withTrashed()->get()
+                : $phieuXuatKho->chiTiets()->get();
+
+            $chiTiets->each(function (PhieuXuatKhoChiTiet $chiTiet) use ($phieuXuatKho): void {
+                $phieuXuatKho->isForceDeleting() ? $chiTiet->forceDelete() : $chiTiet->delete();
+            });
+        });
+    }
 }

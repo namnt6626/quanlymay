@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Cat extends Model
@@ -64,5 +65,23 @@ class Cat extends Model
     public function donViCat(): BelongsTo
     {
         return $this->belongsTo(DmDonViCat::class, 'don_vi_cat_id');
+    }
+
+    public function phanBoMays(): HasMany
+    {
+        return $this->hasMany(PhanBoMay::class, 'cat_id');
+    }
+
+    protected static function booted(): void
+    {
+        static::deleting(function (Cat $cat): void {
+            $phanBoMays = $cat->isForceDeleting()
+                ? $cat->phanBoMays()->withTrashed()->get()
+                : $cat->phanBoMays()->get();
+
+            $phanBoMays->each(function (PhanBoMay $phanBoMay) use ($cat): void {
+                $cat->isForceDeleting() ? $phanBoMay->forceDelete() : $phanBoMay->delete();
+            });
+        });
     }
 }

@@ -46,4 +46,27 @@ class NhapKho extends Model
     {
         return $this->hasMany(PhieuXuatKhoChiTiet::class, 'nhap_kho_id');
     }
+
+    protected static function booted(): void
+    {
+        static::deleting(function (NhapKho $nhapKho): void {
+            $chiTiets = $nhapKho->isForceDeleting()
+                ? $nhapKho->phieuXuatKhoChiTiets()->withTrashed()->with('phieuXuatKho')->get()
+                : $nhapKho->phieuXuatKhoChiTiets()->with('phieuXuatKho')->get();
+
+            $chiTiets->each(function (PhieuXuatKhoChiTiet $chiTiet) use ($nhapKho): void {
+                $phieuXuatKho = $chiTiet->phieuXuatKho;
+
+                $nhapKho->isForceDeleting() ? $chiTiet->forceDelete() : $chiTiet->delete();
+
+                if (! $phieuXuatKho || $phieuXuatKho->trashed()) {
+                    return;
+                }
+
+                if (! $phieuXuatKho->chiTiets()->exists()) {
+                    $phieuXuatKho->delete();
+                }
+            });
+        });
+    }
 }

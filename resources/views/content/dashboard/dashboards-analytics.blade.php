@@ -52,6 +52,10 @@
 
 @section('page-style')
   <style>
+    .dashboard-section > .card-body.border-top {
+      padding-top: 1.75rem;
+    }
+
     @media (max-width: 575.98px) {
       .dashboard-section {
         margin-bottom: 1rem !important;
@@ -67,6 +71,10 @@
 
       .dashboard-section > .card-body {
         padding: 1rem;
+      }
+
+      .dashboard-section > .card-body.border-top {
+        padding-top: 1.25rem;
       }
 
       .dashboard-section .form-label {

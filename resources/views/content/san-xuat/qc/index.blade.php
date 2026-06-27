@@ -2,6 +2,10 @@
 
 @section('title', 'QC')
 
+@section('page-style')
+  @include('content.san-xuat._filter-style')
+@endsection
+
 @section('content')
   @include('content.danh-muc._toast')
 
@@ -38,20 +42,78 @@
     </div>
 
     <div class="card-body">
-      <form action="{{ route('qc.index') }}" method="GET" class="row g-3 align-items-end">
-        <div class="col-12 col-xl">
+      <form action="{{ route('qc.index') }}" method="GET" class="row production-filter-form production-filter-grid align-items-end">
+        <div class="col-12 col-lg-4 filter-span-4">
           <label class="form-label" for="q">Tìm kiếm</label>
           <input type="text" class="form-control" id="q" name="q" value="{{ $keyword }}"
-            placeholder="Nhập mã đơn, mã KH, mã hàng, tên hàng, màu, size hoặc đơn vị may">
+            placeholder="Mã đơn, mã KH, mã hàng, màu, size, đơn vị may">
         </div>
-        @include('content.shared._per-page-select')
+        <div class="col-6 col-lg-2 filter-span-2">
+          <label class="form-label" for="tu_ngay">Từ ngày</label>
+          <input type="date" class="form-control" id="tu_ngay" name="tu_ngay" value="{{ $filters['tu_ngay'] }}">
+        </div>
+        <div class="col-6 col-lg-2 filter-span-2">
+          <label class="form-label" for="den_ngay">Đến ngày</label>
+          <input type="date" class="form-control" id="den_ngay" name="den_ngay" value="{{ $filters['den_ngay'] }}">
+        </div>
+        <div class="col-12 col-lg-2 filter-span-2">
+          <label class="form-label" for="qc_mode">Kiểu QC</label>
+          <select class="form-select" id="qc_mode" name="qc_mode">
+            <option value="">Tất cả</option>
+            <option value="from_allocation" @selected($filters['qc_mode'] === 'from_allocation')>Từ phân bổ may</option>
+            <option value="manual" @selected($filters['qc_mode'] === 'manual')>Nhập tay</option>
+          </select>
+        </div>
+        @include('content.shared._per-page-select', ['perPageColumnClass' => 'col-6 col-lg-2 filter-span-2'])
 
-        <div class="col-12 col-xl-auto">
-          <div class="d-flex gap-2 flex-wrap">
-            <button type="submit" class="btn btn-primary">
-              <i class="icon-base bx bx-search me-1"></i> Tìm kiếm
+        <div class="col-12 col-lg-4 filter-span-4">
+          <label class="form-label" for="mat_hang_id">Mã hàng</label>
+          <select class="form-select" id="mat_hang_id" name="mat_hang_id">
+            <option value="">Tất cả</option>
+            @foreach ($matHangs as $matHang)
+              <option value="{{ $matHang->id }}" @selected((string) $filters['mat_hang_id'] === (string) $matHang->id)>
+                {{ $matHang->ma_hang }} - {{ $matHang->ten_hang }}
+              </option>
+            @endforeach
+          </select>
+        </div>
+        <div class="col-6 col-lg-2 filter-span-2">
+          <label class="form-label" for="mau_id">Màu</label>
+          <select class="form-select" id="mau_id" name="mau_id">
+            <option value="">Tất cả</option>
+            @foreach ($maus as $mau)
+              <option value="{{ $mau->id }}" @selected((string) $filters['mau_id'] === (string) $mau->id)>{{ $mau->ten_mau }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="col-6 col-lg-2 filter-span-2">
+          <label class="form-label" for="size_id">Size</label>
+          <select class="form-select" id="size_id" name="size_id">
+            <option value="">Tất cả</option>
+            @foreach ($sizes as $size)
+              <option value="{{ $size->id }}" @selected((string) $filters['size_id'] === (string) $size->id)>{{ $size->ten_size }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="col-12 col-lg-2 filter-span-2">
+          <label class="form-label" for="don_vi_may_id">Đơn vị may</label>
+          <select class="form-select" id="don_vi_may_id" name="don_vi_may_id">
+            <option value="">Tất cả</option>
+            @foreach ($donViMays as $donViMay)
+              <option value="{{ $donViMay->id }}" @selected((string) $filters['don_vi_may_id'] === (string) $donViMay->id)>
+                {{ $donViMay->ten_don_vi }}
+              </option>
+            @endforeach
+          </select>
+        </div>
+        <div class="col-12 col-lg-2 filter-span-2">
+          <div class="d-flex gap-2 flex-wrap filter-actions">
+            <button type="submit" class="btn btn-primary flex-fill flex-sm-grow-0">
+              <i class="icon-base bx bx-search me-1"></i> Tìm
             </button>
-            <a href="{{ route('qc.index') }}" class="btn btn-outline-secondary">Làm mới</a>
+            <a href="{{ route('qc.index') }}" class="btn btn-outline-secondary flex-fill flex-sm-grow-0">
+              <i class="icon-base bx bx-refresh me-1"></i> Mới
+            </a>
           </div>
         </div>
       </form>

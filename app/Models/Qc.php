@@ -67,4 +67,17 @@ class Qc extends Model
     {
         return $this->hasMany(NhapKho::class, 'qc_id');
     }
+
+    protected static function booted(): void
+    {
+        static::deleting(function (Qc $qc): void {
+            $nhapKhos = $qc->isForceDeleting()
+                ? $qc->nhapKhos()->withTrashed()->get()
+                : $qc->nhapKhos()->get();
+
+            $nhapKhos->each(function (NhapKho $nhapKho) use ($qc): void {
+                $qc->isForceDeleting() ? $nhapKho->forceDelete() : $nhapKho->delete();
+            });
+        });
+    }
 }

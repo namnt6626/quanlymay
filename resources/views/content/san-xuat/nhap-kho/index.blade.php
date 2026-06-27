@@ -3,6 +3,8 @@
 @section('title', 'Nhập kho')
 
 @section('page-style')
+  @include('content.san-xuat._filter-style')
+
   <style>
     .nhap-kho-table {
       min-width: 1180px;
@@ -73,44 +75,44 @@
     </div>
 
     <div class="card-body">
-      <form action="{{ route('nhap-kho.index') }}" method="GET" class="row g-3 align-items-end">
-        <div class="col-12 col-xl">
+      <form action="{{ route('nhap-kho.index') }}" method="GET" class="row production-filter-form production-filter-grid align-items-end">
+        <div class="col-12 col-lg-4 filter-span-4">
           <label class="form-label" for="q">Tìm kiếm</label>
           <input type="text" class="form-control" id="q" name="q" value="{{ $keyword }}"
-            placeholder="Nhập mã đơn, mã KH, mã hàng, tên hàng, màu, size hoặc đơn vị may">
+            placeholder="Mã đơn, mã KH, mã hàng, màu, size, đơn vị may">
         </div>
-        <div class="col-12 col-md-6 col-xl-2">
+        <div class="col-6 col-lg-2 filter-span-2">
           <label class="form-label" for="tu_ngay">Từ ngày</label>
           <input type="date" class="form-control" id="tu_ngay" name="tu_ngay" value="{{ $tuNgay }}">
         </div>
-        <div class="col-12 col-md-6 col-xl-2">
+        <div class="col-6 col-lg-2 filter-span-2">
           <label class="form-label" for="den_ngay">Đến ngày</label>
           <input type="date" class="form-control" id="den_ngay" name="den_ngay" value="{{ $denNgay }}">
         </div>
-        <div class="col-12 col-md-6 col-xl-2">
+        <div class="col-6 col-lg-2 filter-span-2">
           <label class="form-label" for="ma_don">Mã đơn</label>
           <input type="text" class="form-control" id="ma_don" name="ma_don" value="{{ $maDon }}"
             placeholder="Mã đơn">
         </div>
-        <div class="col-12 col-md-6 col-xl-2">
+        <div class="col-6 col-lg-2 filter-span-2">
           <label class="form-label" for="ma_kh">Mã KH</label>
           <input type="text" class="form-control" id="ma_kh" name="ma_kh" value="{{ $maKh }}"
             placeholder="Mã KH">
         </div>
-        <div class="col-12 col-md-6 col-xl-2">
+        <div class="col-12 col-lg-2 filter-span-2">
           <label class="form-label" for="ma_hang">Mã hàng</label>
           <input type="text" class="form-control" id="ma_hang" name="ma_hang" value="{{ $maHang }}"
             placeholder="Mã/tên hàng">
         </div>
-        <div class="col-12 col-md-6 col-xl-2">
+        <div class="col-6 col-lg-2 filter-span-2">
           <label class="form-label" for="mau">Màu</label>
           <input type="text" class="form-control" id="mau" name="mau" value="{{ $mau }}" placeholder="Màu">
         </div>
-        <div class="col-12 col-md-6 col-xl-2">
+        <div class="col-6 col-lg-2 filter-span-2">
           <label class="form-label" for="size">Size</label>
           <input type="text" class="form-control" id="size" name="size" value="{{ $size }}" placeholder="Size">
         </div>
-        <div class="col-12 col-md-6 col-xl-2">
+        <div class="col-12 col-lg-2 filter-span-2">
           <label class="form-label" for="loai_ton">Loại tồn</label>
           <select class="form-select" id="loai_ton" name="loai_ton">
             <option value="">Tất cả</option>
@@ -119,14 +121,16 @@
             <option value="hong" @selected($loaiTon === 'hong')>Hỏng</option>
           </select>
         </div>
-        @include('content.shared._per-page-select')
+        @include('content.shared._per-page-select', ['perPageColumnClass' => 'col-6 col-lg-2 filter-span-2'])
 
-        <div class="col-12 col-xl-auto">
-          <div class="d-flex gap-2 flex-wrap">
-            <button type="submit" class="btn btn-primary">
+        <div class="col-12 col-lg-2 filter-span-2">
+          <div class="d-flex gap-2 flex-wrap filter-actions">
+            <button type="submit" class="btn btn-primary flex-fill flex-sm-grow-0">
               <i class="icon-base bx bx-search me-1"></i> Tìm kiếm
             </button>
-            <a href="{{ route('nhap-kho.index') }}" class="btn btn-outline-secondary">Làm mới</a>
+            <a href="{{ route('nhap-kho.index') }}" class="btn btn-outline-secondary flex-fill flex-sm-grow-0">
+              <i class="icon-base bx bx-refresh me-1"></i> Làm mới
+            </a>
           </div>
         </div>
       </form>

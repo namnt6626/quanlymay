@@ -24,6 +24,18 @@ class PhieuXuatKhoController extends Controller
     public function index(Request $request): View
     {
         $keyword = trim((string) $request->input('q'));
+        $tuNgay = trim((string) $request->input('tu_ngay'));
+        $denNgay = trim((string) $request->input('den_ngay'));
+        $kenhBan = trim((string) $request->input('kenh_ban'));
+
+        $filters = [
+            'q' => $keyword,
+            'tu_ngay' => $tuNgay,
+            'den_ngay' => $denNgay,
+            'kenh_ban' => $kenhBan,
+            'per_page' => paginationPerPage(),
+        ];
+
         $sourceGroups = $this->buildSourceGroups();
         $sourceGroupMap = $sourceGroups->keyBy('source_group_key');
 
@@ -42,6 +54,9 @@ class PhieuXuatKhoController extends Controller
                 'nhapKho.donHangChiTiet.donHang',
                 'donHangChiTiet.donHang',
             ])
+            ->when($tuNgay !== '', fn (Builder $query) => $query->whereHas('phieuXuatKho', fn (Builder $query) => $query->whereDate('ngay_xuat', '>=', $tuNgay)))
+            ->when($denNgay !== '', fn (Builder $query) => $query->whereHas('phieuXuatKho', fn (Builder $query) => $query->whereDate('ngay_xuat', '<=', $denNgay)))
+            ->when($kenhBan !== '', fn (Builder $query) => $query->whereHas('phieuXuatKho', fn (Builder $query) => $query->where('kenh_ban', 'like', "%{$kenhBan}%")))
             ->when($keyword !== '', function (Builder $query) use ($keyword) {
                 $query->where(function (Builder $query) use ($keyword) {
                     $query->whereHas('phieuXuatKho', function (Builder $query) use ($keyword) {
@@ -81,7 +96,7 @@ class PhieuXuatKhoController extends Controller
                 });
             })
             ->latest('id')
-            ->paginate(paginationPerPage())
+            ->paginate($filters['per_page'])
             ->withQueryString();
 
         $chiTiets->getCollection()->transform(function (PhieuXuatKhoChiTiet $chiTiet) use ($sourceGroupMap) {
@@ -107,7 +122,11 @@ class PhieuXuatKhoController extends Controller
             return $chiTiet;
         });
 
-        return view('content.san-xuat.xuat-kho.index', compact('chiTiets', 'keyword'));
+        return view('content.san-xuat.xuat-kho.index', [
+            'chiTiets' => $chiTiets,
+            'keyword' => $keyword,
+            'filters' => $filters,
+        ]);
     }
 
     public function create(): View

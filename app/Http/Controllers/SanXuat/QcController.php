@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Qc\StoreQcRequest;
 use App\Http\Requests\Qc\UpdateQcRequest;
 use App\Models\Cat;
+use App\Models\DmDonViMay;
+use App\Models\DmSize;
 use App\Models\MatHang;
+use App\Models\Mau;
 use App\Models\NhapKho;
 use App\Models\PhanBoMay;
 use App\Models\PhieuXuatKhoChiTiet;
@@ -27,6 +30,26 @@ class QcController extends Controller
     public function index(Request $request): View
     {
         $keyword = trim((string) $request->input('q'));
+        $tuNgay = trim((string) $request->input('tu_ngay'));
+        $denNgay = trim((string) $request->input('den_ngay'));
+        $matHangId = $request->integer('mat_hang_id') ?: null;
+        $mauId = $request->integer('mau_id') ?: null;
+        $sizeId = $request->integer('size_id') ?: null;
+        $donViMayId = $request->integer('don_vi_may_id') ?: null;
+        $qcMode = trim((string) $request->input('qc_mode'));
+        $qcMode = in_array($qcMode, ['from_allocation', 'manual'], true) ? $qcMode : '';
+
+        $filters = [
+            'q' => $keyword,
+            'tu_ngay' => $tuNgay,
+            'den_ngay' => $denNgay,
+            'mat_hang_id' => $matHangId,
+            'mau_id' => $mauId,
+            'size_id' => $sizeId,
+            'don_vi_may_id' => $donViMayId,
+            'qc_mode' => $qcMode,
+            'per_page' => paginationPerPage(),
+        ];
 
         $qcs = Qc::query()
             ->with([
@@ -68,8 +91,31 @@ class QcController extends Controller
                     });
                 });
             })
+            ->when($tuNgay !== '', fn (Builder $query) => $query->whereDate('ngay_qc', '>=', $tuNgay))
+            ->when($denNgay !== '', fn (Builder $query) => $query->whereDate('ngay_qc', '<=', $denNgay))
+            ->when($matHangId, function (Builder $query) use ($matHangId): void {
+                $query->where(function (Builder $query) use ($matHangId): void {
+                    $query->where('mat_hang_id', $matHangId)
+                        ->orWhereHas('phanBoMay.cat', fn (Builder $query) => $query->where('mat_hang_id', $matHangId));
+                });
+            })
+            ->when($mauId, function (Builder $query) use ($mauId): void {
+                $query->where(function (Builder $query) use ($mauId): void {
+                    $query->where('mau_id', $mauId)
+                        ->orWhereHas('phanBoMay.cat', fn (Builder $query) => $query->where('mau_id', $mauId));
+                });
+            })
+            ->when($sizeId, function (Builder $query) use ($sizeId): void {
+                $query->where(function (Builder $query) use ($sizeId): void {
+                    $query->where('size_id', $sizeId)
+                        ->orWhereHas('phanBoMay.cat', fn (Builder $query) => $query->where('size_id', $sizeId));
+                });
+            })
+            ->when($donViMayId, fn (Builder $query) => $query->whereHas('phanBoMay', fn (Builder $query) => $query->where('don_vi_may_id', $donViMayId)))
+            ->when($qcMode === 'from_allocation', fn (Builder $query) => $query->whereNotNull('phan_bo_may_id'))
+            ->when($qcMode === 'manual', fn (Builder $query) => $query->whereNull('phan_bo_may_id'))
             ->latest('id')
-            ->paginate(paginationPerPage())
+            ->paginate($filters['per_page'])
             ->withQueryString();
 
         $sourceGroups = $this->buildSourceGroups();
@@ -89,7 +135,15 @@ class QcController extends Controller
             return $qc;
         });
 
-        return view('content.san-xuat.qc.index', compact('qcs', 'keyword'));
+        return view('content.san-xuat.qc.index', [
+            'qcs' => $qcs,
+            'keyword' => $keyword,
+            'filters' => $filters,
+            'matHangs' => MatHang::query()->where('trang_thai', true)->orderBy('ma_hang')->get(['id', 'ma_hang', 'ten_hang']),
+            'maus' => Mau::query()->where('trang_thai', true)->orderBy('ten_mau')->get(['id', 'ma_mau', 'ten_mau']),
+            'sizes' => DmSize::query()->where('trang_thai', true)->orderBy('ten_size')->get(['id', 'ma_size', 'ten_size']),
+            'donViMays' => DmDonViMay::query()->where('trang_thai', true)->orderBy('ten_don_vi')->get(['id', 'ma_don_vi', 'ten_don_vi']),
+        ]);
     }
 
     public function create(): View
