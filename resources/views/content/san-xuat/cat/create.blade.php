@@ -18,6 +18,52 @@
     .cut-filter-menu .form-check:hover {
       background: var(--bs-gray-100);
     }
+
+    .cut-search-combobox {
+      position: relative;
+    }
+
+    .cut-search-combobox-menu {
+      background: var(--bs-card-bg, #fff);
+      border: 1px solid var(--bs-border-color);
+      border-radius: 0.375rem;
+      box-shadow: 0 0.5rem 1rem rgba(34, 48, 62, 0.12);
+      display: none;
+      left: 0;
+      margin-top: 0.25rem;
+      max-height: 280px;
+      overflow-y: auto;
+      position: absolute;
+      right: 0;
+      top: 100%;
+      z-index: 1080;
+    }
+
+    .cut-search-combobox-menu.show {
+      display: block;
+    }
+
+    .cut-search-combobox-option {
+      background: transparent;
+      border: 0;
+      color: inherit;
+      display: block;
+      padding: 0.65rem 0.875rem;
+      text-align: left;
+      width: 100%;
+    }
+
+    .cut-search-combobox-option:hover,
+    .cut-search-combobox-option:focus,
+    .cut-search-combobox-option.is-selected {
+      background: var(--bs-gray-100);
+      outline: 0;
+    }
+
+    .cut-search-combobox-empty {
+      color: var(--bs-secondary-color);
+      padding: 0.75rem 0.875rem;
+    }
   </style>
 @endsection
 
@@ -96,10 +142,121 @@
       const fixedColorFilterLabel = document.getElementById('fixed-color-filter-label');
       const fixedSizeFilterLabel = document.getElementById('fixed-size-filter-label');
       const matHangSelect = document.getElementById('mat_hang_id');
+      const donHangSearch = document.getElementById('don_hang_search');
+      const donHangMenu = document.getElementById('don_hang_search_menu');
+      const matHangSearch = document.getElementById('mat_hang_search');
+      const matHangMenu = document.getElementById('mat_hang_search_menu');
       const orderData = @json($donHangData);
       const fixedItems = @json($oldFixedItems);
       const fixedItemOptions = @json($fixedItemOptions);
       const initialMatHangId = @json((string) $selectedMatHangId);
+
+      function normalizeSearchText(value) {
+        return String(value || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .trim();
+      }
+
+      function bindSearchableSelect(select, input, menu, options = {}) {
+        if (!select || !input || !menu) {
+          return;
+        }
+
+        const sourceOptions = Array.from(select.options).map(function(option) {
+          return {
+            value: option.value,
+            label: option.textContent.trim(),
+            search: normalizeSearchText(option.textContent),
+          };
+        });
+
+        function selectedOption() {
+          return sourceOptions.find(option => option.value === select.value);
+        }
+
+        function syncInput() {
+          const selected = selectedOption();
+          input.value = selected && selected.value ? selected.label : '';
+        }
+
+        function choose(option) {
+          select.value = option.value;
+          input.value = option.value ? option.label : '';
+          menu.classList.remove('show');
+          input.setAttribute('aria-expanded', 'false');
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        function render(showAll = false) {
+          const keyword = showAll ? '' : normalizeSearchText(input.value);
+          const rows = sourceOptions.filter(function(option) {
+            if (!option.value && !options.allowEmpty) {
+              return false;
+            }
+
+            return keyword === '' || option.search.includes(keyword);
+          });
+
+          menu.innerHTML = '';
+
+          if (rows.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'cut-search-combobox-empty';
+            empty.textContent = 'Không tìm thấy dữ liệu phù hợp.';
+            menu.appendChild(empty);
+          } else {
+            rows.forEach(function(option) {
+              const button = document.createElement('button');
+              button.type = 'button';
+              button.className = 'cut-search-combobox-option';
+              button.classList.toggle('is-selected', option.value === select.value);
+              button.textContent = option.label;
+              button.addEventListener('mousedown', event => event.preventDefault());
+              button.addEventListener('click', () => choose(option));
+              menu.appendChild(button);
+            });
+          }
+
+          menu.classList.add('show');
+          input.setAttribute('aria-expanded', 'true');
+        }
+
+        input.addEventListener('focus', function() {
+          input.select();
+          render(true);
+        });
+
+        input.addEventListener('click', function() {
+          render(true);
+        });
+        input.addEventListener('input', function() {
+          if (select.value) {
+            select.value = '';
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          render();
+        });
+
+        input.addEventListener('keydown', function(event) {
+          if (event.key === 'Escape') {
+            menu.classList.remove('show');
+            input.setAttribute('aria-expanded', 'false');
+            syncInput();
+          }
+        });
+
+        input.addEventListener('blur', function() {
+          window.setTimeout(function() {
+            menu.classList.remove('show');
+            input.setAttribute('aria-expanded', 'false');
+            syncInput();
+          }, 120);
+        });
+
+        syncInput();
+      }
 
       function normalizeNumber(value) {
         let text = String(value || '').trim();
@@ -487,6 +644,9 @@
         toggleMode();
       }
 
+      bindSearchableSelect(donHangSelect, donHangSearch, donHangMenu, { allowEmpty: true });
+      bindSearchableSelect(matHangSelect, matHangSearch, matHangMenu);
+
       if (form) {
         form.addEventListener('submit', function() {
           form.querySelectorAll('.js-number-format').forEach(function(input) {
@@ -522,8 +682,15 @@
 
         <div class="row g-4">
           <div class="col-12">
-            <label class="form-label" for="don_hang_id">Mã đơn hàng</label>
-            <select class="form-select @error('don_hang_id') is-invalid @enderror" id="don_hang_id" name="don_hang_id">
+            <label class="form-label" for="don_hang_search">Mã đơn hàng</label>
+            <div class="cut-search-combobox">
+              <input type="text" class="form-control @error('don_hang_id') is-invalid @enderror"
+                id="don_hang_search" autocomplete="off" role="combobox" aria-autocomplete="list"
+                aria-expanded="false" aria-controls="don_hang_search_menu"
+                placeholder="Gõ mã đơn hoặc mã khách hàng để tìm">
+              <div class="cut-search-combobox-menu" id="don_hang_search_menu" role="listbox"></div>
+            </div>
+            <select class="d-none" id="don_hang_id" name="don_hang_id" tabindex="-1" aria-hidden="true">
               <option value="">-- Cắt cố định / không chọn đơn hàng --</option>
               @foreach ($donHangs as $donHang)
                 <option value="{{ $donHang->id }}" @selected((string) $selectedDonHangId === (string) $donHang->id)>
@@ -532,7 +699,7 @@
               @endforeach
             </select>
             @error('don_hang_id')
-              <div class="invalid-feedback">{{ $message }}</div>
+              <div class="invalid-feedback d-block">{{ $message }}</div>
             @enderror
           </div>
 
@@ -644,9 +811,15 @@
           <div class="col-12" id="fixed-cat-fields">
             <div class="row g-4">
               <div class="col-md-4">
-                <label class="form-label" for="mat_hang_id">Mặt hàng <span class="text-danger">*</span></label>
-                <select class="form-select @error('mat_hang_id') is-invalid @enderror" id="mat_hang_id"
-                  name="mat_hang_id" required>
+                <label class="form-label" for="mat_hang_search">Mặt hàng <span class="text-danger">*</span></label>
+                <div class="cut-search-combobox">
+                  <input type="text" class="form-control @error('mat_hang_id') is-invalid @enderror"
+                    id="mat_hang_search" autocomplete="off" role="combobox" aria-autocomplete="list"
+                    aria-expanded="false" aria-controls="mat_hang_search_menu"
+                    placeholder="Gõ mã hàng hoặc tên hàng để tìm">
+                  <div class="cut-search-combobox-menu" id="mat_hang_search_menu" role="listbox"></div>
+                </div>
+                <select class="d-none" id="mat_hang_id" name="mat_hang_id" tabindex="-1" aria-hidden="true">
                   <option value="">-- Chọn mặt hàng --</option>
                   @foreach ($matHangs as $matHang)
                     <option value="{{ $matHang->id }}" @selected((string) $selectedMatHangId === (string) $matHang->id)>
@@ -655,7 +828,7 @@
                   @endforeach
                 </select>
                 @error('mat_hang_id')
-                  <div class="invalid-feedback">{{ $message }}</div>
+                  <div class="invalid-feedback d-block">{{ $message }}</div>
                 @enderror
               </div>
 

@@ -101,7 +101,9 @@ class DashboardService
     {
         [$from, $to] = $this->dateRange($filters);
         $dates = collect(CarbonPeriod::create($from, $to))
-            ->map(fn (Carbon $date) => $date->toDateString());
+            ->map(fn (Carbon $date) => $date->toDateString())
+            ->sortDesc()
+            ->values();
 
         $cat = $this->dailyProductionTotals('cat', $from, $to);
         $giaoMay = $this->dailyProductionTotals('phan_bo_may', $from, $to);

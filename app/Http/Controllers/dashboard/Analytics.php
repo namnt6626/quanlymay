@@ -7,6 +7,7 @@ use App\Models\DonHang;
 use App\Services\Dashboard\DashboardService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
@@ -58,6 +59,22 @@ class Analytics extends Controller
             'date_from' => trim((string) $request->input('daily_date_from')),
             'date_to' => trim((string) $request->input('daily_date_to')),
         ];
+        $dailyPerPage = in_array($request->integer('daily_per_page'), paginationPerPageOptions(), true)
+            ? $request->integer('daily_per_page')
+            : 10;
+        $dailyRows = $service->getDailyProduction($dailyFilters);
+        $dailyPage = max(1, $request->integer('daily_page', 1));
+        $dailyProduction = new LengthAwarePaginator(
+            $dailyRows->forPage($dailyPage, $dailyPerPage)->values(),
+            $dailyRows->count(),
+            $dailyPerPage,
+            $dailyPage,
+            [
+                'path' => $request->url(),
+                'pageName' => 'daily_page',
+                'query' => $request->query(),
+            ]
+        );
 
         return view('content.dashboard.dashboards-analytics', [
             'quickFilters' => $quickFilters,
@@ -67,7 +84,8 @@ class Analytics extends Controller
             'quickSummary' => $service->getQuickSummary($quickFilters),
             'timeProductionSummary' => $service->getTimeProductionSummary($timeFilters),
             'todayProduction' => $service->getTodayProduction(),
-            'dailyProduction' => $service->getDailyProduction($dailyFilters),
+            'dailyProduction' => $dailyProduction,
+            'dailyPerPage' => $dailyPerPage,
             ...$this->filterOptions(),
         ]);
     }

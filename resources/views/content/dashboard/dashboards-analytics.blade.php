@@ -223,7 +223,7 @@
       'time_mau_id',
       'time_size_id',
   ];
-  $dailyKeys = ['daily_date_from', 'daily_date_to'];
+  $dailyKeys = ['daily_date_from', 'daily_date_to', 'daily_per_page'];
 
   $quickPreserved = request()->only([...$timeKeys, ...$dailyKeys]);
   $timePreserved = request()->only([...$quickKeys, ...$dailyKeys]);
@@ -534,7 +534,15 @@
           <input type="date" class="form-control" id="daily_date_to" name="daily_date_to"
             value="{{ $dailyFilters['date_to'] ?? '' }}">
         </div>
-        <div class="col-12 col-xl-6">
+        <div class="col-6 col-md-3 col-xl-2">
+          <label class="form-label" for="daily_per_page">Hiển thị</label>
+          <select class="form-select" id="daily_per_page" name="daily_per_page" onchange="this.form.submit()">
+            @foreach (paginationPerPageOptions() as $option)
+              <option value="{{ $option }}" @selected($dailyPerPage === $option)>{{ $option }} dòng</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="col-12 col-md-9 col-xl-4">
           <div class="d-flex gap-2 dashboard-filter-actions">
             <button type="submit" class="btn btn-primary">
               <i class="icon-base bx bx-filter-alt me-1"></i> Lọc
@@ -576,5 +584,10 @@
         </tbody>
       </table>
     </div>
+    @if ($dailyProduction->hasPages())
+      <div class="card-footer">
+        {{ $dailyProduction->links() }}
+      </div>
+    @endif
   </div>
 @endsection

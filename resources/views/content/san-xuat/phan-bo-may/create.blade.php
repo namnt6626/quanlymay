@@ -33,6 +33,52 @@
       text-align: right;
     }
 
+    .cut-search-combobox {
+      position: relative;
+    }
+
+    .cut-search-combobox-menu {
+      background: var(--bs-card-bg, #fff);
+      border: 1px solid var(--bs-border-color);
+      border-radius: 0.375rem;
+      box-shadow: 0 0.5rem 1rem rgba(34, 48, 62, 0.12);
+      display: none;
+      left: 0;
+      margin-top: 0.25rem;
+      max-height: 280px;
+      overflow-y: auto;
+      position: absolute;
+      right: 0;
+      top: 100%;
+      z-index: 1080;
+    }
+
+    .cut-search-combobox-menu.show {
+      display: block;
+    }
+
+    .cut-search-combobox-option {
+      background: transparent;
+      border: 0;
+      color: inherit;
+      display: block;
+      padding: 0.65rem 0.875rem;
+      text-align: left;
+      width: 100%;
+    }
+
+    .cut-search-combobox-option:hover,
+    .cut-search-combobox-option:focus,
+    .cut-search-combobox-option.is-selected {
+      background: var(--bs-gray-100);
+      outline: 0;
+    }
+
+    .cut-search-combobox-empty {
+      color: var(--bs-secondary-color);
+      padding: 0.75rem 0.875rem;
+    }
+
     @media (max-width: 575.98px) {
       .allocation-table-scroll {
         margin-inline: 0;
@@ -139,10 +185,10 @@
       const modeInputs = Array.from(document.querySelectorAll('input[name="allocation_mode"]'));
       const donHangSearchInput = document.getElementById('don_hang_search');
       const donHangInput = document.getElementById('don_hang_id');
-      const donHangList = document.getElementById('don_hang_options');
+      const donHangMenu = document.getElementById('don_hang_search_menu');
       const productSearchInput = document.getElementById('product_search');
       const matHangInput = document.getElementById('mat_hang_id');
-      const productList = document.getElementById('product_options');
+      const productMenu = document.getElementById('product_search_menu');
       const sizeBox = document.getElementById('size-box');
       const sizeList = document.getElementById('size-list');
       const tableWrapper = document.getElementById('allocation-table-wrapper');
@@ -286,67 +332,118 @@
         return `${item.ma_hang || '-'} - ${item.ten_hang || '-'}`;
       }
 
-      function refreshOrders() {
-        const keyword = String(donHangSearchInput.value || '').trim().toLowerCase();
+      function normalizeSearchText(value) {
+        return String(value || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .trim();
+      }
+
+      function appendMenuOption(menu, label, isSelected, onSelect) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'cut-search-combobox-option';
+        button.classList.toggle('is-selected', isSelected);
+        button.textContent = label;
+        button.addEventListener('mousedown', event => event.preventDefault());
+        button.addEventListener('click', onSelect);
+        menu.appendChild(button);
+      }
+
+      function showEmptyMenu(menu) {
+        const empty = document.createElement('div');
+        empty.className = 'cut-search-combobox-empty';
+        empty.textContent = 'Không tìm thấy dữ liệu phù hợp.';
+        menu.appendChild(empty);
+      }
+
+      function selectOrder(item) {
+        donHangInput.value = item ? item.don_hang_id : '';
+        donHangSearchInput.value = item ? orderLabel(item) : '';
+        donHangMenu.classList.remove('show');
+        donHangSearchInput.setAttribute('aria-expanded', 'false');
+        productSearchInput.value = '';
+        matHangInput.value = '';
+        refreshAll();
+      }
+
+      function renderOrderMenu(showAll = false) {
+        const keyword = showAll ? '' : normalizeSearchText(donHangSearchInput.value);
         const orders = uniqueBy(options.filter(function(item) {
           return item.don_hang_id;
         }), function(item) {
           return String(item.don_hang_id);
         }).filter(function(item) {
-          const label = orderLabel(item).toLowerCase();
-          return !keyword || label.includes(keyword);
+          return !keyword || normalizeSearchText(orderLabel(item)).includes(keyword);
         });
 
-        donHangList.innerHTML = '';
+        donHangMenu.innerHTML = '';
+        appendMenuOption(
+          donHangMenu,
+          '-- Không chọn mã đơn --',
+          !selectedDonHangId(),
+          () => selectOrder(null)
+        );
 
         orders.forEach(function(item) {
-          const option = document.createElement('option');
-          option.value = orderLabel(item);
-          donHangList.appendChild(option);
+          appendMenuOption(
+            donHangMenu,
+            orderLabel(item),
+            String(item.don_hang_id) === selectedDonHangId(),
+            () => selectOrder(item)
+          );
         });
+
+        donHangMenu.classList.add('show');
+        donHangSearchInput.setAttribute('aria-expanded', 'true');
       }
 
-      function syncSelectedOrder() {
-        const value = String(donHangSearchInput.value || '').trim();
-        const order = uniqueBy(options.filter(item => item.don_hang_id), item => String(item.don_hang_id))
-          .find(function(item) {
-            return orderLabel(item) === value;
-          });
-
-        donHangInput.value = order ? order.don_hang_id : '';
+      function syncOrderLabel() {
+        const order = options.find(item => String(item.don_hang_id || '') === selectedDonHangId());
+        donHangSearchInput.value = order ? orderLabel(order) : '';
       }
 
-      function refreshProducts() {
-        const keyword = String(productSearchInput.value || '').trim().toLowerCase();
-        const currentValue = matHangInput.value;
+      function selectProduct(item) {
+        matHangInput.value = item ? item.mat_hang_id : '';
+        productSearchInput.value = item ? productLabel(item) : '';
+        productMenu.classList.remove('show');
+        productSearchInput.setAttribute('aria-expanded', 'false');
+        refreshSizes();
+        renderTable();
+      }
+
+      function renderProductMenu(showAll = false) {
+        const keyword = showAll ? '' : normalizeSearchText(productSearchInput.value);
         const products = uniqueBy(filteredBaseOptions(), function(item) {
           return String(item.mat_hang_id);
         }).filter(function(item) {
-          const label = `${item.ma_hang || ''} ${item.ten_hang || ''}`.toLowerCase();
-          return !keyword || label.includes(keyword);
+          return !keyword || normalizeSearchText(productLabel(item)).includes(keyword);
         });
 
-        productList.innerHTML = '';
+        productMenu.innerHTML = '';
 
-        products.forEach(function(item) {
-          const option = document.createElement('option');
-          option.value = productLabel(item);
-          productList.appendChild(option);
-        });
-
-        if (currentValue && products.some(item => String(item.mat_hang_id) === String(currentValue))) {
-          return;
+        if (products.length === 0) {
+          showEmptyMenu(productMenu);
+        } else {
+          products.forEach(function(item) {
+            appendMenuOption(
+              productMenu,
+              productLabel(item),
+              String(item.mat_hang_id) === selectedMatHangId(),
+              () => selectProduct(item)
+            );
+          });
         }
+
+        productMenu.classList.add('show');
+        productSearchInput.setAttribute('aria-expanded', 'true');
       }
 
-      function syncSelectedProduct() {
-        const value = String(productSearchInput.value || '').trim();
+      function syncProductLabel() {
         const product = uniqueBy(filteredBaseOptions(), item => String(item.mat_hang_id))
-          .find(function(item) {
-            return productLabel(item) === value;
-          });
-
-        matHangInput.value = product ? product.mat_hang_id : '';
+          .find(item => String(item.mat_hang_id) === selectedMatHangId());
+        productSearchInput.value = product ? productLabel(product) : '';
       }
 
       function refreshSizes() {
@@ -440,7 +537,6 @@
       }
 
       function refreshAll() {
-        refreshProducts();
         refreshSizes();
         renderTable();
       }
@@ -453,30 +549,69 @@
       });
 
       donHangSearchInput.addEventListener('input', function() {
-        refreshOrders();
-        syncSelectedOrder();
+        donHangInput.value = '';
         productSearchInput.value = '';
         matHangInput.value = '';
         refreshAll();
+        renderOrderMenu();
+      });
+
+      donHangSearchInput.addEventListener('focus', function() {
+        donHangSearchInput.select();
+        renderOrderMenu(true);
+      });
+
+      donHangSearchInput.addEventListener('click', function() {
+        renderOrderMenu(true);
       });
 
       donHangSearchInput.addEventListener('blur', function() {
-        syncSelectedOrder();
-        refreshAll();
+        window.setTimeout(function() {
+          donHangMenu.classList.remove('show');
+          donHangSearchInput.setAttribute('aria-expanded', 'false');
+          syncOrderLabel();
+        }, 120);
       });
 
       productSearchInput.addEventListener('input', function() {
-        refreshProducts();
-        syncSelectedProduct();
+        matHangInput.value = '';
         refreshSizes();
         renderTable();
+        renderProductMenu();
+      });
+
+      productSearchInput.addEventListener('focus', function() {
+        productSearchInput.select();
+        renderProductMenu(true);
+      });
+
+      productSearchInput.addEventListener('click', function() {
+        renderProductMenu(true);
       });
 
       productSearchInput.addEventListener('blur', function() {
-        syncSelectedProduct();
-        refreshSizes();
-        renderTable();
+        window.setTimeout(function() {
+          productMenu.classList.remove('show');
+          productSearchInput.setAttribute('aria-expanded', 'false');
+          syncProductLabel();
+        }, 120);
       });
+
+      [donHangSearchInput, productSearchInput].forEach(function(input) {
+        input.addEventListener('keydown', function(event) {
+          if (event.key !== 'Escape') {
+            return;
+          }
+
+          donHangMenu.classList.remove('show');
+          productMenu.classList.remove('show');
+          donHangSearchInput.setAttribute('aria-expanded', 'false');
+          productSearchInput.setAttribute('aria-expanded', 'false');
+          syncOrderLabel();
+          syncProductLabel();
+        });
+      });
+
       sizeList.addEventListener('change', renderTable);
 
       if (form) {
@@ -500,9 +635,6 @@
         donHangSearchInput.value = order ? orderLabel(order) : '';
         donHangInput.value = initialState.don_hang_id;
       }
-
-      refreshOrders();
-      refreshProducts();
 
       if (initialState.mat_hang_id) {
         const product = filteredBaseOptions().find(function(item) {
@@ -562,23 +694,31 @@
 
           <div class="col-md-4">
             <label class="form-label" for="don_hang_search">Mã đơn</label>
-            <input type="text" class="form-control @error('don_hang_id') is-invalid @enderror" id="don_hang_search"
-              list="don_hang_options" autocomplete="off" placeholder="Gõ mã đơn hoặc mã KH">
+            <div class="cut-search-combobox">
+              <input type="text" class="form-control @error('don_hang_id') is-invalid @enderror"
+                id="don_hang_search" autocomplete="off" role="combobox" aria-autocomplete="list"
+                aria-expanded="false" aria-controls="don_hang_search_menu"
+                placeholder="Gõ mã đơn hoặc mã KH để tìm">
+              <div class="cut-search-combobox-menu" id="don_hang_search_menu" role="listbox"></div>
+            </div>
             <input type="hidden" id="don_hang_id" name="don_hang_id" value="{{ old('don_hang_id') }}">
-            <datalist id="don_hang_options"></datalist>
             @error('don_hang_id')
-              <div class="invalid-feedback">{{ $message }}</div>
+              <div class="invalid-feedback d-block">{{ $message }}</div>
             @enderror
           </div>
 
           <div class="col-md-4">
             <label class="form-label" for="product_search">Mã hàng <span class="text-danger">*</span></label>
-            <input type="text" class="form-control @error('mat_hang_id') is-invalid @enderror" id="product_search"
-              list="product_options" autocomplete="off" placeholder="Gõ mã hàng hoặc tên hàng">
+            <div class="cut-search-combobox">
+              <input type="text" class="form-control @error('mat_hang_id') is-invalid @enderror"
+                id="product_search" autocomplete="off" role="combobox" aria-autocomplete="list"
+                aria-expanded="false" aria-controls="product_search_menu"
+                placeholder="Gõ mã hàng hoặc tên hàng để tìm">
+              <div class="cut-search-combobox-menu" id="product_search_menu" role="listbox"></div>
+            </div>
             <input type="hidden" id="mat_hang_id" name="mat_hang_id" value="{{ old('mat_hang_id') }}">
-            <datalist id="product_options"></datalist>
             @error('mat_hang_id')
-              <div class="invalid-feedback">{{ $message }}</div>
+              <div class="invalid-feedback d-block">{{ $message }}</div>
             @enderror
           </div>
 
