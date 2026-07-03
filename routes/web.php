@@ -113,6 +113,19 @@ $registerCrudRoutes('don-vi-may', DonViMayController::class, 'don_vi_may', [
   'edit' => 'DANH_MUC_EDIT',
   'delete' => 'DANH_MUC_DELETE',
 ]);
+Route::delete('cat/bulk', [CatController::class, 'bulkDestroy'])
+  ->middleware(['auth', 'permission:CAT_DELETE'])
+  ->name('cat.bulk-destroy');
+Route::delete('phan-bo-may/bulk', [PhanBoMayController::class, 'bulkDestroy'])
+  ->middleware(['auth', 'permission:PHAN_BO_MAY_DELETE'])
+  ->name('phan-bo-may.bulk-destroy');
+Route::delete('qc/bulk', [QcController::class, 'bulkDestroy'])
+  ->middleware(['auth', 'permission:QC_DELETE'])
+  ->name('qc.bulk-destroy');
+Route::delete('xuat-kho/bulk', [PhieuXuatKhoController::class, 'bulkDestroy'])
+  ->middleware(['auth', 'permission:XUAT_KHO_DELETE'])
+  ->name('xuat-kho.bulk-destroy');
+
 $registerCrudRoutes('cat', CatController::class, 'cat', [
   'view' => 'CAT_VIEW',
   'create' => 'CAT_CREATE',

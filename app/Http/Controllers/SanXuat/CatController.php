@@ -228,7 +228,30 @@ class CatController extends Controller
             $cat->delete();
         });
 
-        return $this->redirectToIndex('Xóa lần cắt thành công.');
+        return redirect()
+            ->route('cat.index', request()->query())
+            ->with('success', 'Xóa lần cắt thành công.');
+    }
+
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $ids = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer', 'distinct', 'exists:cat,id'],
+        ], [
+            'ids.required' => 'Vui lòng chọn ít nhất một lần cắt để xóa.',
+            'ids.min' => 'Vui lòng chọn ít nhất một lần cắt để xóa.',
+        ])['ids'];
+
+        $cats = Cat::query()->whereIn('id', $ids)->get();
+
+        DB::transaction(function () use ($cats): void {
+            $cats->each->delete();
+        });
+
+        return redirect()
+            ->route('cat.index', $request->query())
+            ->with('success', 'Đã xóa '.$cats->count().' lần cắt.');
     }
 
     private function formOptions(): array

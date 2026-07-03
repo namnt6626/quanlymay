@@ -341,7 +341,33 @@ class PhieuXuatKhoController extends Controller
             $xuatKho->delete();
         });
 
-        return $this->redirectToIndex('Xóa xuất kho thành công.');
+        return redirect()
+            ->route('xuat-kho.index', request()->query())
+            ->with('success', 'Xóa xuất kho thành công.');
+    }
+
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $ids = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer', 'distinct', 'exists:phieu_xuat_kho,id'],
+        ], [
+            'ids.required' => 'Vui lòng chọn ít nhất một phiếu xuất kho để xóa.',
+            'ids.min' => 'Vui lòng chọn ít nhất một phiếu xuất kho để xóa.',
+        ])['ids'];
+
+        $phieuXuatKhos = PhieuXuatKho::query()->whereIn('id', $ids)->get();
+
+        DB::transaction(function () use ($phieuXuatKhos): void {
+            $phieuXuatKhos->each(function (PhieuXuatKho $phieuXuatKho): void {
+                $phieuXuatKho->chiTiets()->withTrashed()->get()->each->delete();
+                $phieuXuatKho->delete();
+            });
+        });
+
+        return redirect()
+            ->route('xuat-kho.index', $request->query())
+            ->with('success', 'Đã xóa '.$phieuXuatKhos->count().' phiếu xuất kho.');
     }
 
     private function formOptions(?PhieuXuatKhoChiTiet $currentChiTiet = null): array

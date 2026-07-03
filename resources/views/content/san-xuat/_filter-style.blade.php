@@ -35,6 +35,16 @@
     white-space: nowrap;
   }
 
+  .bulk-select-cell {
+    min-width: 52px;
+    text-align: center;
+    width: 52px;
+  }
+
+  .js-bulk-toolbar {
+    background-color: var(--bs-gray-100);
+  }
+
   @media (max-width: 767.98px) {
     .production-filter-form {
       --bs-gutter-x: .65rem;

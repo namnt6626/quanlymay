@@ -249,7 +249,38 @@ class QcController extends Controller
             $qc->delete();
         });
 
-        return $this->redirectToIndex('Xóa QC thành công.');
+        return redirect()
+            ->route('qc.index', request()->query())
+            ->with('success', 'Xóa QC thành công.');
+    }
+
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $ids = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer', 'distinct', 'exists:qc,id'],
+        ], [
+            'ids.required' => 'Vui lòng chọn ít nhất một bản ghi QC để xóa.',
+            'ids.min' => 'Vui lòng chọn ít nhất một bản ghi QC để xóa.',
+        ])['ids'];
+
+        $qcs = Qc::query()->whereIn('id', $ids)->get();
+        $qcs->each(fn (Qc $qc) => $this->ensureQcCanBeDeleted($qc));
+
+        DB::transaction(function () use ($qcs): void {
+            $qcs->each(function (Qc $qc): void {
+                $qc->nhapKhos()
+                    ->where('auto_from_qc', true)
+                    ->get()
+                    ->each
+                    ->delete();
+                $qc->delete();
+            });
+        });
+
+        return redirect()
+            ->route('qc.index', $request->query())
+            ->with('success', 'Đã xóa '.$qcs->count().' bản ghi QC.');
     }
 
     private function formOptions(?Qc $currentQc = null): array

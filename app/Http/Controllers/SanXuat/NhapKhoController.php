@@ -246,13 +246,15 @@ class NhapKhoController extends Controller
     {
         if ($nhapKho->auto_from_qc) {
             return redirect()
-                ->route('nhap-kho.index')
+                ->route('nhap-kho.index', request()->query())
                 ->with('error', 'Nhập kho tự động từ QC không được xóa trực tiếp.');
         }
 
         $nhapKho->delete();
 
-        return $this->redirectToIndex('Xóa nhập kho thành công.');
+        return redirect()
+            ->route('nhap-kho.index', request()->query())
+            ->with('success', 'Xóa nhập kho thành công.');
     }
 
     private function formOptions(?NhapKho $currentNhapKho = null): array

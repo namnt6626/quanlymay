@@ -179,7 +179,30 @@ class PhanBoMayController extends Controller
             $phanBoMay->delete();
         });
 
-        return $this->redirectToIndex('Xóa phân bổ may thành công.');
+        return redirect()
+            ->route('phan-bo-may.index', request()->query())
+            ->with('success', 'Xóa phân bổ may thành công.');
+    }
+
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $ids = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer', 'distinct', 'exists:phan_bo_may,id'],
+        ], [
+            'ids.required' => 'Vui lòng chọn ít nhất một phân bổ may để xóa.',
+            'ids.min' => 'Vui lòng chọn ít nhất một phân bổ may để xóa.',
+        ])['ids'];
+
+        $phanBoMays = PhanBoMay::query()->whereIn('id', $ids)->get();
+
+        DB::transaction(function () use ($phanBoMays): void {
+            $phanBoMays->each->delete();
+        });
+
+        return redirect()
+            ->route('phan-bo-may.index', $request->query())
+            ->with('success', 'Đã xóa '.$phanBoMays->count().' phân bổ may.');
     }
 
     private function formOptions(?PhanBoMay $currentPhanBoMay = null): array

@@ -34,12 +34,23 @@
   <div class="card">
     <div class="card-header d-flex flex-column flex-md-row gap-3 justify-content-between align-items-md-center">
       <h5 class="mb-0">Danh sách QC</h5>
-      @if (hasPermission('QC_CREATE'))
-        <a href="{{ route('qc.create') }}" class="btn btn-primary">
-          <i class="icon-base bx bx-plus me-1"></i> Thêm mới
-        </a>
-      @endif
+      <div class="d-flex gap-2 flex-wrap">
+        @if (hasPermission('QC_DELETE'))
+          <button type="button" class="btn btn-outline-danger js-bulk-toggle">
+            <i class="icon-base bx bx-select-multiple me-1"></i> Xóa hàng loạt
+          </button>
+        @endif
+        @if (hasPermission('QC_CREATE'))
+          <a href="{{ route('qc.create') }}" class="btn btn-primary">
+            <i class="icon-base bx bx-plus me-1"></i> Thêm mới
+          </a>
+        @endif
+      </div>
     </div>
+
+    @if (hasPermission('QC_DELETE'))
+      @include('content.san-xuat._bulk-delete', ['bulkRoute' => 'qc.bulk-destroy', 'bulkLabel' => 'bản ghi QC'])
+    @endif
 
     <div class="card-body">
       <form action="{{ route('qc.index') }}" method="GET" class="row production-filter-form production-filter-grid align-items-end">
@@ -123,6 +134,11 @@
       <table class="table align-middle">
         <thead>
           <tr>
+            @if (hasPermission('QC_DELETE'))
+              <th class="bulk-select-cell js-bulk-column d-none">
+                <input class="form-check-input js-bulk-check-all" type="checkbox" aria-label="Chọn tất cả QC">
+              </th>
+            @endif
             <th style="width: 80px;">STT</th>
             <th>Ngày QC</th>
             <th>Mã đơn</th>
@@ -148,6 +164,12 @@
               $size = $qc->phanBoMay?->cat?->size ?? $qc->size;
             @endphp
             <tr>
+              @if (hasPermission('QC_DELETE'))
+                <td class="bulk-select-cell js-bulk-column d-none">
+                  <input class="form-check-input js-bulk-item" type="checkbox" value="{{ $qc->id }}"
+                    aria-label="Chọn QC {{ $qc->id }}">
+                </td>
+              @endif
               <td>{{ $qcs->firstItem() + $loop->index }}</td>
               <td>{{ $qc->ngay_qc ? \Illuminate\Support\Carbon::parse($qc->ngay_qc)->format('d/m/Y') : '-' }}</td>
               <td>{{ $qc->donHangChiTiet?->donHang?->ma_don ?? '-' }}</td>
@@ -175,7 +197,7 @@
                     </a>
                   @endif
                   @if (hasPermission('QC_DELETE'))
-                    <form action="{{ route('qc.destroy', $qc) }}" method="POST"
+                    <form action="{{ route('qc.destroy', ['qc' => $qc] + request()->query()) }}" method="POST"
                       onsubmit="return confirm('Bạn có chắc muốn xóa QC này?');">
                       @csrf
                       @method('DELETE')
@@ -189,7 +211,7 @@
             </tr>
           @empty
             <tr>
-              <td colspan="15" class="text-center py-4">Chưa có dữ liệu QC.</td>
+              <td colspan="{{ hasPermission('QC_DELETE') ? 16 : 15 }}" class="text-center py-4">Chưa có dữ liệu QC.</td>
             </tr>
           @endforelse
         </tbody>

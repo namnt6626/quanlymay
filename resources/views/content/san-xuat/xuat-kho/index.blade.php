@@ -34,12 +34,23 @@
   <div class="card">
     <div class="card-header d-flex flex-column flex-md-row gap-3 justify-content-between align-items-md-center">
       <h5 class="mb-0">Danh sách xuất kho</h5>
-      @if (hasPermission('XUAT_KHO_CREATE'))
-        <a href="{{ route('xuat-kho.create') }}" class="btn btn-primary">
-          <i class="icon-base bx bx-plus me-1"></i> Thêm mới
-        </a>
-      @endif
+      <div class="d-flex gap-2 flex-wrap">
+        @if (hasPermission('XUAT_KHO_DELETE'))
+          <button type="button" class="btn btn-outline-danger js-bulk-toggle">
+            <i class="icon-base bx bx-select-multiple me-1"></i> Xóa hàng loạt
+          </button>
+        @endif
+        @if (hasPermission('XUAT_KHO_CREATE'))
+          <a href="{{ route('xuat-kho.create') }}" class="btn btn-primary">
+            <i class="icon-base bx bx-plus me-1"></i> Thêm mới
+          </a>
+        @endif
+      </div>
     </div>
+
+    @if (hasPermission('XUAT_KHO_DELETE'))
+      @include('content.san-xuat._bulk-delete', ['bulkRoute' => 'xuat-kho.bulk-destroy', 'bulkLabel' => 'phiếu xuất kho'])
+    @endif
 
     <div class="card-body">
       <form action="{{ route('xuat-kho.index') }}" method="GET" class="row production-filter-form production-filter-grid align-items-end">
@@ -80,6 +91,11 @@
       <table class="table align-middle">
         <thead>
           <tr>
+            @if (hasPermission('XUAT_KHO_DELETE'))
+              <th class="bulk-select-cell js-bulk-column d-none">
+                <input class="form-check-input js-bulk-check-all" type="checkbox" aria-label="Chọn tất cả phiếu xuất kho">
+              </th>
+            @endif
             <th style="width: 80px;">STT</th>
             <th>Số phiếu</th>
             <th>Ngày xuất</th>
@@ -98,6 +114,12 @@
         <tbody class="table-border-bottom-0">
           @forelse ($chiTiets as $chiTiet)
             <tr>
+              @if (hasPermission('XUAT_KHO_DELETE'))
+                <td class="bulk-select-cell js-bulk-column d-none">
+                  <input class="form-check-input js-bulk-item" type="checkbox"
+                    value="{{ $chiTiet->phieu_xuat_kho_id }}" aria-label="Chọn phiếu xuất {{ $chiTiet->phieu_xuat_kho_id }}">
+                </td>
+              @endif
               <td>{{ $chiTiets->firstItem() + $loop->index }}</td>
               <td>{{ $chiTiet->phieuXuatKho?->so_phieu ?? '-' }}</td>
               <td>{{ $chiTiet->phieuXuatKho?->ngay_xuat ? \Illuminate\Support\Carbon::parse($chiTiet->phieuXuatKho->ngay_xuat)->format('d/m/Y') : '-' }}</td>
@@ -122,7 +144,7 @@
                     </a>
                   @endif
                   @if (hasPermission('XUAT_KHO_DELETE'))
-                    <form action="{{ route('xuat-kho.destroy', $chiTiet->phieuXuatKho) }}" method="POST"
+                    <form action="{{ route('xuat-kho.destroy', ['phieu_xuat_kho' => $chiTiet->phieuXuatKho] + request()->query()) }}" method="POST"
                       onsubmit="return confirm('Bạn có chắc muốn xóa xuất kho này?');">
                       @csrf
                       @method('DELETE')
@@ -136,7 +158,7 @@
             </tr>
           @empty
             <tr>
-              <td colspan="13" class="text-center py-4">Chưa có dữ liệu xuất kho.</td>
+              <td colspan="{{ hasPermission('XUAT_KHO_DELETE') ? 14 : 13 }}" class="text-center py-4">Chưa có dữ liệu xuất kho.</td>
             </tr>
           @endforelse
         </tbody>

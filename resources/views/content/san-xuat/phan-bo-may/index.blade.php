@@ -34,12 +34,23 @@
   <div class="card">
     <div class="card-header d-flex flex-column flex-md-row gap-3 justify-content-between align-items-md-center">
       <h5 class="mb-0">Danh sách phân bổ may</h5>
-      @if (hasPermission('PHAN_BO_MAY_CREATE'))
-        <a href="{{ route('phan-bo-may.create') }}" class="btn btn-primary">
-          <i class="icon-base bx bx-plus me-1"></i> Thêm mới
-        </a>
-      @endif
+      <div class="d-flex gap-2 flex-wrap">
+        @if (hasPermission('PHAN_BO_MAY_DELETE'))
+          <button type="button" class="btn btn-outline-danger js-bulk-toggle">
+            <i class="icon-base bx bx-select-multiple me-1"></i> Xóa hàng loạt
+          </button>
+        @endif
+        @if (hasPermission('PHAN_BO_MAY_CREATE'))
+          <a href="{{ route('phan-bo-may.create') }}" class="btn btn-primary">
+            <i class="icon-base bx bx-plus me-1"></i> Thêm mới
+          </a>
+        @endif
+      </div>
     </div>
+
+    @if (hasPermission('PHAN_BO_MAY_DELETE'))
+      @include('content.san-xuat._bulk-delete', ['bulkRoute' => 'phan-bo-may.bulk-destroy', 'bulkLabel' => 'phân bổ may'])
+    @endif
 
     <div class="card-body">
       <form action="{{ route('phan-bo-may.index') }}" method="GET" class="row production-filter-form production-filter-grid align-items-end">
@@ -115,6 +126,11 @@
       <table class="table align-middle">
         <thead>
           <tr>
+            @if (hasPermission('PHAN_BO_MAY_DELETE'))
+              <th class="bulk-select-cell js-bulk-column d-none">
+                <input class="form-check-input js-bulk-check-all" type="checkbox" aria-label="Chọn tất cả phân bổ may">
+              </th>
+            @endif
             <th style="width: 80px;">STT</th>
             <th>Ngày giao</th>
             <th>Mã đơn</th>
@@ -132,6 +148,12 @@
         <tbody class="table-border-bottom-0">
           @forelse ($phanBoMays as $phanBoMay)
             <tr>
+              @if (hasPermission('PHAN_BO_MAY_DELETE'))
+                <td class="bulk-select-cell js-bulk-column d-none">
+                  <input class="form-check-input js-bulk-item" type="checkbox" value="{{ $phanBoMay->id }}"
+                    aria-label="Chọn phân bổ may {{ $phanBoMay->id }}">
+                </td>
+              @endif
               <td>{{ $phanBoMays->firstItem() + $loop->index }}</td>
               <td>
                 {{ $phanBoMay->ngay_phan_bo ? \Illuminate\Support\Carbon::parse($phanBoMay->ngay_phan_bo)->format('d/m/Y') : '-' }}
@@ -159,7 +181,7 @@
                     </a>
                   @endif
                   @if (hasPermission('PHAN_BO_MAY_DELETE'))
-                    <form action="{{ route('phan-bo-may.destroy', $phanBoMay) }}" method="POST"
+                    <form action="{{ route('phan-bo-may.destroy', ['phan_bo_may' => $phanBoMay] + request()->query()) }}" method="POST"
                       onsubmit="return confirm('Bạn có chắc muốn xóa phân bổ may này?');">
                       @csrf
                       @method('DELETE')
@@ -173,7 +195,7 @@
             </tr>
           @empty
             <tr>
-              <td colspan="12" class="text-center py-4">Chưa có dữ liệu phân bổ may.</td>
+              <td colspan="{{ hasPermission('PHAN_BO_MAY_DELETE') ? 13 : 12 }}" class="text-center py-4">Chưa có dữ liệu phân bổ may.</td>
             </tr>
           @endforelse
         </tbody>

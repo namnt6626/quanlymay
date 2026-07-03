@@ -34,12 +34,23 @@
   <div class="card">
     <div class="card-header d-flex flex-column flex-md-row gap-3 justify-content-between align-items-md-center">
       <h5 class="mb-0">Danh sách lần cắt</h5>
-      @if (hasPermission('CAT_CREATE'))
-        <a href="{{ route('cat.create') }}" class="btn btn-primary">
-          <i class="icon-base bx bx-plus me-1"></i> Thêm mới
-        </a>
-      @endif
+      <div class="d-flex gap-2 flex-wrap">
+        @if (hasPermission('CAT_DELETE'))
+          <button type="button" class="btn btn-outline-danger js-bulk-toggle">
+            <i class="icon-base bx bx-select-multiple me-1"></i> Xóa hàng loạt
+          </button>
+        @endif
+        @if (hasPermission('CAT_CREATE'))
+          <a href="{{ route('cat.create') }}" class="btn btn-primary">
+            <i class="icon-base bx bx-plus me-1"></i> Thêm mới
+          </a>
+        @endif
+      </div>
     </div>
+
+    @if (hasPermission('CAT_DELETE'))
+      @include('content.san-xuat._bulk-delete', ['bulkRoute' => 'cat.bulk-destroy', 'bulkLabel' => 'lần cắt'])
+    @endif
 
     <div class="card-body">
       <form action="{{ route('cat.index') }}" method="GET" class="row production-filter-form production-filter-grid align-items-end">
@@ -128,6 +139,11 @@
       <table class="table align-middle">
         <thead>
           <tr>
+            @if (hasPermission('CAT_DELETE'))
+              <th class="bulk-select-cell js-bulk-column d-none">
+                <input class="form-check-input js-bulk-check-all" type="checkbox" aria-label="Chọn tất cả lần cắt">
+              </th>
+            @endif
             <th style="width: 80px;">STT</th>
             <th>Ngày cắt</th>
             <th>Mã hàng</th>
@@ -145,6 +161,12 @@
         <tbody class="table-border-bottom-0">
           @forelse ($cats as $cat)
             <tr>
+              @if (hasPermission('CAT_DELETE'))
+                <td class="bulk-select-cell js-bulk-column d-none">
+                  <input class="form-check-input js-bulk-item" type="checkbox" value="{{ $cat->id }}"
+                    aria-label="Chọn lần cắt {{ $cat->id }}">
+                </td>
+              @endif
               <td>{{ $cats->firstItem() + $loop->index }}</td>
               <td>{{ $cat->ngay_cat ? \Illuminate\Support\Carbon::parse($cat->ngay_cat)->format('d/m/Y') : '-' }}</td>
               <td>
@@ -168,7 +190,7 @@
                     </a>
                   @endif
                   @if (hasPermission('CAT_DELETE'))
-                    <form action="{{ route('cat.destroy', $cat) }}" method="POST"
+                    <form action="{{ route('cat.destroy', ['cat' => $cat] + request()->query()) }}" method="POST"
                       onsubmit="return confirm('Bạn có chắc muốn xóa lần cắt này?');">
                       @csrf
                       @method('DELETE')
@@ -182,7 +204,7 @@
             </tr>
           @empty
             <tr>
-              <td colspan="14" class="text-center py-4">Chưa có dữ liệu lần cắt.</td>
+              <td colspan="{{ hasPermission('CAT_DELETE') ? 13 : 12 }}" class="text-center py-4">Chưa có dữ liệu lần cắt.</td>
             </tr>
           @endforelse
         </tbody>
