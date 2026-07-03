@@ -6,7 +6,7 @@
   <style>
     .xuat-source-dropdown {
       left: 0;
-      max-height: 320px;
+      max-height: 420px;
       overflow-y: auto;
       right: 0;
       top: calc(100% + 4px);
@@ -19,11 +19,49 @@
 
     .xuat-source-option {
       cursor: pointer;
+      white-space: normal;
     }
 
     .xuat-source-option:hover,
     .xuat-source-option.active {
       background-color: var(--bs-gray-100);
+    }
+
+    .xuat-source-group-label {
+      background-color: var(--bs-gray-100);
+      color: var(--bs-secondary-color);
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.5rem 0.875rem;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .xuat-source-option-main {
+      min-width: 0;
+    }
+
+    .xuat-source-option-name {
+      overflow-wrap: anywhere;
+    }
+
+    .xuat-source-option-meta {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.75rem;
+      margin-top: 0.35rem;
+    }
+
+    .xuat-source-result-count {
+      color: var(--bs-secondary-color);
+      font-size: 0.8125rem;
+      min-height: 1.25rem;
+    }
+
+    .xuat-source-search-icon {
+      color: var(--bs-secondary-color);
     }
 
     .xuat-lines-table {
@@ -174,9 +212,17 @@
       const linesBody = document.getElementById('xuat-lines-body');
       const emptyRow = document.getElementById('xuat-empty-row');
       const kenhBanInput = document.getElementById('kenh_ban');
+      const orderFilter = document.getElementById('xuat-source-order-filter');
+      const productFilter = document.getElementById('xuat-source-product-filter');
+      const colorFilter = document.getElementById('xuat-source-color-filter');
+      const sizeFilter = document.getElementById('xuat-source-size-filter');
+      const resetFiltersButton = document.getElementById('xuat-source-reset-filters');
+      const resultCount = document.getElementById('xuat-source-result-count');
 
       const sources = @json($sourceOptions);
       let selectedRows = @json($selectedItems);
+      let visibleSources = [];
+      let activeSourceIndex = -1;
 
       function normalizeNumber(value) {
         let text = String(value || '').trim();
@@ -237,6 +283,73 @@
         return selectedRows.map((row) => Number(row.id));
       }
 
+      function normalizeSearchText(value) {
+        return String(value || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .trim();
+      }
+
+      function uniqueSortedValues(rows, valueGetter) {
+        return Array.from(new Set(rows.map(valueGetter).filter(Boolean)))
+          .sort((a, b) => String(a).localeCompare(String(b), 'vi'));
+      }
+
+      function setSelectOptions(select, rows, valueGetter, placeholder, formatter = (value) => value) {
+        const currentValue = select.value;
+        const values = uniqueSortedValues(rows, valueGetter);
+
+        select.innerHTML = `<option value="">${placeholder}</option>`;
+        values.forEach((value) => {
+          const option = document.createElement('option');
+          option.value = value;
+          option.textContent = formatter(value);
+          select.appendChild(option);
+        });
+
+        select.value = values.includes(currentValue) ? currentValue : '';
+      }
+
+      function matchesOrderFilter(source) {
+        if (!orderFilter.value) return true;
+        if (orderFilter.value === '__no_order__') return !source.has_order;
+
+        return source.has_order && String(source.order_number || '') === orderFilter.value;
+      }
+
+      function populateSourceFilters() {
+        const orderValue = orderFilter.value;
+        const orderRows = sources.filter((source) => source.has_order);
+        const orderNumbers = uniqueSortedValues(orderRows, (source) => source.order_number);
+        const hasNoOrder = sources.some((source) => !source.has_order);
+
+        orderFilter.innerHTML = '<option value="">Tất cả mã đơn</option>';
+        if (hasNoOrder) {
+          orderFilter.appendChild(new Option('Không đơn hàng', '__no_order__'));
+        }
+        orderNumbers.forEach((value) => orderFilter.appendChild(new Option(value, value)));
+        orderFilter.value = orderValue === '__no_order__' || orderNumbers.includes(orderValue) ? orderValue : '';
+
+        const productRows = sources.filter(matchesOrderFilter);
+        setSelectOptions(
+          productFilter,
+          productRows,
+          (source) => String(source.product_code || ''),
+          'Tất cả mã hàng',
+          (code) => {
+            const source = productRows.find((item) => String(item.product_code || '') === code);
+            return source?.product_name ? `${code} - ${source.product_name}` : code;
+          }
+        );
+
+        const colorRows = productRows.filter((source) => !productFilter.value || String(source.product_code || '') === productFilter.value);
+        setSelectOptions(colorFilter, colorRows, (source) => String(source.color || ''), 'Tất cả màu');
+
+        const sizeRows = colorRows.filter((source) => !colorFilter.value || String(source.color || '') === colorFilter.value);
+        setSelectOptions(sizeFilter, sizeRows, (source) => String(source.size || ''), 'Tất cả size');
+      }
+
       function syncSelectedQuantities() {
         linesBody.querySelectorAll('tr[data-source-row="1"]').forEach((row) => {
           const sourceId = Number(row.dataset.sourceId);
@@ -250,33 +363,72 @@
       }
 
       function filteredSources() {
-        const keyword = sourceInput.value.trim().toLowerCase();
+        const keyword = normalizeSearchText(sourceInput.value);
         const ids = selectedIds();
 
         return sources
           .filter((source) => !ids.includes(Number(source.id)))
-          .filter((source) => keyword === '' || source.search_text.includes(keyword))
-          .slice(0, 30);
+          .filter(matchesOrderFilter)
+          .filter((source) => !productFilter.value || String(source.product_code || '') === productFilter.value)
+          .filter((source) => !colorFilter.value || String(source.color || '') === colorFilter.value)
+          .filter((source) => !sizeFilter.value || String(source.size || '') === sizeFilter.value)
+          .filter((source) => keyword === '' || normalizeSearchText(source.search_text).includes(keyword))
+          .sort((a, b) => {
+            return String(a.order_number || 'Không đơn').localeCompare(String(b.order_number || 'Không đơn'), 'vi') ||
+              String(a.product_code || '').localeCompare(String(b.product_code || ''), 'vi') ||
+              String(a.color || '').localeCompare(String(b.color || ''), 'vi') ||
+              String(a.size || '').localeCompare(String(b.size || ''), 'vi');
+          });
       }
 
       function renderDropdown() {
-        const options = filteredSources();
+        const matchingSources = filteredSources();
+        visibleSources = matchingSources.slice(0, 100);
+        activeSourceIndex = -1;
         sourceDropdown.innerHTML = '';
+        resultCount.textContent = matchingSources.length > visibleSources.length
+          ? `Hiển thị ${visibleSources.length} / ${matchingSources.length} nguồn phù hợp`
+          : `${matchingSources.length} nguồn phù hợp`;
 
-        if (!options.length) {
+        if (!visibleSources.length) {
           sourceDropdown.innerHTML = '<div class="px-3 py-2 text-muted small">Không có nguồn hàng phù hợp.</div>';
           sourceDropdown.classList.remove('d-none');
           sourceDropdown.classList.add('show');
           return;
         }
 
-        options.forEach((source) => {
+        let previousGroup = null;
+
+        visibleSources.forEach((source, index) => {
+          const groupLabel = source.has_order ? `Đơn ${source.order_number}` : 'Không theo đơn hàng';
+
+          if (groupLabel !== previousGroup) {
+            const group = document.createElement('div');
+            group.className = 'xuat-source-group-label';
+            group.textContent = groupLabel;
+            sourceDropdown.appendChild(group);
+            previousGroup = groupLabel;
+          }
+
           const item = document.createElement('button');
           item.type = 'button';
           item.className = 'dropdown-item xuat-source-option py-2';
+          item.dataset.sourceIndex = index;
           item.innerHTML = `
-            <div class="fw-semibold">${source.label}</div>
-            <div class="text-muted small">Nhập đạt: ${formatDisplayNumber(source.imported)} | Đã xuất: ${formatDisplayNumber(source.exported)} | Còn lại: ${formatDisplayNumber(source.remaining)}</div>
+            <div class="d-flex align-items-start justify-content-between gap-3">
+              <div class="xuat-source-option-main">
+                <div class="fw-semibold xuat-source-option-name">${source.product_code || '-'} - ${source.product_name || '-'}</div>
+                <div class="xuat-source-option-meta small">
+                  <span class="badge bg-label-secondary">${source.color || '-'}</span>
+                  <span class="badge bg-label-info">Size ${source.size || '-'}</span>
+                  ${source.customer_number ? `<span class="text-muted">KH: ${source.customer_number}</span>` : ''}
+                </div>
+                <div class="text-muted small mt-1">
+                  Nhập đạt: ${formatDisplayNumber(source.imported)} · Đã xuất: ${formatDisplayNumber(source.exported)}
+                </div>
+              </div>
+              <span class="badge bg-label-success flex-shrink-0">Còn ${formatDisplayNumber(source.remaining)}</span>
+            </div>
           `;
           item.addEventListener('click', function() {
             addSource(source);
@@ -293,6 +445,18 @@
           sourceDropdown.classList.add('d-none');
           sourceDropdown.classList.remove('show');
         }, 160);
+      }
+
+      function updateActiveSource(index) {
+        if (!visibleSources.length) return;
+
+        activeSourceIndex = Math.max(0, Math.min(index, visibleSources.length - 1));
+        sourceDropdown.querySelectorAll('.xuat-source-option').forEach((item) => {
+          item.classList.toggle('active', Number(item.dataset.sourceIndex) === activeSourceIndex);
+        });
+
+        sourceDropdown.querySelector(`[data-source-index="${activeSourceIndex}"]`)
+          ?.scrollIntoView({ block: 'nearest' });
       }
 
       function addSource(source) {
@@ -397,6 +561,55 @@
       sourceInput.addEventListener('focus', renderDropdown);
       sourceInput.addEventListener('input', renderDropdown);
       sourceInput.addEventListener('blur', hideDropdown);
+      sourceInput.addEventListener('keydown', function(event) {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          updateActiveSource(activeSourceIndex + 1);
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          updateActiveSource(activeSourceIndex <= 0 ? visibleSources.length - 1 : activeSourceIndex - 1);
+        } else if (event.key === 'Enter' && activeSourceIndex >= 0) {
+          event.preventDefault();
+          addSource(visibleSources[activeSourceIndex]);
+        } else if (event.key === 'Escape') {
+          sourceDropdown.classList.add('d-none');
+          sourceDropdown.classList.remove('show');
+        }
+      });
+
+      orderFilter.addEventListener('change', function() {
+        productFilter.value = '';
+        colorFilter.value = '';
+        sizeFilter.value = '';
+        populateSourceFilters();
+        renderDropdown();
+      });
+
+      productFilter.addEventListener('change', function() {
+        colorFilter.value = '';
+        sizeFilter.value = '';
+        populateSourceFilters();
+        renderDropdown();
+      });
+
+      colorFilter.addEventListener('change', function() {
+        sizeFilter.value = '';
+        populateSourceFilters();
+        renderDropdown();
+      });
+
+      sizeFilter.addEventListener('change', renderDropdown);
+
+      resetFiltersButton.addEventListener('click', function() {
+        orderFilter.value = '';
+        productFilter.value = '';
+        colorFilter.value = '';
+        sizeFilter.value = '';
+        sourceInput.value = '';
+        populateSourceFilters();
+        renderDropdown();
+        sourceInput.focus();
+      });
 
       if (form) {
         form.addEventListener('submit', function() {
@@ -413,6 +626,7 @@
         });
       }
 
+      populateSourceFilters();
       renderRows();
     });
   </script>
@@ -514,10 +728,46 @@
       </div>
 
       <div class="card-body">
+        <div class="row g-2 mb-3">
+          <div class="col-6 col-xl-3">
+            <label class="form-label" for="xuat-source-order-filter">Mã đơn</label>
+            <select class="form-select" id="xuat-source-order-filter">
+              <option value="">Tất cả mã đơn</option>
+            </select>
+          </div>
+          <div class="col-6 col-xl-3">
+            <label class="form-label" for="xuat-source-product-filter">Mã hàng</label>
+            <select class="form-select" id="xuat-source-product-filter">
+              <option value="">Tất cả mã hàng</option>
+            </select>
+          </div>
+          <div class="col-6 col-xl-2">
+            <label class="form-label" for="xuat-source-color-filter">Màu</label>
+            <select class="form-select" id="xuat-source-color-filter">
+              <option value="">Tất cả màu</option>
+            </select>
+          </div>
+          <div class="col-6 col-xl-2">
+            <label class="form-label" for="xuat-source-size-filter">Size</label>
+            <select class="form-select" id="xuat-source-size-filter">
+              <option value="">Tất cả size</option>
+            </select>
+          </div>
+          <div class="col-12 col-xl-2 d-flex align-items-end">
+            <button type="button" class="btn btn-outline-secondary w-100" id="xuat-source-reset-filters">
+              <i class="icon-base bx bx-refresh me-1"></i> Xóa lọc
+            </button>
+          </div>
+        </div>
+
         <div class="position-relative mb-3">
           <label class="form-label" for="xuat-source-search">Nguồn xuất <span class="text-danger">*</span></label>
-          <input type="text" class="form-control" id="xuat-source-search"
-            placeholder="Gõ để tìm mã đơn / mã hàng / màu / size cần xuất" autocomplete="off">
+          <div class="input-group">
+            <span class="input-group-text xuat-source-search-icon"><i class="icon-base bx bx-search"></i></span>
+            <input type="text" class="form-control" id="xuat-source-search"
+              placeholder="Tìm mã đơn, mã KH, mã hàng, tên hàng, màu hoặc size" autocomplete="off">
+          </div>
+          <div class="xuat-source-result-count mt-1" id="xuat-source-result-count"></div>
           <div id="xuat-source-dropdown" class="dropdown-menu shadow xuat-source-dropdown d-none"></div>
           @error('items')
             <div class="text-danger small mt-1">{{ $message }}</div>

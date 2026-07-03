@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SanXuat;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\XuatKho\StoreXuatKhoRequest;
 use App\Http\Requests\XuatKho\UpdateXuatKhoRequest;
+use App\Models\DonHangChiTiet;
 use App\Models\NhapKho;
 use App\Models\PhieuXuatKho;
 use App\Models\PhieuXuatKhoChiTiet;
@@ -298,6 +299,8 @@ class PhieuXuatKhoController extends Controller
                 'qc.phanBoMay.cat.matHang',
                 'qc.phanBoMay.cat.mau',
                 'qc.phanBoMay.cat.size',
+                'qc.phanBoMay.cat.donHangChiTiet.donHang',
+                'qc.phanBoMay.donHangChiTiet.donHang',
                 'qc.phanBoMay.donViMay',
                 'qc.matHang',
                 'qc.mau',
@@ -469,6 +472,8 @@ class PhieuXuatKhoController extends Controller
                 'qc.phanBoMay.cat.matHang',
                 'qc.phanBoMay.cat.mau',
                 'qc.phanBoMay.cat.size',
+                'qc.phanBoMay.cat.donHangChiTiet.donHang',
+                'qc.phanBoMay.donHangChiTiet.donHang',
                 'qc.phanBoMay.donViMay',
                 'qc.matHang',
                 'qc.mau',
@@ -486,6 +491,8 @@ class PhieuXuatKhoController extends Controller
                 'nhapKho.qc.phanBoMay.cat.matHang',
                 'nhapKho.qc.phanBoMay.cat.mau',
                 'nhapKho.qc.phanBoMay.cat.size',
+                'nhapKho.qc.phanBoMay.cat.donHangChiTiet.donHang',
+                'nhapKho.qc.phanBoMay.donHangChiTiet.donHang',
                 'nhapKho.qc.phanBoMay.donViMay',
                 'nhapKho.qc.matHang',
                 'nhapKho.qc.mau',
@@ -526,16 +533,18 @@ class PhieuXuatKhoController extends Controller
                     $totalXuat -= (float) $currentChiTiet->so_luong_xuat;
                 }
 
+                $donHangChiTiet = $this->donHangChiTietFromNhapKho($representativeNhapKho);
+
                 $representativeNhapKho->setAttribute('source_group_key', $sourceGroupKey);
-                $representativeNhapKho->setAttribute('source_has_order', (bool) $representativeNhapKho->don_hang_chi_tiet_id);
-                $representativeNhapKho->setAttribute('source_order_number', $representativeNhapKho->donHangChiTiet?->donHang?->ma_don);
-                $representativeNhapKho->setAttribute('source_customer_number', $representativeNhapKho->donHangChiTiet?->donHang?->ma_kh);
-                $representativeNhapKho->setAttribute('source_order_quantity', $representativeNhapKho->donHangChiTiet?->so_luong_dat);
+                $representativeNhapKho->setAttribute('source_has_order', (bool) $donHangChiTiet);
+                $representativeNhapKho->setAttribute('source_order_number', $donHangChiTiet?->donHang?->ma_don);
+                $representativeNhapKho->setAttribute('source_customer_number', $donHangChiTiet?->donHang?->ma_kh);
+                $representativeNhapKho->setAttribute('source_order_quantity', $donHangChiTiet?->so_luong_dat);
                 $representativeNhapKho->setAttribute('source_product_code', $representativeNhapKho->qc?->phanBoMay?->cat?->matHang?->ma_hang ?? $representativeNhapKho->qc?->matHang?->ma_hang);
                 $representativeNhapKho->setAttribute('source_product_name', $representativeNhapKho->qc?->phanBoMay?->cat?->matHang?->ten_hang ?? $representativeNhapKho->qc?->matHang?->ten_hang);
                 $representativeNhapKho->setAttribute('source_color', $representativeNhapKho->qc?->phanBoMay?->cat?->mau?->ten_mau ?? $representativeNhapKho->qc?->mau?->ten_mau);
                 $representativeNhapKho->setAttribute('source_size', $representativeNhapKho->qc?->phanBoMay?->cat?->size?->ten_size ?? $representativeNhapKho->qc?->size?->ten_size);
-                $representativeNhapKho->setAttribute('source_kenh_ban', $representativeNhapKho->donHangChiTiet?->donHang?->kenh_ban);
+                $representativeNhapKho->setAttribute('source_kenh_ban', $donHangChiTiet?->donHang?->kenh_ban);
                 $representativeNhapKho->setAttribute('source_total_imported', max(0, $totalNhap));
                 $representativeNhapKho->setAttribute('source_total_exported', max(0, $totalXuat));
                 $representativeNhapKho->setAttribute('source_total_remaining', max(0, $totalNhap - $totalXuat));
@@ -553,7 +562,35 @@ class PhieuXuatKhoController extends Controller
             return null;
         }
 
+        $qc = $nhapKho->qc;
+        $phanBoMay = $qc->phanBoMay;
+        $cat = $phanBoMay?->cat;
+        $donHangChiTietId = $nhapKho->don_hang_chi_tiet_id
+            ?? $qc->don_hang_chi_tiet_id
+            ?? $phanBoMay?->don_hang_chi_tiet_id
+            ?? $cat?->don_hang_chi_tiet_id;
+
+        if ($donHangChiTietId) {
+            return 'order-detail:'.(int) $donHangChiTietId;
+        }
+
+        $matHangId = $qc->mat_hang_id ?? $cat?->mat_hang_id;
+        $mauId = $qc->mau_id ?? $cat?->mau_id;
+        $sizeId = $qc->size_id ?? $cat?->size_id;
+
+        if ($matHangId && $mauId && $sizeId) {
+            return sprintf('catalog:%d:%d:%d', $matHangId, $mauId, $sizeId);
+        }
+
         return 'nhap:'.$nhapKho->id;
+    }
+
+    private function donHangChiTietFromNhapKho(NhapKho $nhapKho): ?DonHangChiTiet
+    {
+        return $nhapKho->donHangChiTiet
+            ?? $nhapKho->qc?->donHangChiTiet
+            ?? $nhapKho->qc?->phanBoMay?->donHangChiTiet
+            ?? $nhapKho->qc?->phanBoMay?->cat?->donHangChiTiet;
     }
 
     private function redirectToIndex(string $message): RedirectResponse
