@@ -16,6 +16,7 @@ use App\Http\Controllers\authentications\LoginBasic;
 use App\Http\Controllers\authentications\RegisterBasic;
 use App\Http\Controllers\authentications\ForgotPasswordBasic;
 use App\Http\Controllers\BaoCao\BaoCaoTongHopDonHangController;
+use App\Http\Controllers\BaoCao\BaoCaoBanHangOnlineController;
 use App\Http\Controllers\DanhMuc\MatHangController;
 use App\Http\Controllers\DanhMuc\MauController;
 use App\Http\Controllers\DanhMuc\SizeController;
@@ -23,6 +24,7 @@ use App\Http\Controllers\DanhMuc\DonViCatController;
 use App\Http\Controllers\DanhMuc\DonViMayController;
 use App\Http\Controllers\DonHang\DonHangController;
 use App\Http\Controllers\SanXuat\CatController;
+use App\Http\Controllers\SanXuat\DonHangHoanThanhController;
 use App\Http\Controllers\SanXuat\NhapKhoController;
 use App\Http\Controllers\SanXuat\PhanBoMayController;
 use App\Http\Controllers\SanXuat\PhieuXuatKhoController;
@@ -122,6 +124,9 @@ Route::delete('phan-bo-may/bulk', [PhanBoMayController::class, 'bulkDestroy'])
 Route::delete('qc/bulk', [QcController::class, 'bulkDestroy'])
   ->middleware(['auth', 'permission:QC_DELETE'])
   ->name('qc.bulk-destroy');
+Route::delete('don-hang-hoan-thanh/bulk', [DonHangHoanThanhController::class, 'bulkDestroy'])
+  ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_DELETE'])
+  ->name('don-hang-hoan-thanh.bulk-destroy');
 Route::delete('xuat-kho/bulk', [PhieuXuatKhoController::class, 'bulkDestroy'])
   ->middleware(['auth', 'permission:XUAT_KHO_DELETE'])
   ->name('xuat-kho.bulk-destroy');
@@ -143,6 +148,18 @@ $registerCrudRoutes('qc', QcController::class, 'qc', [
   'create' => 'QC_CREATE',
   'edit' => 'QC_EDIT',
   'delete' => 'QC_DELETE',
+]);
+Route::get('don-hang-hoan-thanh/import', [DonHangHoanThanhController::class, 'importForm'])
+  ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_CREATE'])->name('don-hang-hoan-thanh.import');
+Route::post('don-hang-hoan-thanh/import/preview', [DonHangHoanThanhController::class, 'preview'])
+  ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_CREATE'])->name('don-hang-hoan-thanh.preview');
+Route::post('don-hang-hoan-thanh/import/commit', [DonHangHoanThanhController::class, 'commit'])
+  ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_CREATE'])->name('don-hang-hoan-thanh.commit');
+$registerCrudRoutes('don-hang-hoan-thanh', DonHangHoanThanhController::class, 'don_hang_hoan_thanh', [
+  'view' => 'DON_HANG_HOAN_THANH_VIEW',
+  'create' => 'DON_HANG_HOAN_THANH_CREATE',
+  'edit' => 'DON_HANG_HOAN_THANH_EDIT',
+  'delete' => 'DON_HANG_HOAN_THANH_DELETE',
 ]);
 $registerCrudRoutes('nhap-kho', NhapKhoController::class, 'nhap_kho', [
   'view' => 'NHAP_KHO_VIEW',
@@ -171,6 +188,9 @@ $registerIndexRoute('ton-kho', TonKhoController::class, [
 Route::get('bao-cao/tong-hop-don-hang', BaoCaoTongHopDonHangController::class)
   ->middleware(['auth', 'permission:BAO_CAO_TONG_HOP_DON_HANG_VIEW'])
   ->name('bao-cao.tong-hop-don-hang');
+Route::get('bao-cao/ban-hang-online', BaoCaoBanHangOnlineController::class)
+  ->middleware(['auth', 'permission:BAO_CAO_BAN_HANG_ONLINE_VIEW'])
+  ->name('bao-cao.ban-hang-online');
 $registerCrudRoutes('role', RoleController::class, 'role', [
   'view' => 'ROLE_VIEW',
   'create' => 'ROLE_CREATE',

@@ -2,6 +2,10 @@
 
 @section('title', 'Dashboard')
 
+@section('vendor-script')
+  @vite(['resources/assets/vendor/libs/apex-charts/apexcharts.js'])
+@endsection
+
 @section('page-script')
   @parent
   <script>
@@ -46,6 +50,39 @@
       }
 
       monthInput?.addEventListener('change', rebuildMonthWeeks);
+
+      const onlineTrendEl = document.querySelector('#dashboard-online-sales-trend');
+      const onlineTopEl = document.querySelector('#dashboard-online-top-products');
+      const currency = value => new Intl.NumberFormat('vi-VN').format(value) + ' ₫';
+
+      if (@json(request('tab') === 'online') && onlineTrendEl && window.ApexCharts) {
+        new ApexCharts(onlineTrendEl, {
+          chart: { type: 'line', height: 320, toolbar: { show: false } },
+          stroke: { curve: 'smooth', width: [3, 3] },
+          series: [
+            { name: 'Tổng tiền', type: 'area', data: @json($onlineTrend->pluck('tong_tien')->map(fn($v) => (float) $v)->values()) },
+            { name: 'Số lượng', type: 'line', data: @json($onlineTrend->pluck('so_luong')->map(fn($v) => (float) $v)->values()) }
+          ],
+          xaxis: { categories: @json($onlineTrend->pluck('ngay')->map(fn($v) => \Illuminate\Support\Carbon::parse($v)->format('d/m'))->values()) },
+          yaxis: [
+            { labels: { formatter: value => new Intl.NumberFormat('vi-VN', { notation: 'compact' }).format(value) } },
+            { opposite: true, labels: { formatter: value => Math.round(value) } }
+          ],
+          tooltip: { shared: true, y: [{ formatter: currency }, { formatter: value => new Intl.NumberFormat('vi-VN').format(value) }] },
+          colors: ['#696cff', '#03c3ec']
+        }).render();
+      }
+
+      if (@json(request('tab') === 'online') && onlineTopEl && window.ApexCharts) {
+        new ApexCharts(onlineTopEl, {
+          chart: { type: 'bar', height: 320, toolbar: { show: false } },
+          plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
+          series: [{ name: 'Số lượng', data: @json($onlineTopProducts->pluck('so_luong')->map(fn($v) => (float) $v)->reverse()->values()) }],
+          xaxis: { categories: @json($onlineTopProducts->pluck('ten_san_pham')->map(fn($v) => \Illuminate\Support\Str::limit($v, 28))->reverse()->values()) },
+          colors: ['#71dd37'],
+          dataLabels: { enabled: false }
+        }).render();
+      }
     });
   </script>
 @endsection
@@ -54,6 +91,58 @@
   <style>
     .dashboard-section > .card-body.border-top {
       padding-top: 1.75rem;
+    }
+
+    .dashboard-report-filter .form-control,
+    .dashboard-report-filter .form-select,
+    .dashboard-report-filter .btn {
+      min-height: 38px;
+    }
+
+    .dashboard-report-filter-actions {
+      display: flex;
+      gap: .5rem;
+    }
+
+    .dashboard-report-filter-actions .btn {
+      flex: 1 1 auto;
+      white-space: nowrap;
+    }
+
+    .dashboard-report-kpi {
+      border: 1px solid var(--bs-border-color);
+    }
+
+    .dashboard-report-kpi .kpi-icon {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border-radius: 12px;
+      flex: 0 0 42px;
+    }
+
+    .dashboard-report-scroll {
+      overflow-x: auto;
+      scrollbar-gutter: stable;
+    }
+
+    .dashboard-online-table {
+      min-width: 1200px;
+    }
+
+    .dashboard-online-daily-table {
+      min-width: 760px;
+    }
+
+    .dashboard-order-table {
+      min-width: 1320px;
+    }
+
+    .dashboard-product-name {
+      max-width: 380px;
+      white-space: normal;
+      line-height: 1.4;
     }
 
     @media (max-width: 575.98px) {
@@ -91,6 +180,10 @@
         flex: 1 1 0;
         justify-content: center;
         white-space: nowrap;
+      }
+
+      .dashboard-report-filter-actions {
+        width: 100%;
       }
 
       .dashboard-stat-card .card-body {
@@ -224,14 +317,40 @@
       'time_size_id',
   ];
   $dailyKeys = ['daily_date_from', 'daily_date_to', 'daily_per_page'];
+  $onlineKeys = ['online_tu_ngay', 'online_den_ngay', 'online_q', 'online_ten_kho', 'online_per_page', 'online_daily_page', 'online_page'];
+  $orderKeys = [
+      'order_q',
+      'order_ma_don',
+      'order_ma_kh',
+      'order_mat_hang_id',
+      'order_mau_id',
+      'order_size_id',
+      'order_ngay_nhan_tu',
+      'order_ngay_nhan_den',
+      'order_han_giao_tu',
+      'order_han_giao_den',
+      'order_per_page',
+      'order_page',
+  ];
+  $activeDashboardTab = in_array(request('tab'), ['overview', 'online', 'orders'], true) ? request('tab') : 'overview';
+  $dashboardTabs = [
+      ['key' => 'overview', 'label' => 'Dashboard hiện tại', 'icon' => 'bx-home-smile'],
+      ['key' => 'online', 'label' => 'Bán hàng online', 'icon' => 'bx-line-chart'],
+      ['key' => 'orders', 'label' => 'Tổng hợp đơn hàng', 'icon' => 'bx-receipt'],
+  ];
+  $dashboardTabUrl = fn (string $tab) => route('dashboard-analytics', array_merge(request()->query(), ['tab' => $tab]));
 
-  $quickPreserved = request()->only([...$timeKeys, ...$dailyKeys]);
-  $timePreserved = request()->only([...$quickKeys, ...$dailyKeys]);
-  $dailyPreserved = request()->only([...$quickKeys, ...$timeKeys]);
+  $quickPreserved = request()->only([...$timeKeys, ...$dailyKeys, ...$onlineKeys, ...$orderKeys]);
+  $timePreserved = request()->only([...$quickKeys, ...$dailyKeys, ...$onlineKeys, ...$orderKeys]);
+  $dailyPreserved = request()->only([...$quickKeys, ...$timeKeys, ...$onlineKeys, ...$orderKeys]);
+  $onlinePreserved = request()->only([...$quickKeys, ...$timeKeys, ...$dailyKeys, ...$orderKeys]);
+  $orderPreserved = request()->only([...$quickKeys, ...$timeKeys, ...$dailyKeys, ...$onlineKeys]);
 
-  $quickResetUrl = route('dashboard-analytics', request()->except($quickKeys));
-  $timeResetUrl = route('dashboard-analytics', request()->except($timeKeys));
-  $dailyResetUrl = route('dashboard-analytics', request()->except($dailyKeys));
+  $quickResetUrl = route('dashboard-analytics', array_merge(request()->except($quickKeys), ['tab' => 'overview']));
+  $timeResetUrl = route('dashboard-analytics', array_merge(request()->except($timeKeys), ['tab' => 'overview']));
+  $dailyResetUrl = route('dashboard-analytics', array_merge(request()->except($dailyKeys), ['tab' => 'overview']));
+  $onlineResetUrl = route('dashboard-analytics', array_merge(request()->except($onlineKeys), ['tab' => 'online']));
+  $orderResetUrl = route('dashboard-analytics', array_merge(request()->except($orderKeys), ['tab' => 'orders']));
 
   $quickCards = [
       ['label' => 'Tổng SL đặt', 'value' => $quickSummary['tong_sl_dat'] ?? 0, 'icon' => 'bx-receipt', 'class' => 'primary'],
@@ -266,15 +385,35 @@
       ['label' => 'Hôm nay nhập kho', 'value' => $todayProduction['nhap_kho'] ?? 0, 'icon' => 'bx-archive-in', 'class' => 'primary'],
       ['label' => 'Hôm nay xuất hàng', 'value' => $todayProduction['xuat_hang'] ?? 0, 'icon' => 'bx-archive-out', 'class' => 'secondary'],
   ];
+
+  $onlineQuantity = (float) ($onlineTotals->tong_so_luong ?? 0);
+  $onlineRevenue = (float) ($onlineTotals->tong_tien_ban_hang ?? 0);
+  $onlineSalesDays = (int) ($onlineTotals->so_ngay_ban ?? 0);
+  $onlineAverage = $onlineQuantity > 0 ? $onlineRevenue / $onlineQuantity : 0;
+  $onlineDailyAverage = $onlineSalesDays > 0 ? $onlineRevenue / $onlineSalesDays : 0;
 @endphp
 
 @section('content')
+  <ul class="nav nav-tabs flex-nowrap overflow-auto mb-4" role="tablist">
+    @foreach ($dashboardTabs as $tab)
+      <li class="nav-item" role="presentation">
+        <a href="{{ $dashboardTabUrl($tab['key']) }}"
+          class="nav-link text-nowrap {{ $activeDashboardTab === $tab['key'] ? 'active' : '' }}">
+          <i class="icon-base bx {{ $tab['icon'] }} me-1"></i>{{ $tab['label'] }}
+        </a>
+      </li>
+    @endforeach
+  </ul>
+
+  <div class="tab-content p-0 bg-transparent shadow-none">
+    <div class="tab-pane fade {{ $activeDashboardTab === 'overview' ? 'show active' : '' }}">
   <div class="card mb-5 dashboard-section">
     <div class="card-header">
       <h5 class="mb-0">Bảng tổng nhanh</h5>
     </div>
     <div class="card-body border-top">
       <form action="{{ route('dashboard-analytics') }}" method="GET" class="row g-3 align-items-end">
+        <input type="hidden" name="tab" value="overview">
         @foreach ($quickPreserved as $name => $value)
           <input type="hidden" name="{{ $name }}" value="{{ $value }}">
         @endforeach
@@ -394,6 +533,7 @@
     </div>
     <div class="card-body border-top">
       <form action="{{ route('dashboard-analytics') }}" method="GET" class="row g-3 align-items-end">
+        <input type="hidden" name="tab" value="overview">
         @foreach ($timePreserved as $name => $value)
           <input type="hidden" name="{{ $name }}" value="{{ $value }}">
         @endforeach
@@ -515,12 +655,13 @@
     </div>
   </div>
 
-  <div class="card dashboard-section">
+  <div class="card mb-5 dashboard-section">
     <div class="card-header">
       <h5 class="mb-0">Sản lượng theo ngày</h5>
     </div>
     <div class="card-body border-top pb-0">
       <form action="{{ route('dashboard-analytics') }}" method="GET" class="row g-3 align-items-end">
+        <input type="hidden" name="tab" value="overview">
         @foreach ($dailyPreserved as $name => $value)
           <input type="hidden" name="{{ $name }}" value="{{ $value }}">
         @endforeach
@@ -589,5 +730,345 @@
         {{ $dailyProduction->links() }}
       </div>
     @endif
+  </div>
+
+    </div>
+
+    <div class="tab-pane fade {{ $activeDashboardTab === 'online' ? 'show active' : '' }}">
+  <div class="card mb-5 dashboard-section">
+    <div class="card-header">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div>
+          <h5 class="mb-0">Bán hàng online</h5>
+          <div class="text-muted small mt-1">Tổng hợp số lượng và tổng tiền bán hàng từ file đơn hoàn thành.</div>
+        </div>
+        <span class="badge bg-label-primary">
+          {{ \Carbon\Carbon::parse($onlineFilters['tu_ngay'])->format('d/m/Y') }} -
+          {{ \Carbon\Carbon::parse($onlineFilters['den_ngay'])->format('d/m/Y') }}
+        </span>
+      </div>
+    </div>
+    <div class="card-body border-top">
+      <form action="{{ route('dashboard-analytics') }}" method="GET" class="row g-3 align-items-end dashboard-report-filter">
+        <input type="hidden" name="tab" value="online">
+        @foreach ($onlinePreserved as $name => $value)
+          <input type="hidden" name="{{ $name }}" value="{{ $value }}">
+        @endforeach
+        <div class="col-6 col-xl-2">
+          <label class="form-label" for="online_tu_ngay">Từ ngày</label>
+          <input type="date" class="form-control" id="online_tu_ngay" name="online_tu_ngay" value="{{ $onlineFilters['tu_ngay'] }}" required>
+        </div>
+        <div class="col-6 col-xl-2">
+          <label class="form-label" for="online_den_ngay">Đến ngày</label>
+          <input type="date" class="form-control" id="online_den_ngay" name="online_den_ngay" value="{{ $onlineFilters['den_ngay'] }}" required>
+        </div>
+        <div class="col-12 col-xl-3">
+          <label class="form-label" for="online_q">Tìm kiếm</label>
+          <input type="text" class="form-control" id="online_q" name="online_q" value="{{ $onlineFilters['q'] }}" placeholder="Sản phẩm, màu, size">
+        </div>
+        <div class="col-6 col-xl-2">
+          <label class="form-label" for="online_ten_kho">Kho</label>
+          <select class="form-select" id="online_ten_kho" name="online_ten_kho">
+            <option value="">Tất cả</option>
+            @foreach ($onlineWarehouses as $warehouse)
+              <option value="{{ $warehouse }}" @selected($onlineFilters['ten_kho'] === $warehouse)>{{ $warehouse }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="col-6 col-xl-1">
+          <label class="form-label" for="online_per_page">Hiển thị</label>
+          <select class="form-select" id="online_per_page" name="online_per_page" onchange="this.form.submit()">
+            @foreach (paginationPerPageOptions() as $option)
+              <option value="{{ $option }}" @selected((int) $onlineFilters['per_page'] === $option)>{{ $option }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="col-12 col-xl-2">
+          <div class="dashboard-report-filter-actions">
+            <a href="{{ $onlineResetUrl }}" class="btn btn-outline-secondary" title="Xóa lọc"><i class="icon-base bx bx-refresh"></i></a>
+            <button type="submit" class="btn btn-primary"><i class="icon-base bx bx-filter-alt me-1"></i>Lọc</button>
+          </div>
+        </div>
+      </form>
+
+      <div class="row g-4 mt-1">
+        <div class="col-sm-6 col-xl-3">
+          <div class="card h-100 shadow-none dashboard-report-kpi">
+            <div class="card-body d-flex gap-3">
+              <div class="kpi-icon bg-label-primary"><i class="icon-base bx bx-package fs-4"></i></div>
+              <div><div class="text-muted small">Sản phẩm đã bán</div><h4 class="mb-0">{{ number_format($onlineQuantity, 0, ',', '.') }}</h4></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+          <div class="card h-100 shadow-none dashboard-report-kpi">
+            <div class="card-body d-flex gap-3">
+              <div class="kpi-icon bg-label-success"><i class="icon-base bx bx-wallet fs-4"></i></div>
+              <div>
+                <div class="text-muted small">Tổng tiền bán hàng</div>
+                <h4 class="mb-0">{{ number_format($onlineRevenue, 0, ',', '.') }} ₫</h4>
+                @if ($onlineRevenueChange !== null)
+                  <small class="{{ $onlineRevenueChange >= 0 ? 'text-success' : 'text-danger' }}">
+                    {{ $onlineRevenueChange >= 0 ? '+' : '' }}{{ number_format($onlineRevenueChange, 1, ',', '.') }}% so với kỳ trước
+                  </small>
+                @endif
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+          <div class="card h-100 shadow-none dashboard-report-kpi">
+            <div class="card-body d-flex gap-3">
+              <div class="kpi-icon bg-label-info"><i class="icon-base bx bx-calendar-check fs-4"></i></div>
+              <div><div class="text-muted small">Tiền bán TB/ngày có bán</div><h4 class="mb-0">{{ number_format($onlineDailyAverage, 0, ',', '.') }} ₫</h4><small class="text-muted">{{ $onlineSalesDays }} ngày phát sinh</small></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+          <div class="card h-100 shadow-none dashboard-report-kpi">
+            <div class="card-body d-flex gap-3">
+              <div class="kpi-icon bg-label-warning"><i class="icon-base bx bx-calculator fs-4"></i></div>
+              <div><div class="text-muted small">Tiền bán / sản phẩm</div><h4 class="mb-0">{{ number_format($onlineAverage, 0, ',', '.') }} ₫</h4></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-4 mt-1">
+        <div class="col-xl-8">
+          <div class="card h-100 shadow-none border">
+            <div class="card-header"><h6 class="mb-0">Xu hướng bán hàng</h6></div>
+            <div class="card-body"><div id="dashboard-online-sales-trend" style="min-height: 320px"></div></div>
+          </div>
+        </div>
+        <div class="col-xl-4">
+          <div class="card h-100 shadow-none border">
+            <div class="card-header"><h6 class="mb-0">Top sản phẩm bán chạy</h6></div>
+            <div class="card-body"><div id="dashboard-online-top-products" style="min-height: 320px"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow-none border mt-4">
+        <div class="card-header">
+          <h6 class="mb-0">Tổng hợp doanh thu từng ngày</h6>
+        </div>
+        <div class="dashboard-report-scroll">
+          <table class="table align-middle dashboard-online-daily-table">
+            <thead>
+              <tr>
+                <th>Ngày</th>
+                <th class="text-end">Số lượng bán</th>
+                <th class="text-end">Tổng tiền bán hàng</th>
+                <th class="text-end">Tiền bán / sản phẩm</th>
+                <th class="text-end">Tỷ trọng</th>
+              </tr>
+            </thead>
+            <tbody class="table-border-bottom-0">
+              @forelse ($onlineDailyRows as $dayRow)
+                @php
+                  $dayQuantity = (float) $dayRow->so_luong;
+                  $dayRevenue = (float) $dayRow->tong_tien;
+                @endphp
+                <tr>
+                  <td class="fw-semibold">{{ \Carbon\Carbon::parse($dayRow->ngay)->format('d/m/Y') }}</td>
+                  <td class="text-end">{{ number_format($dayQuantity, 0, ',', '.') }}</td>
+                  <td class="text-end fw-semibold">{{ number_format($dayRevenue, 0, ',', '.') }} ₫</td>
+                  <td class="text-end">{{ number_format($dayQuantity > 0 ? $dayRevenue / $dayQuantity : 0, 0, ',', '.') }} ₫</td>
+                  <td class="text-end">{{ $onlineRevenue > 0 ? number_format(($dayRevenue / $onlineRevenue) * 100, 1, ',', '.') : '0' }}%</td>
+                </tr>
+              @empty
+                <tr>
+                  <td colspan="5" class="text-center py-4">Không có dữ liệu doanh thu theo ngày trong kỳ đã chọn.</td>
+                </tr>
+              @endforelse
+            </tbody>
+          </table>
+        </div>
+        @if ($onlineDailyRows->hasPages())
+          <div class="card-footer">
+            {{ $onlineDailyRows->links() }}
+          </div>
+        @endif
+      </div>
+    </div>
+
+    <div class="dashboard-report-scroll">
+      <table class="table align-middle dashboard-online-table">
+        <thead>
+          <tr>
+            <th>Sản phẩm</th>
+            <th>Kho</th>
+            <th>Màu</th>
+            <th>Size</th>
+            <th class="text-end">Số lượng</th>
+            <th class="text-end">Tổng tiền</th>
+            <th class="text-end">Tỷ trọng</th>
+          </tr>
+        </thead>
+        <tbody class="table-border-bottom-0">
+          @forelse ($onlineRows as $row)
+            <tr>
+              <td><div class="dashboard-product-name fw-semibold" title="{{ $row->ten_san_pham }}">{{ $row->ten_san_pham }}</div></td>
+              <td>{{ $row->ten_kho ?: '-' }}</td>
+              <td>{{ $row->mau ?: '-' }}</td>
+              <td>{{ $row->size ?: '-' }}</td>
+              <td class="text-end">{{ number_format((float) $row->so_luong, 0, ',', '.') }}</td>
+              <td class="text-end fw-semibold">{{ number_format((float) $row->tong_tien, 0, ',', '.') }} ₫</td>
+              <td class="text-end">{{ $onlineRevenue > 0 ? number_format(((float) $row->tong_tien / $onlineRevenue) * 100, 1, ',', '.') : '0' }}%</td>
+            </tr>
+          @empty
+            <tr><td colspan="7" class="text-center py-4">Không có dữ liệu bán hàng online trong kỳ đã chọn.</td></tr>
+          @endforelse
+        </tbody>
+      </table>
+    </div>
+    @if ($onlineRows->hasPages())
+      <div class="card-footer">{{ $onlineRows->links() }}</div>
+    @endif
+  </div>
+
+    </div>
+
+    <div class="tab-pane fade {{ $activeDashboardTab === 'orders' ? 'show active' : '' }}">
+  <div class="card dashboard-section">
+    <div class="card-header">
+      <div>
+        <h5 class="mb-0">Tổng hợp đơn hàng</h5>
+        <div class="text-muted small mt-1">Theo dõi đặt hàng, sản xuất, tồn kho và phần còn phải xử lý.</div>
+      </div>
+    </div>
+    <div class="card-body border-top pb-0">
+      <form action="{{ route('dashboard-analytics') }}" method="GET" class="row g-3 align-items-end dashboard-report-filter">
+        <input type="hidden" name="tab" value="orders">
+        @foreach ($orderPreserved as $name => $value)
+          <input type="hidden" name="{{ $name }}" value="{{ $value }}">
+        @endforeach
+        <div class="col-12 col-xl">
+          <label class="form-label" for="order_q">Tìm kiếm</label>
+          <input type="text" class="form-control" id="order_q" name="order_q" value="{{ $orderFilters['q'] }}" placeholder="Mã đơn, mã KH, mã hàng, màu hoặc size">
+        </div>
+        <div class="col-12 col-md-6 col-xl-2">
+          <label class="form-label" for="order_ma_don">Mã đơn</label>
+          <input type="text" class="form-control" id="order_ma_don" name="order_ma_don" value="{{ $orderFilters['ma_don'] }}" placeholder="Mã đơn">
+        </div>
+        <div class="col-12 col-md-6 col-xl-2">
+          <label class="form-label" for="order_ma_kh">Mã KH</label>
+          <input type="text" class="form-control" id="order_ma_kh" name="order_ma_kh" value="{{ $orderFilters['ma_kh'] }}" placeholder="Mã KH">
+        </div>
+        <div class="col-12 col-md-4 col-xl-2">
+          <label class="form-label" for="order_mat_hang_id">Mã hàng</label>
+          <select class="form-select" id="order_mat_hang_id" name="order_mat_hang_id">
+            <option value="">Tất cả</option>
+            @foreach ($orderMatHangs as $matHang)
+              <option value="{{ $matHang->id }}" @selected((int) ($orderFilters['mat_hang_id'] ?? 0) === (int) $matHang->id)>{{ $matHang->ma_hang }} - {{ $matHang->ten_hang }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="col-12 col-md-4 col-xl-2">
+          <label class="form-label" for="order_mau_id">Màu</label>
+          <select class="form-select" id="order_mau_id" name="order_mau_id">
+            <option value="">Tất cả</option>
+            @foreach ($orderMaus as $mau)
+              <option value="{{ $mau->id }}" @selected((int) ($orderFilters['mau_id'] ?? 0) === (int) $mau->id)>{{ $mau->ten_mau }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="col-12 col-md-4 col-xl-2">
+          <label class="form-label" for="order_size_id">Size</label>
+          <select class="form-select" id="order_size_id" name="order_size_id">
+            <option value="">Tất cả</option>
+            @foreach ($orderSizes as $size)
+              <option value="{{ $size->id }}" @selected((int) ($orderFilters['size_id'] ?? 0) === (int) $size->id)>{{ $size->ten_size }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="col-12 col-md-6 col-xl-2">
+          <label class="form-label" for="order_ngay_nhan_tu">Ngày nhận từ</label>
+          <input type="date" class="form-control" id="order_ngay_nhan_tu" name="order_ngay_nhan_tu" value="{{ $orderFilters['ngay_nhan_tu'] }}">
+        </div>
+        <div class="col-12 col-md-6 col-xl-2">
+          <label class="form-label" for="order_ngay_nhan_den">Ngày nhận đến</label>
+          <input type="date" class="form-control" id="order_ngay_nhan_den" name="order_ngay_nhan_den" value="{{ $orderFilters['ngay_nhan_den'] }}">
+        </div>
+        <div class="col-12 col-md-6 col-xl-2">
+          <label class="form-label" for="order_han_giao_tu">Hạn giao từ</label>
+          <input type="date" class="form-control" id="order_han_giao_tu" name="order_han_giao_tu" value="{{ $orderFilters['han_giao_tu'] }}">
+        </div>
+        <div class="col-12 col-md-6 col-xl-2">
+          <label class="form-label" for="order_han_giao_den">Hạn giao đến</label>
+          <input type="date" class="form-control" id="order_han_giao_den" name="order_han_giao_den" value="{{ $orderFilters['han_giao_den'] }}">
+        </div>
+        <div class="col-6 col-xl-2">
+          <label class="form-label" for="order_per_page">Hiển thị</label>
+          <select class="form-select" id="order_per_page" name="order_per_page" onchange="this.form.submit()">
+            @foreach (paginationPerPageOptions() as $option)
+              <option value="{{ $option }}" @selected((int) $orderFilters['per_page'] === $option)>{{ $option }} dòng</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="col-12 col-xl-auto">
+          <div class="dashboard-report-filter-actions">
+            <button type="submit" class="btn btn-primary"><i class="icon-base bx bx-search me-1"></i>Tìm kiếm</button>
+            <a href="{{ $orderResetUrl }}" class="btn btn-outline-secondary">Làm mới</a>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="dashboard-report-scroll mt-3">
+      <table class="table align-middle dashboard-order-table">
+        <thead>
+          <tr>
+            <th>Mã đơn</th>
+            <th>Mã KH</th>
+            <th>Mã hàng</th>
+            <th>Màu</th>
+            <th>Size</th>
+            <th class="text-end">SL đặt</th>
+            <th class="text-end">Đã cắt</th>
+            <th class="text-end">Đã giao may</th>
+            <th class="text-end">QC đạt</th>
+            <th class="text-end">QC lỗi</th>
+            <th class="text-end">Nhập kho</th>
+            <th class="text-end">Đã xuất</th>
+            <th class="text-end">Tồn kho</th>
+            <th class="text-end">Còn phải cắt</th>
+            <th class="text-end">Còn phải giao</th>
+          </tr>
+        </thead>
+        <tbody class="table-border-bottom-0">
+          @forelse ($orderRows as $row)
+            <tr>
+              <td>{{ $row->ma_don }}</td>
+              <td>{{ $row->ma_kh }}</td>
+              <td>
+                <strong>{{ $row->ma_hang }}</strong>
+                <div class="text-muted small dashboard-product-name">{{ $row->ten_hang }}</div>
+              </td>
+              <td>{{ $row->ten_mau }}</td>
+              <td>{{ $row->ten_size }}</td>
+              <td class="text-end">{{ $formatNumber($row->so_luong_dat) }}</td>
+              <td class="text-end">{{ $formatNumber($row->da_cat) }}</td>
+              <td class="text-end">{{ $formatNumber($row->da_giao_may) }}</td>
+              <td class="text-end">{{ $formatNumber($row->qc_dat) }}</td>
+              <td class="text-end">{{ $formatNumber($row->qc_loi) }}</td>
+              <td class="text-end">{{ $formatNumber($row->nhap_kho) }}</td>
+              <td class="text-end">{{ $formatNumber($row->da_xuat) }}</td>
+              <td class="text-end fw-semibold">{{ $formatNumber($row->ton_kho) }}</td>
+              <td class="text-end">{{ $formatNumber($row->con_phai_cat) }}</td>
+              <td class="text-end">{{ $formatNumber($row->con_phai_giao) }}</td>
+            </tr>
+          @empty
+            <tr><td colspan="15" class="text-center py-4">Chưa có dữ liệu tổng hợp đơn hàng.</td></tr>
+          @endforelse
+        </tbody>
+      </table>
+    </div>
+    @if ($orderRows->hasPages())
+      <div class="card-footer">{{ $orderRows->links() }}</div>
+    @endif
+  </div>
+    </div>
   </div>
 @endsection

@@ -8,6 +8,7 @@ use App\Models\DmDonViCat;
 use App\Models\DmDonViMay;
 use App\Models\DmSize;
 use App\Models\DonHang;
+use App\Models\DonHangHoanThanh;
 use App\Models\MatHang;
 use App\Models\Mau;
 use App\Models\NhapKho;
@@ -116,6 +117,7 @@ class ActivityLogObserver
             $model instanceof DmDonViCat => 'Đơn vị cắt',
             $model instanceof DmDonViMay => 'Đơn vị may',
             $model instanceof DonHang => 'Đơn hàng',
+            $model instanceof DonHangHoanThanh => 'Đơn hàng hoàn thành',
             $model instanceof Cat => 'Cắt',
             $model instanceof PhanBoMay => 'Phân bổ may',
             $model instanceof Qc => 'QC',
@@ -139,6 +141,7 @@ class ActivityLogObserver
             ?? $model->username
             ?? $model->ma_vai_tro
             ?? $model->ma_quyen
+            ?? $model->ten_san_pham
             ?? null;
 
         return $this->moduleName($model).($code ? ' '.$code : ' #'.$model->getKey());

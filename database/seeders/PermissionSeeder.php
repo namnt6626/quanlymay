@@ -30,6 +30,11 @@ class PermissionSeeder extends Seeder
             ['ma_quyen' => 'QC_EDIT', 'ten_quyen' => 'Sửa QC', 'module' => 'QC', 'action' => 'EDIT'],
             ['ma_quyen' => 'QC_DELETE', 'ten_quyen' => 'Xóa QC', 'module' => 'QC', 'action' => 'DELETE'],
 
+            ['ma_quyen' => 'DON_HANG_HOAN_THANH_VIEW', 'ten_quyen' => 'Xem Đơn hàng hoàn thành', 'module' => 'Đơn hàng hoàn thành', 'action' => 'VIEW'],
+            ['ma_quyen' => 'DON_HANG_HOAN_THANH_CREATE', 'ten_quyen' => 'Thêm/Import Đơn hàng hoàn thành', 'module' => 'Đơn hàng hoàn thành', 'action' => 'CREATE'],
+            ['ma_quyen' => 'DON_HANG_HOAN_THANH_EDIT', 'ten_quyen' => 'Sửa Đơn hàng hoàn thành', 'module' => 'Đơn hàng hoàn thành', 'action' => 'EDIT'],
+            ['ma_quyen' => 'DON_HANG_HOAN_THANH_DELETE', 'ten_quyen' => 'Xóa Đơn hàng hoàn thành', 'module' => 'Đơn hàng hoàn thành', 'action' => 'DELETE'],
+
             ['ma_quyen' => 'NHAP_KHO_VIEW', 'ten_quyen' => 'Xem Nhập kho', 'module' => 'Nhập kho', 'action' => 'VIEW'],
             ['ma_quyen' => 'NHAP_KHO_CREATE', 'ten_quyen' => 'Thêm Nhập kho', 'module' => 'Nhập kho', 'action' => 'CREATE'],
             ['ma_quyen' => 'NHAP_KHO_EDIT', 'ten_quyen' => 'Sửa Nhập kho', 'module' => 'Nhập kho', 'action' => 'EDIT'],
@@ -51,6 +56,7 @@ class PermissionSeeder extends Seeder
 
             ['ma_quyen' => 'BAO_CAO_VIEW', 'ten_quyen' => 'Xem Báo cáo', 'module' => 'Báo cáo', 'action' => 'VIEW'],
             ['ma_quyen' => 'BAO_CAO_TONG_HOP_DON_HANG_VIEW', 'ten_quyen' => 'Xem Báo cáo tổng hợp đơn hàng', 'module' => 'Báo cáo', 'action' => 'VIEW'],
+            ['ma_quyen' => 'BAO_CAO_BAN_HANG_ONLINE_VIEW', 'ten_quyen' => 'Xem Báo cáo bán hàng online', 'module' => 'Báo cáo', 'action' => 'VIEW'],
 
             ['ma_quyen' => 'ROLE_VIEW', 'ten_quyen' => 'Xem Vai trò', 'module' => 'Tài khoản', 'action' => 'VIEW'],
             ['ma_quyen' => 'ROLE_CREATE', 'ten_quyen' => 'Thêm Vai trò', 'module' => 'Tài khoản', 'action' => 'CREATE'],

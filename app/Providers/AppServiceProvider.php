@@ -8,6 +8,7 @@ use App\Models\DmDonViCat;
 use App\Models\DmDonViMay;
 use App\Models\DmSize;
 use App\Models\DonHang;
+use App\Models\DonHangHoanThanh;
 use App\Models\MatHang;
 use App\Models\Mau;
 use App\Models\NhapKho;
@@ -72,6 +73,7 @@ class AppServiceProvider extends ServiceProvider
             DmDonViCat::class,
             DmDonViMay::class,
             DonHang::class,
+            DonHangHoanThanh::class,
             Cat::class,
             PhanBoMay::class,
             Qc::class,

@@ -22,6 +22,7 @@ class AccessRedirect
             ['route' => 'xuat-kho.index', 'permission' => 'XUAT_KHO_VIEW'],
             ['route' => 'ton-kho.index', 'permission' => 'TON_KHO_VIEW'],
             ['route' => 'bao-cao.tong-hop-don-hang', 'permission' => 'BAO_CAO_TONG_HOP_DON_HANG_VIEW'],
+            ['route' => 'bao-cao.ban-hang-online', 'permission' => 'BAO_CAO_BAN_HANG_ONLINE_VIEW'],
             ['route' => 'mat-hang.index', 'permission' => 'DANH_MUC_VIEW'],
             ['route' => 'mau.index', 'permission' => 'DANH_MUC_VIEW'],
             ['route' => 'size.index', 'permission' => 'DANH_MUC_VIEW'],

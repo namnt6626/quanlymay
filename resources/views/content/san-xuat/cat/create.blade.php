@@ -64,6 +64,17 @@
       color: var(--bs-secondary-color);
       padding: 0.75rem 0.875rem;
     }
+
+    .cut-summary-card {
+      background: linear-gradient(180deg, rgba(105, 108, 255, 0.08), rgba(105, 108, 255, 0.02));
+      border: 1px solid rgba(105, 108, 255, 0.18);
+    }
+
+    .cut-summary-color-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
   </style>
 @endsection
 
@@ -146,6 +157,9 @@
       const donHangMenu = document.getElementById('don_hang_search_menu');
       const matHangSearch = document.getElementById('mat_hang_search');
       const matHangMenu = document.getElementById('mat_hang_search_menu');
+      const cutSummaryTotal = document.getElementById('cut-summary-total');
+      const cutSummaryColorList = document.getElementById('cut-summary-color-list');
+      const cutSummaryEmpty = document.getElementById('cut-summary-empty');
       const orderData = @json($donHangData);
       const fixedItems = @json($oldFixedItems);
       const fixedItemOptions = @json($fixedItemOptions);
@@ -394,6 +408,7 @@
           `;
 
           row.dataset.colorId = String(item.mau_id);
+          row.dataset.colorName = item.ten_mau || '-';
           row.dataset.sizeId = String(item.size_id);
           fixedDetailBody.appendChild(row);
           wireNumberInput(row.querySelector('.js-number-format'));
@@ -401,6 +416,7 @@
         });
 
         applyFixedFilters();
+        updateCutSummary();
       }
 
       function checkedFilterValues(inputs) {
@@ -493,6 +509,7 @@
           updatePreview();
           updateOrderRowDiff(input.closest('tr'));
           updateFixedRowFabric(input.closest('tr'));
+          updateCutSummary();
         });
 
         input.addEventListener('focus', function() {
@@ -504,10 +521,50 @@
           updatePreview();
           updateOrderRowDiff(input.closest('tr'));
           updateFixedRowFabric(input.closest('tr'));
+          updateCutSummary();
         });
 
         input.value = formatDisplayNumber(input.value);
         updateOrderRowDiff(input.closest('tr'));
+      }
+
+      function updateCutSummary() {
+        if (!cutSummaryTotal || !cutSummaryColorList || !cutSummaryEmpty) {
+          return;
+        }
+
+        const hasOrder = Boolean(donHangSelect?.value);
+        const selector = hasOrder ? '#order-detail-body tr' : '#fixed-detail-body tr';
+        const rows = Array.from(document.querySelectorAll(selector));
+        const totalsByColor = new Map();
+        let total = 0;
+
+        rows.forEach(function(row) {
+          const input = row.querySelector('.js-order-cut-quantity, .js-fixed-cut-quantity');
+          const quantity = Number(normalizeNumber(input?.value) || 0);
+
+          if (quantity <= 0) {
+            return;
+          }
+
+          const colorName = row.dataset.colorName || row.children[1]?.textContent?.trim() || row.children[0]?.textContent?.trim() || '-';
+
+          total += quantity;
+          totalsByColor.set(colorName, (totalsByColor.get(colorName) || 0) + quantity);
+        });
+
+        cutSummaryTotal.textContent = formatDisplayNumber(String(total || 0));
+        cutSummaryColorList.innerHTML = '';
+        cutSummaryEmpty.classList.toggle('d-none', totalsByColor.size > 0);
+
+        Array.from(totalsByColor.entries())
+          .sort((a, b) => a[0].localeCompare(b[0], 'vi'))
+          .forEach(function([colorName, quantity]) {
+            const item = document.createElement('span');
+            item.className = 'badge bg-label-primary fs-6 fw-normal';
+            item.textContent = `${colorName}: ${formatDisplayNumber(String(quantity))}`;
+            cutSummaryColorList.appendChild(item);
+          });
       }
 
       function updatePreview() {
@@ -578,9 +635,12 @@
             <td class="js-order-cut-diff"></td>
           `;
 
+          row.dataset.colorName = item.ten_mau || '-';
           orderDetailBody.appendChild(row);
           wireNumberInput(row.querySelector('.js-number-format'));
         });
+
+        updateCutSummary();
       }
 
       function toggleMode() {
@@ -605,6 +665,7 @@
         setOrderInfo(order);
         renderOrderDetails(order);
         updatePreview();
+        updateCutSummary();
       }
 
       document.querySelectorAll('.js-number-format').forEach(wireNumberInput);
@@ -911,6 +972,24 @@
                       </thead>
                       <tbody id="fixed-detail-body"></tbody>
                     </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <div class="card shadow-none cut-summary-card">
+              <div class="card-body">
+                <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+                  <div>
+                    <div class="text-muted small mb-1">Tổng nhanh trước khi lưu</div>
+                    <h5 class="mb-0">Tổng SL cắt: <span id="cut-summary-total">0</span></h5>
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="text-muted small mb-2">Tổng SL cắt theo màu</div>
+                    <div class="cut-summary-color-list" id="cut-summary-color-list"></div>
+                    <div class="text-muted small" id="cut-summary-empty">Chưa có số lượng cắt.</div>
                   </div>
                 </div>
               </div>
