@@ -4,6 +4,31 @@
 
 @section('page-style')
   @include('content.san-xuat._filter-style')
+  <style>
+    .xuat-kho-filter .input-group-text {
+      background-color: var(--bs-gray-100);
+      border-color: var(--bs-border-color);
+      color: var(--bs-secondary-color);
+      min-width: 42px;
+      padding-left: .7rem;
+      padding-right: .7rem;
+    }
+
+    .xuat-kho-filter .form-control,
+    .xuat-kho-filter .form-select {
+      font-weight: 500;
+    }
+
+    .xuat-kho-filter .filter-actions {
+      align-items: end;
+    }
+
+    @media (min-width: 992px) {
+      .xuat-kho-filter.production-filter-grid .filter-actions {
+        grid-template-columns: minmax(0, 1fr) minmax(0, .95fr);
+      }
+    }
+  </style>
 @endsection
 
 @section('content')
@@ -53,28 +78,69 @@
     @endif
 
     <div class="card-body">
-      <form action="{{ route('xuat-kho.index') }}" method="GET" class="row production-filter-form production-filter-grid align-items-end">
-        <div class="col-12 col-lg-3 filter-span-3">
-          <label class="form-label" for="q">Tìm kiếm</label>
-          <input type="text" class="form-control" id="q" name="q" value="{{ $keyword }}"
-            placeholder="Nhập mã đơn, mã KH, kênh bán, mã hàng, tên hàng, màu hoặc size">
+      <form action="{{ route('xuat-kho.index') }}" method="GET" class="row production-filter-form production-filter-grid xuat-kho-filter align-items-end">
+        <div class="col-12 col-lg-4 filter-span-4">
+          <label class="form-label" for="ma_hang">Mã hàng</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="icon-base bx bx-barcode"></i></span>
+            <input type="search" class="form-control" id="ma_hang" name="ma_hang" value="{{ $filters['ma_hang'] }}"
+              list="ma_hang_options" placeholder="Gõ hoặc chọn mã hàng" autocomplete="off">
+          </div>
+          <datalist id="ma_hang_options">
+            @foreach ($matHangs as $matHang)
+              <option value="{{ $matHang->ma_hang }}" label="{{ $matHang->ma_hang }} - {{ $matHang->ten_hang }}"></option>
+            @endforeach
+          </datalist>
+        </div>
+        <div class="col-6 col-lg-2 filter-span-2">
+          <label class="form-label" for="ma_mau">Màu</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="icon-base bx bx-palette"></i></span>
+            <select class="form-select" id="ma_mau" name="ma_mau">
+              <option value="">Tất cả</option>
+              @foreach ($maus as $mau)
+                <option value="{{ $mau->ma_mau }}" @selected($filters['ma_mau'] === $mau->ma_mau)>{{ $mau->ten_mau }}</option>
+              @endforeach
+            </select>
+          </div>
+        </div>
+        <div class="col-6 col-lg-2 filter-span-2">
+          <label class="form-label" for="ma_size">Size</label>
+          <div class="input-group">
+            <span class="input-group-text"><i class="icon-base bx bx-ruler"></i></span>
+            <select class="form-select" id="ma_size" name="ma_size">
+              <option value="">Tất cả</option>
+              @foreach ($sizes as $size)
+                <option value="{{ $size->ma_size }}" @selected($filters['ma_size'] === $size->ma_size)>{{ $size->ten_size }}</option>
+              @endforeach
+            </select>
+          </div>
         </div>
         <div class="col-6 col-lg-2 filter-span-2">
           <label class="form-label" for="tu_ngay">Từ ngày</label>
-          <input type="date" class="form-control" id="tu_ngay" name="tu_ngay" value="{{ $filters['tu_ngay'] }}">
+          <div class="input-group">
+            <span class="input-group-text"><i class="icon-base bx bx-calendar"></i></span>
+            <input type="date" class="form-control" id="tu_ngay" name="tu_ngay" value="{{ $filters['tu_ngay'] }}">
+          </div>
         </div>
         <div class="col-6 col-lg-2 filter-span-2">
           <label class="form-label" for="den_ngay">Đến ngày</label>
-          <input type="date" class="form-control" id="den_ngay" name="den_ngay" value="{{ $filters['den_ngay'] }}">
+          <div class="input-group">
+            <span class="input-group-text"><i class="icon-base bx bx-calendar-check"></i></span>
+            <input type="date" class="form-control" id="den_ngay" name="den_ngay" value="{{ $filters['den_ngay'] }}">
+          </div>
         </div>
-        <div class="col-12 col-lg-2 filter-span-2">
+        <div class="col-12 col-lg-3 filter-span-3">
           <label class="form-label" for="kenh_ban">Kênh bán</label>
-          <input type="text" class="form-control" id="kenh_ban" name="kenh_ban" value="{{ $filters['kenh_ban'] }}"
-            placeholder="Nhập kênh bán">
+          <div class="input-group">
+            <span class="input-group-text"><i class="icon-base bx bx-store"></i></span>
+            <input type="text" class="form-control" id="kenh_ban" name="kenh_ban" value="{{ $filters['kenh_ban'] }}"
+              placeholder="Nhập kênh bán">
+          </div>
         </div>
-        @include('content.shared._per-page-select', ['perPageColumnClass' => 'col-6 col-lg-1 filter-span-1'])
+        @include('content.shared._per-page-select', ['perPageColumnClass' => 'col-6 col-lg-2 filter-span-2'])
 
-        <div class="col-12 col-lg-2 filter-span-2">
+        <div class="col-12 col-lg-3 filter-span-3">
           <div class="d-flex gap-2 flex-wrap filter-actions">
             <button type="submit" class="btn btn-primary flex-fill flex-sm-grow-0">
               <i class="icon-base bx bx-search me-1"></i> Tìm kiếm

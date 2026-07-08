@@ -5,7 +5,10 @@ namespace App\Http\Controllers\SanXuat;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\XuatKho\StoreXuatKhoRequest;
 use App\Http\Requests\XuatKho\UpdateXuatKhoRequest;
+use App\Models\DmSize;
 use App\Models\DonHangChiTiet;
+use App\Models\MatHang;
+use App\Models\Mau;
 use App\Models\NhapKho;
 use App\Models\PhieuXuatKho;
 use App\Models\PhieuXuatKhoChiTiet;
@@ -28,12 +31,18 @@ class PhieuXuatKhoController extends Controller
         $tuNgay = trim((string) $request->input('tu_ngay'));
         $denNgay = trim((string) $request->input('den_ngay'));
         $kenhBan = trim((string) $request->input('kenh_ban'));
+        $maHang = trim((string) $request->input('ma_hang'));
+        $maMau = trim((string) $request->input('ma_mau'));
+        $maSize = trim((string) $request->input('ma_size'));
 
         $filters = [
             'q' => $keyword,
             'tu_ngay' => $tuNgay,
             'den_ngay' => $denNgay,
             'kenh_ban' => $kenhBan,
+            'ma_hang' => $maHang,
+            'ma_mau' => $maMau,
+            'ma_size' => $maSize,
             'per_page' => paginationPerPage(),
         ];
 
@@ -53,11 +62,41 @@ class PhieuXuatKhoController extends Controller
                 'nhapKho.qc.size',
                 'nhapKho.qc.donHangChiTiet.donHang',
                 'nhapKho.donHangChiTiet.donHang',
+                'nhapKho.donHangChiTiet.matHang',
+                'nhapKho.donHangChiTiet.mau',
+                'nhapKho.donHangChiTiet.size',
                 'donHangChiTiet.donHang',
+                'donHangChiTiet.matHang',
+                'donHangChiTiet.mau',
+                'donHangChiTiet.size',
             ])
             ->when($tuNgay !== '', fn (Builder $query) => $query->whereHas('phieuXuatKho', fn (Builder $query) => $query->whereDate('ngay_xuat', '>=', $tuNgay)))
             ->when($denNgay !== '', fn (Builder $query) => $query->whereHas('phieuXuatKho', fn (Builder $query) => $query->whereDate('ngay_xuat', '<=', $denNgay)))
             ->when($kenhBan !== '', fn (Builder $query) => $query->whereHas('phieuXuatKho', fn (Builder $query) => $query->where('kenh_ban', 'like', "%{$kenhBan}%")))
+            ->when($maHang !== '', function (Builder $query) use ($maHang): void {
+                $query->where(function (Builder $query) use ($maHang): void {
+                    $query->whereHas('nhapKho.qc.phanBoMay.cat.matHang', fn (Builder $query) => $query->where('ma_hang', $maHang))
+                        ->orWhereHas('nhapKho.qc.matHang', fn (Builder $query) => $query->where('ma_hang', $maHang))
+                        ->orWhereHas('nhapKho.donHangChiTiet.matHang', fn (Builder $query) => $query->where('ma_hang', $maHang))
+                        ->orWhereHas('donHangChiTiet.matHang', fn (Builder $query) => $query->where('ma_hang', $maHang));
+                });
+            })
+            ->when($maMau !== '', function (Builder $query) use ($maMau): void {
+                $query->where(function (Builder $query) use ($maMau): void {
+                    $query->whereHas('nhapKho.qc.phanBoMay.cat.mau', fn (Builder $query) => $query->where('ma_mau', $maMau))
+                        ->orWhereHas('nhapKho.qc.mau', fn (Builder $query) => $query->where('ma_mau', $maMau))
+                        ->orWhereHas('nhapKho.donHangChiTiet.mau', fn (Builder $query) => $query->where('ma_mau', $maMau))
+                        ->orWhereHas('donHangChiTiet.mau', fn (Builder $query) => $query->where('ma_mau', $maMau));
+                });
+            })
+            ->when($maSize !== '', function (Builder $query) use ($maSize): void {
+                $query->where(function (Builder $query) use ($maSize): void {
+                    $query->whereHas('nhapKho.qc.phanBoMay.cat.size', fn (Builder $query) => $query->where('ma_size', $maSize))
+                        ->orWhereHas('nhapKho.qc.size', fn (Builder $query) => $query->where('ma_size', $maSize))
+                        ->orWhereHas('nhapKho.donHangChiTiet.size', fn (Builder $query) => $query->where('ma_size', $maSize))
+                        ->orWhereHas('donHangChiTiet.size', fn (Builder $query) => $query->where('ma_size', $maSize));
+                });
+            })
             ->when($keyword !== '', function (Builder $query) use ($keyword) {
                 $query->where(function (Builder $query) use ($keyword) {
                     $query->whereHas('phieuXuatKho', function (Builder $query) use ($keyword) {
@@ -127,6 +166,29 @@ class PhieuXuatKhoController extends Controller
             'chiTiets' => $chiTiets,
             'keyword' => $keyword,
             'filters' => $filters,
+            'matHangs' => MatHang::query()
+                ->where('trang_thai', true)
+                ->whereNotNull('ma_hang')
+                ->select('ma_hang', DB::raw('MIN(ten_hang) as ten_hang'))
+                ->groupBy('ma_hang')
+                ->orderBy('ma_hang')
+                ->get(),
+            'maus' => Mau::query()
+                ->where('trang_thai', true)
+                ->whereNotNull('ma_mau')
+                ->select('ma_mau', DB::raw('MIN(ten_mau) as ten_mau'))
+                ->groupBy('ma_mau')
+                ->orderBy('ten_mau')
+                ->orderBy('ma_mau')
+                ->get(),
+            'sizes' => DmSize::query()
+                ->where('trang_thai', true)
+                ->whereNotNull('ma_size')
+                ->select('ma_size', DB::raw('MIN(ten_size) as ten_size'))
+                ->groupBy('ma_size')
+                ->orderBy('ten_size')
+                ->orderBy('ma_size')
+                ->get(),
         ]);
     }
 
