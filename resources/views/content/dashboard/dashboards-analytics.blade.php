@@ -900,7 +900,7 @@
           <div class="card h-100 shadow-none dashboard-report-kpi">
             <div class="card-body d-flex gap-3">
               <div class="kpi-icon bg-label-primary"><i class="icon-base bx bx-package fs-4"></i></div>
-              <div><div class="text-muted small">Sản phẩm đã bán</div><h4 class="mb-0">{{ number_format($onlineQuantity, 0, ',', '.') }}</h4></div>
+              <div><div class="text-muted small">Số lượng sản phẩm đã bán</div><h4 class="mb-0">{{ number_format($onlineQuantity, 0, ',', '.') }}</h4></div>
             </div>
           </div>
         </div>

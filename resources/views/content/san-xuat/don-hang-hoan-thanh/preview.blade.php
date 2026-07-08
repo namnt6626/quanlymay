@@ -35,7 +35,8 @@
 <div class="alert alert-info">Tìm thấy <strong>{{ count($rows) }}</strong> dòng hợp lệ. Có thể sửa trực tiếp Màu/Size trước khi nhập.</div>
 @if($ignored)<div class="alert alert-warning">Đã bỏ qua dòng không phải dữ liệu hoặc không hợp lệ: {{ implode(', ', $ignored) }}.</div>@endif
 @if($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
-<form method="POST" action="{{ route('don-hang-hoan-thanh.commit') }}">@csrf
+<form method="POST" action="{{ route('don-hang-hoan-thanh.commit') }}" id="completed-order-import-form">@csrf
+<input type="hidden" name="rows_payload" id="completed-order-rows-payload">
 <div class="card"><div class="excel-preview-scroll"><table class="table table-sm align-middle excel-preview-table">
   <thead><tr><th class="col-row">Dòng</th><th class="col-date">Ngày</th><th class="col-product">Sản phẩm</th><th class="col-variation">Phân loại gốc</th><th class="col-color">Màu</th><th class="col-size">Size</th><th class="col-quantity">SL</th><th class="col-money">Thành tiền</th></tr></thead>
   <tbody>@foreach($rows as $index => $row)<tr>
@@ -51,4 +52,37 @@
 </table></div></div>
 <div class="d-flex justify-content-end gap-2 mt-4"><a class="btn btn-outline-secondary" href="{{ route('don-hang-hoan-thanh.import') }}">Chọn file khác</a><button class="btn btn-success"><i class="icon-base bx bx-check me-1"></i>Xác nhận nhập {{ count($rows) }} dòng</button></div>
 </form>
+@endsection
+
+@section('page-script')
+@parent
+<script>
+(() => {
+  const form = document.getElementById('completed-order-import-form');
+  const payload = document.getElementById('completed-order-rows-payload');
+
+  if (!form || !payload) {
+    return;
+  }
+
+  form.addEventListener('submit', () => {
+    const rows = [];
+
+    form.querySelectorAll('[name^="rows["]').forEach(input => {
+      const match = input.name.match(/^rows\[(\d+)]\[([^\]]+)]$/);
+      if (!match) {
+        return;
+      }
+
+      const index = Number(match[1]);
+      const field = match[2];
+      rows[index] = rows[index] || {};
+      rows[index][field] = input.value;
+      input.disabled = true;
+    });
+
+    payload.value = JSON.stringify(rows.filter(row => row));
+  });
+})();
+</script>
 @endsection

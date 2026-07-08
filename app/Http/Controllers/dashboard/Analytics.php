@@ -100,9 +100,10 @@ class Analytics extends Controller
 
     private function onlineSalesReport(Request $request): array
     {
+        $defaultDateRange = $this->onlineSalesDateRange();
         $onlineFilters = [
-            'tu_ngay' => $this->dateInput($request, 'online_tu_ngay', now()->subDays(89)->toDateString()),
-            'den_ngay' => $this->dateInput($request, 'online_den_ngay', now()->toDateString()),
+            'tu_ngay' => $this->dateInput($request, 'online_tu_ngay', $defaultDateRange['tu_ngay']),
+            'den_ngay' => $this->dateInput($request, 'online_den_ngay', $defaultDateRange['den_ngay']),
             'ma_hang' => trim((string) $request->input('online_ma_hang')),
             'mau' => trim((string) $request->input('online_mau')),
             'size' => trim((string) $request->input('online_size')),
@@ -113,16 +114,16 @@ class Analytics extends Controller
         ];
 
         if (Carbon::parse($onlineFilters['tu_ngay'])->gt(Carbon::parse($onlineFilters['den_ngay']))) {
-            $onlineFilters['tu_ngay'] = now()->subDays(89)->toDateString();
-            $onlineFilters['den_ngay'] = now()->toDateString();
+            $onlineFilters['tu_ngay'] = $defaultDateRange['tu_ngay'];
+            $onlineFilters['den_ngay'] = $defaultDateRange['den_ngay'];
         }
 
         $base = $this->onlineSalesBaseQuery($onlineFilters);
         $onlineTotals = (clone $base)->selectRaw('
-            COALESCE(SUM(ct.so_luong), 0) as tong_so_luong,
             COALESCE(SUM(ct.thanh_tien), 0) as tong_tien_ban_hang,
             COUNT(DISTINCT dhht.ngay_hoan_thanh) as so_ngay_ban
         ')->first();
+        $onlineTotals->tong_so_luong = $this->onlineSoldQuantity($onlineFilters);
 
         $from = Carbon::parse($onlineFilters['tu_ngay']);
         $to = Carbon::parse($onlineFilters['den_ngay']);
@@ -218,6 +219,11 @@ class Analytics extends Controller
             ->when($filters['kenh_ban'] !== '', fn (Builder $query) => $query->where('dhht.kenh_ban', $filters['kenh_ban']));
     }
 
+    private function onlineSoldQuantity(array $filters): float
+    {
+        return (float) $this->onlineSalesBaseQuery($filters)->sum('ct.so_luong');
+    }
+
     private function orderSummaryReport(Request $request, BaoCaoTongHopDonHangService $service): array
     {
         $orderFilters = [
@@ -304,6 +310,23 @@ class Analytics extends Controller
         }
 
         return $default;
+    }
+
+    private function onlineSalesDateRange(): array
+    {
+        $bounds = DB::table('don_hang_hoan_thanh')
+            ->whereNull('deleted_at')
+            ->selectRaw('MIN(ngay_hoan_thanh) as tu_ngay, MAX(ngay_hoan_thanh) as den_ngay')
+            ->first();
+
+        return [
+            'tu_ngay' => $bounds?->tu_ngay
+                ? Carbon::parse($bounds->tu_ngay)->toDateString()
+                : now()->subDays(89)->toDateString(),
+            'den_ngay' => $bounds?->den_ngay
+                ? Carbon::parse($bounds->den_ngay)->toDateString()
+                : now()->toDateString(),
+        ];
     }
 
     private function filterOptions(): array

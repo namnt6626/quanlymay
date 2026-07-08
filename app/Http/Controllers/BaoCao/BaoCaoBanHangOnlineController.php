@@ -19,19 +19,20 @@ class BaoCaoBanHangOnlineController extends Controller
             'q' => ['nullable', 'string', 'max:500'],
         ]);
 
+        $defaultDateRange = $this->defaultDateRange();
         $filters = [
-            'tu_ngay' => $request->input('tu_ngay') ?: now()->subDays(89)->toDateString(),
-            'den_ngay' => $request->input('den_ngay') ?: now()->toDateString(),
+            'tu_ngay' => $request->input('tu_ngay') ?: $defaultDateRange['tu_ngay'],
+            'den_ngay' => $request->input('den_ngay') ?: $defaultDateRange['den_ngay'],
             'q' => trim((string) $request->input('q')),
             'per_page' => paginationPerPage(),
         ];
 
         $base = $this->baseQuery($filters);
         $totals = (clone $base)->selectRaw('
-            COALESCE(SUM(ct.so_luong), 0) as tong_so_luong,
             COALESCE(SUM(ct.thanh_tien), 0) as tong_doanh_thu,
             COUNT(DISTINCT dhht.ngay_hoan_thanh) as so_ngay_ban
         ')->first();
+        $totals->tong_so_luong = $this->soldQuantity($filters);
 
         $from = Carbon::parse($filters['tu_ngay']);
         $to = Carbon::parse($filters['den_ngay']);
@@ -75,5 +76,27 @@ class BaoCaoBanHangOnlineController extends Controller
                 $query->where('dhht.ten_san_pham', 'like', "%{$keyword}%")
                     ->orWhere('ct.mau', 'like', "%{$keyword}%")->orWhere('ct.size', 'like', "%{$keyword}%");
             }));
+    }
+
+    private function soldQuantity(array $filters): float
+    {
+        return (float) $this->baseQuery($filters)->sum('ct.so_luong');
+    }
+
+    private function defaultDateRange(): array
+    {
+        $bounds = DB::table('don_hang_hoan_thanh')
+            ->whereNull('deleted_at')
+            ->selectRaw('MIN(ngay_hoan_thanh) as tu_ngay, MAX(ngay_hoan_thanh) as den_ngay')
+            ->first();
+
+        return [
+            'tu_ngay' => $bounds?->tu_ngay
+                ? Carbon::parse($bounds->tu_ngay)->toDateString()
+                : now()->subDays(89)->toDateString(),
+            'den_ngay' => $bounds?->den_ngay
+                ? Carbon::parse($bounds->den_ngay)->toDateString()
+                : now()->toDateString(),
+        ];
     }
 }

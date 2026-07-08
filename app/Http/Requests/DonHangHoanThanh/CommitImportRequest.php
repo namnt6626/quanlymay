@@ -8,6 +8,19 @@ class CommitImportRequest extends FormRequest
 {
     public function authorize(): bool { return true; }
 
+    protected function prepareForValidation(): void
+    {
+        $payload = $this->input('rows_payload');
+
+        if (is_string($payload) && trim($payload) !== '') {
+            $rows = json_decode($payload, true);
+
+            if (json_last_error() === JSON_ERROR_NONE && is_array($rows)) {
+                $this->merge(['rows' => $rows]);
+            }
+        }
+    }
+
     public function rules(): array
     {
         return [
