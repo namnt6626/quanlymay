@@ -165,6 +165,7 @@
             <th style="width: 80px;">STT</th>
             <th>Số phiếu</th>
             <th>Ngày xuất</th>
+            <th>Ngày nhập/QC</th>
             <th>Mã đơn</th>
             <th>Mã KH</th>
             <th>Kênh bán</th>
@@ -189,6 +190,11 @@
               <td>{{ $chiTiets->firstItem() + $loop->index }}</td>
               <td>{{ $chiTiet->phieuXuatKho?->so_phieu ?? '-' }}</td>
               <td>{{ $chiTiet->phieuXuatKho?->ngay_xuat ? \Illuminate\Support\Carbon::parse($chiTiet->phieuXuatKho->ngay_xuat)->format('d/m/Y') : '-' }}</td>
+              <td>
+                {{ $chiTiet->nhapKho?->ngay_nhap
+                    ? \Illuminate\Support\Carbon::parse($chiTiet->nhapKho->ngay_nhap)->format('d/m/Y')
+                    : ($chiTiet->nhapKho?->qc?->ngay_qc ? \Illuminate\Support\Carbon::parse($chiTiet->nhapKho->qc->ngay_qc)->format('d/m/Y') : '-') }}
+              </td>
               <td>{{ $chiTiet->source_has_order ? ($chiTiet->source_order_number ?? $chiTiet->nhapKho?->donHangChiTiet?->donHang?->ma_don ?? '-') : '-' }}</td>
               <td>{{ $chiTiet->source_has_order ? ($chiTiet->source_customer_number ?? $chiTiet->nhapKho?->donHangChiTiet?->donHang?->ma_kh ?? '-') : '-' }}</td>
               <td>{{ $chiTiet->source_kenh_ban ?? $chiTiet->phieuXuatKho?->kenh_ban ?? '-' }}</td>
@@ -224,7 +230,7 @@
             </tr>
           @empty
             <tr>
-              <td colspan="{{ hasPermission('XUAT_KHO_DELETE') ? 14 : 13 }}" class="text-center py-4">Chưa có dữ liệu xuất kho.</td>
+              <td colspan="{{ hasPermission('XUAT_KHO_DELETE') ? 15 : 14 }}" class="text-center py-4">Chưa có dữ liệu xuất kho.</td>
             </tr>
           @endforelse
         </tbody>

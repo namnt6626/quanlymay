@@ -369,7 +369,7 @@
                 <input type="text" inputmode="decimal" autocomplete="off"
                   class="form-control js-number-format @error('so_luong_xuat') is-invalid @enderror"
                   id="so_luong_xuat" name="so_luong_xuat"
-                  value="{{ old('so_luong_xuat') !== null && old('so_luong_xuat') !== '' ? formatPhanBoNumber(old('so_luong_xuat')) : formatPhanBoNumber($chiTiet?->so_luong_xuat) }}"
+                  value="{{ old('so_luong_xuat') !== null && old('so_luong_xuat') !== '' ? formatPhanBoNumber(old('so_luong_xuat')) : formatPhanBoNumber($currentSourceQuantity ?? $chiTiet?->so_luong_xuat) }}"
                   required>
                 @error('so_luong_xuat')
                   <div class="invalid-feedback">{{ $message }}</div>

@@ -14,7 +14,7 @@
     } elseif ($errors->any()) {
         $toastType = 'danger';
         $toastTitle = 'Dữ liệu chưa hợp lệ';
-        $toastMessage = 'Vui lòng kiểm tra lại các trường thông tin.';
+        $toastMessage = $errors->first();
     }
 @endphp
 
@@ -30,7 +30,15 @@
             <div class="d-flex">
                 <div class="toast-body">
                     <strong>{{ $toastTitle }}</strong>
-                    <div>{{ $toastMessage }}</div>
+                    @if ($errors->any() && $errors->count() > 1)
+                        <ul class="mb-0 ps-3">
+                            @foreach ($errors->all() as $message)
+                                <li>{{ $message }}</li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <div>{{ $toastMessage }}</div>
+                    @endif
                 </div>
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>

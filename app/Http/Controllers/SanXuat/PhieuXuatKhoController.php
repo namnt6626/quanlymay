@@ -269,10 +269,9 @@ class PhieuXuatKhoController extends Controller
                     ]);
                 }
 
-                $selectedRows[] = [
-                    'nhap_kho' => $nhapKho,
-                    'so_luong_xuat' => $soLuongXuat,
-                ];
+                foreach ($this->allocateNhapKhoLots($nhapKho, $soLuongXuat) as $allocation) {
+                    $selectedRows[] = $allocation;
+                }
             }
 
             $batchId = ActivityLogger::batchId();
@@ -291,7 +290,7 @@ class PhieuXuatKhoController extends Controller
 
                     $phieuXuatKho->chiTiets()->create([
                         'nhap_kho_id' => $nhapKho->id,
-                        'don_hang_chi_tiet_id' => $nhapKho->don_hang_chi_tiet_id,
+                        'don_hang_chi_tiet_id' => $this->donHangChiTietFromNhapKho($nhapKho)?->id,
                         'so_luong_xuat' => $row['so_luong_xuat'],
                         'ghi_chu' => $data['ghi_chu'] ?? null,
                     ]);
@@ -329,7 +328,7 @@ class PhieuXuatKhoController extends Controller
     {
         $xuatKho = $phieu_xuat_kho;
 
-        $chiTiet = $xuatKho->chiTiets()
+        $chiTiets = $xuatKho->chiTiets()
             ->with([
                 'nhapKho.qc.phanBoMay.cat.matHang',
                 'nhapKho.qc.phanBoMay.cat.mau',
@@ -342,12 +341,19 @@ class PhieuXuatKhoController extends Controller
                 'nhapKho.donHangChiTiet.donHang',
                 'donHangChiTiet.donHang',
             ])
-            ->firstOrFail();
+            ->get();
+
+        $chiTiet = $chiTiets->firstOrFail();
+        $currentSourceKey = $this->sourceGroupKeyFromNhapKho($chiTiet->nhapKho);
+        $currentSourceQuantity = $chiTiets
+            ->filter(fn (PhieuXuatKhoChiTiet $item): bool => $this->sourceGroupKeyFromNhapKho($item->nhapKho) === $currentSourceKey)
+            ->sum('so_luong_xuat');
 
         return view('content.san-xuat.xuat-kho.edit', [
             'phieuXuatKho' => $xuatKho,
             'chiTiet' => $chiTiet,
-            ...$this->formOptions($chiTiet),
+            'currentSourceQuantity' => $currentSourceQuantity,
+            ...$this->formOptions($chiTiet, $xuatKho),
         ]);
     }
 
@@ -372,10 +378,9 @@ class PhieuXuatKhoController extends Controller
             ])
             ->findOrFail((int) $data['nhap_kho_id']);
 
-        $this->ensureXuatKhoLimit($nhapKho, (float) $data['so_luong_xuat'], $chiTiet);
-        $data['don_hang_chi_tiet_id'] = $nhapKho->don_hang_chi_tiet_id;
+        $selectedRows = $this->allocateNhapKhoLots($nhapKho, (float) $data['so_luong_xuat'], $xuatKho);
 
-        DB::transaction(function () use ($data, $xuatKho, $chiTiet) {
+        DB::transaction(function () use ($data, $xuatKho, $selectedRows) {
             $xuatKho->update([
                 'so_phieu' => $data['so_phieu'],
                 'ngay_xuat' => $data['ngay_xuat'],
@@ -383,12 +388,19 @@ class PhieuXuatKhoController extends Controller
                 'ghi_chu' => $data['ghi_chu'] ?? null,
             ]);
 
-            $chiTiet->update([
-                'nhap_kho_id' => $data['nhap_kho_id'],
-                'don_hang_chi_tiet_id' => $data['don_hang_chi_tiet_id'] ?? null,
-                'so_luong_xuat' => $data['so_luong_xuat'],
-                'ghi_chu' => $data['ghi_chu'] ?? null,
-            ]);
+            $xuatKho->chiTiets()->get()->each->delete();
+
+            foreach ($selectedRows as $row) {
+                /** @var NhapKho $nhapKho */
+                $nhapKho = $row['nhap_kho'];
+
+                $xuatKho->chiTiets()->create([
+                    'nhap_kho_id' => $nhapKho->id,
+                    'don_hang_chi_tiet_id' => $this->donHangChiTietFromNhapKho($nhapKho)?->id,
+                    'so_luong_xuat' => $row['so_luong_xuat'],
+                    'ghi_chu' => $data['ghi_chu'] ?? null,
+                ]);
+            }
         });
 
         return $this->redirectToIndex('Cập nhật xuất kho thành công.');
@@ -432,9 +444,12 @@ class PhieuXuatKhoController extends Controller
             ->with('success', 'Đã xóa '.$phieuXuatKhos->count().' phiếu xuất kho.');
     }
 
-    private function formOptions(?PhieuXuatKhoChiTiet $currentChiTiet = null): array
+    private function formOptions(
+        ?PhieuXuatKhoChiTiet $currentChiTiet = null,
+        ?PhieuXuatKho $currentPhieuXuatKho = null
+    ): array
     {
-        $sourceGroups = $this->buildSourceGroups($currentChiTiet);
+        $sourceGroups = $this->buildSourceGroups($currentChiTiet, $currentPhieuXuatKho);
         $currentSourceKey = $currentChiTiet?->nhapKho ? $this->sourceGroupKeyFromNhapKho($currentChiTiet->nhapKho) : null;
         $oldNhapKhoIds = collect(request()->old('items', []))
             ->pluck('nhap_kho_id')
@@ -553,7 +568,116 @@ class PhieuXuatKhoController extends Controller
         }
     }
 
-    private function buildSourceGroups(?PhieuXuatKhoChiTiet $currentChiTiet = null): Collection
+    private function allocateNhapKhoLots(
+        NhapKho $sourceNhapKho,
+        float $soLuongXuat,
+        ?PhieuXuatKho $currentPhieuXuatKho = null
+    ): SupportCollection {
+        $sourceNhapKho->loadMissing([
+            'qc.phanBoMay.cat.matHang',
+            'qc.phanBoMay.cat.mau',
+            'qc.phanBoMay.cat.size',
+            'qc.phanBoMay.cat.donHangChiTiet.donHang',
+            'qc.phanBoMay.donHangChiTiet.donHang',
+            'qc.phanBoMay.donViMay',
+            'qc.matHang',
+            'qc.mau',
+            'qc.size',
+            'qc.donHangChiTiet.donHang',
+            'donHangChiTiet.donHang',
+        ]);
+
+        $sourceGroupKey = $this->sourceGroupKeyFromNhapKho($sourceNhapKho);
+
+        if ($sourceGroupKey === null) {
+            throw ValidationException::withMessages([
+                'items' => 'Nguồn xuất không hợp lệ.',
+            ]);
+        }
+
+        $lots = NhapKho::query()
+            ->with([
+                'qc.phanBoMay.cat.matHang',
+                'qc.phanBoMay.cat.mau',
+                'qc.phanBoMay.cat.size',
+                'qc.phanBoMay.cat.donHangChiTiet.donHang',
+                'qc.phanBoMay.donHangChiTiet.donHang',
+                'qc.phanBoMay.donViMay',
+                'qc.matHang',
+                'qc.mau',
+                'qc.size',
+                'qc.donHangChiTiet.donHang',
+                'donHangChiTiet.donHang',
+            ])
+            ->where('loai_ton', 'dat')
+            ->whereNull('deleted_at')
+            ->get()
+            ->filter(fn (NhapKho $nhapKho): bool => $this->sourceGroupKeyFromNhapKho($nhapKho) === $sourceGroupKey)
+            ->sortBy(function (NhapKho $nhapKho): string {
+                $date = $nhapKho->ngay_nhap
+                    ?? $nhapKho->qc?->ngay_qc
+                    ?? $nhapKho->created_at;
+
+                return ($date ? $date->format('Y-m-d H:i:s') : '9999-12-31 23:59:59').sprintf('-%010d', $nhapKho->id);
+            })
+            ->values();
+
+        $lotIds = $lots->pluck('id')->all();
+        $exportedByLot = $lotIds === []
+            ? collect()
+            : PhieuXuatKhoChiTiet::query()
+                ->select('nhap_kho_id', DB::raw('COALESCE(SUM(so_luong_xuat), 0) as total_exported'))
+                ->whereIn('nhap_kho_id', $lotIds)
+                ->whereNull('deleted_at')
+                ->whereHas('phieuXuatKho', function (Builder $query) use ($currentPhieuXuatKho): void {
+                    if ($currentPhieuXuatKho) {
+                        $query->where('id', '!=', $currentPhieuXuatKho->id);
+                    }
+                })
+                ->groupBy('nhap_kho_id')
+                ->pluck('total_exported', 'nhap_kho_id');
+
+        $remainingToExport = $soLuongXuat;
+        $allocations = collect();
+
+        foreach ($lots as $lot) {
+            if ($remainingToExport <= 0) {
+                break;
+            }
+
+            $lotRemaining = max(
+                0,
+                (float) $lot->so_luong_nhap - (float) ($exportedByLot[$lot->id] ?? 0)
+            );
+
+            if ($lotRemaining <= 0) {
+                continue;
+            }
+
+            $quantity = min($lotRemaining, $remainingToExport);
+            $remainingToExport = round($remainingToExport - $quantity, 4);
+
+            $allocations->push([
+                'nhap_kho' => $lot,
+                'so_luong_xuat' => $quantity,
+            ]);
+        }
+
+        if ($remainingToExport > 0.00009) {
+            $available = max(0, $soLuongXuat - $remainingToExport);
+
+            throw ValidationException::withMessages([
+                'items' => 'SL xuất vượt tồn còn lại. Nguồn này chỉ còn '.$this->formatNumberForOption($available).'.',
+            ]);
+        }
+
+        return $allocations;
+    }
+
+    private function buildSourceGroups(
+        ?PhieuXuatKhoChiTiet $currentChiTiet = null,
+        ?PhieuXuatKho $currentPhieuXuatKho = null
+    ): Collection
     {
         $nhapKhos = NhapKho::query()
             ->with([
@@ -607,7 +731,7 @@ class PhieuXuatKhoController extends Controller
         $currentSourceKey = $currentChiTiet?->nhapKho ? $this->sourceGroupKeyFromNhapKho($currentChiTiet->nhapKho) : null;
 
         return $nhapGroups
-            ->map(function (SupportCollection $group, ?string $sourceGroupKey) use ($xuatGroups, $currentSourceKey, $currentChiTiet) {
+            ->map(function (SupportCollection $group, ?string $sourceGroupKey) use ($xuatGroups, $currentSourceKey, $currentChiTiet, $currentPhieuXuatKho) {
                 if ($sourceGroupKey === null) {
                     return null;
                 }
@@ -617,7 +741,12 @@ class PhieuXuatKhoController extends Controller
                 $totalNhap = (float) $group->sum('so_luong_nhap');
                 $totalXuat = (float) ($xuatGroups->get($sourceGroupKey, collect())->sum('so_luong_xuat'));
 
-                if ($currentChiTiet && $currentSourceKey === $sourceGroupKey) {
+                if ($currentPhieuXuatKho && $currentSourceKey === $sourceGroupKey) {
+                    $totalXuat -= (float) $xuatGroups
+                        ->get($sourceGroupKey, collect())
+                        ->filter(fn (PhieuXuatKhoChiTiet $chiTiet): bool => (int) $chiTiet->phieu_xuat_kho_id === (int) $currentPhieuXuatKho->id)
+                        ->sum('so_luong_xuat');
+                } elseif ($currentChiTiet && $currentSourceKey === $sourceGroupKey) {
                     $totalXuat -= (float) $currentChiTiet->so_luong_xuat;
                 }
 
