@@ -16,7 +16,11 @@ class StoreDonHangHoanThanhRequest extends FormRequest
             $row['thanh_tien'] = $this->money($row['thanh_tien'] ?? null);
             return $row;
         })->all();
-        $this->merge(['chi_tiets' => $details, 'kenh_ban' => 'Online']);
+        $this->merge([
+            'chi_tiets' => $details,
+            'kenh_ban' => $this->input('kenh_ban') ?: 'Tiktok',
+            'ten_kho' => null,
+        ]);
     }
 
     public function rules(): array
@@ -24,8 +28,8 @@ class StoreDonHangHoanThanhRequest extends FormRequest
         return [
             'ngay_hoan_thanh' => ['required', 'date'],
             'ten_san_pham' => ['required', 'string', 'max:500'],
-            'ten_kho' => ['nullable', 'string', 'max:255'],
-            'kenh_ban' => ['required', 'in:Online'],
+            'ten_kho' => ['nullable'],
+            'kenh_ban' => ['required', 'in:Tiktok,Shopee'],
             'ghi_chu' => ['nullable', 'string'],
             'chi_tiets' => ['required', 'array', 'min:1'],
             'chi_tiets.*.mau' => ['nullable', 'string', 'max:255'],

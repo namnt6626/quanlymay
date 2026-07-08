@@ -2,6 +2,7 @@
   $details = old('chi_tiets', isset($order) ? $order->chiTiets->map(fn ($item) => [
     'mau' => $item->mau, 'size' => $item->size, 'so_luong' => $item->so_luong, 'thanh_tien' => $item->thanh_tien, 'nguon' => $item->nguon,
   ])->all() : [['mau' => '', 'size' => '', 'so_luong' => 1, 'thanh_tien' => '', 'nguon' => 'thu_cong']]);
+  $selectedChannel = old('kenh_ban', isset($order) && in_array($order->kenh_ban ?? '', ['Tiktok', 'Shopee'], true) ? $order->kenh_ban : 'Tiktok');
 @endphp
 
 @if ($errors->any())
@@ -22,8 +23,11 @@
         value="{{ old('ten_san_pham', $order->ten_san_pham ?? '') }}">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Kho</label>
-      <input type="text" name="ten_kho" class="form-control" maxlength="255" value="{{ old('ten_kho', $order->ten_kho ?? '') }}">
+      <label class="form-label">Kênh bán <span class="text-danger">*</span></label>
+      <select name="kenh_ban" class="form-select" required>
+        <option value="Tiktok" @selected($selectedChannel === 'Tiktok')>Tiktok</option>
+        <option value="Shopee" @selected($selectedChannel === 'Shopee')>Shopee</option>
+      </select>
     </div>
     <div class="col-12">
       <label class="form-label">Ghi chú</label>

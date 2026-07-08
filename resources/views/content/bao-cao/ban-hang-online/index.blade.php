@@ -9,7 +9,7 @@
   .online-report-kpi .kpi-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; }
   .online-report-product { max-width: 380px; white-space: normal; line-height: 1.4; }
   .online-report-scroll { overflow-x: auto; scrollbar-gutter: stable; }
-  .online-report-table { min-width: 1200px; }
+  .online-report-table { min-width: 1050px; }
   .online-report-filter .form-control,
   .online-report-filter .form-select,
   .online-report-filter .btn { min-height: 38px; }
@@ -29,8 +29,7 @@
   <form method="GET" class="row g-3 align-items-end online-report-filter">
     <div class="col-6 col-xl-2"><label class="form-label">Từ ngày</label><input type="date" name="tu_ngay" class="form-control" value="{{ $filters['tu_ngay'] }}" required></div>
     <div class="col-6 col-xl-2"><label class="form-label">Đến ngày</label><input type="date" name="den_ngay" class="form-control" value="{{ $filters['den_ngay'] }}" required></div>
-    <div class="col-12 col-xl-3"><label class="form-label">Tìm kiếm</label><input name="q" class="form-control" value="{{ $filters['q'] }}" placeholder="Sản phẩm, màu, size"></div>
-    <div class="col-6 col-xl-2"><label class="form-label">Kho</label><select name="ten_kho" class="form-select"><option value="">Tất cả</option>@foreach($warehouses as $warehouse)<option value="{{ $warehouse }}" @selected($filters['ten_kho']===$warehouse)>{{ $warehouse }}</option>@endforeach</select></div>
+    <div class="col-12 col-xl-5"><label class="form-label">Tìm kiếm</label><input name="q" class="form-control" value="{{ $filters['q'] }}" placeholder="Sản phẩm, màu, size"></div>
     @include('content.shared._per-page-select', ['perPageColumnClass' => 'col-6 col-xl-1'])
     <div class="col-12 col-xl-2 online-report-filter-actions"><a href="{{ route('bao-cao.ban-hang-online') }}" class="btn btn-outline-secondary" title="Đặt lại bộ lọc"><i class="icon-base bx bx-refresh"></i></a><button class="btn btn-primary"><i class="icon-base bx bx-filter-alt me-1"></i>Lọc</button></div>
   </form>
@@ -58,12 +57,12 @@
 <div class="card">
   <div class="card-header"><h5 class="mb-0">Phân tích sản phẩm · màu · size</h5></div>
   <div class="online-report-scroll"><table class="table align-middle online-report-table">
-    <thead><tr><th>Sản phẩm</th><th>Kho</th><th>Màu</th><th>Size</th><th class="text-end">Số lượng</th><th class="text-end">Tổng tiền</th><th class="text-end">Tỷ trọng</th></tr></thead>
+    <thead><tr><th>Sản phẩm</th><th>Màu</th><th>Size</th><th class="text-end">Số lượng</th><th class="text-end">Tổng tiền</th><th class="text-end">Tỷ trọng</th></tr></thead>
     <tbody>@forelse($rows as $row)<tr>
       <td><div class="online-report-product fw-semibold" title="{{ $row->ten_san_pham }}">{{ $row->ten_san_pham }}</div></td>
-      <td>{{ $row->ten_kho ?: '-' }}</td><td>{{ $row->mau ?: '-' }}</td><td>{{ $row->size ?: '-' }}</td>
+      <td>{{ $row->mau ?: '-' }}</td><td>{{ $row->size ?: '-' }}</td>
       <td class="text-end">{{ number_format((float)$row->so_luong, 0, ',', '.') }}</td><td class="text-end fw-semibold">{{ number_format((float)$row->doanh_thu, 0, ',', '.') }} ₫</td><td class="text-end">{{ $revenue > 0 ? number_format(((float)$row->doanh_thu / $revenue) * 100, 1, ',', '.') : '0' }}%</td>
-    </tr>@empty<tr><td colspan="7" class="text-center py-4">Không có dữ liệu trong kỳ đã chọn.</td></tr>@endforelse</tbody>
+    </tr>@empty<tr><td colspan="6" class="text-center py-4">Không có dữ liệu trong kỳ đã chọn.</td></tr>@endforelse</tbody>
   </table></div>
   @if($rows->hasPages())<div class="card-footer">{{ $rows->links() }}</div>@endif
 </div>

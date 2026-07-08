@@ -28,7 +28,7 @@ class DonHangHoanThanhController extends Controller
             'q' => trim((string) $request->input('q')),
             'tu_ngay' => trim((string) $request->input('tu_ngay')),
             'den_ngay' => trim((string) $request->input('den_ngay')),
-            'ten_kho' => trim((string) $request->input('ten_kho')),
+            'kenh_ban' => in_array($request->input('kenh_ban'), ['Tiktok', 'Shopee'], true) ? $request->input('kenh_ban') : '',
             'nguon' => in_array($request->input('nguon'), ['excel', 'thu_cong'], true) ? $request->input('nguon') : '',
             'per_page' => paginationPerPage(),
         ];
@@ -41,13 +41,12 @@ class DonHangHoanThanhController extends Controller
                 $keyword = $filters['q'];
                 $query->where(function (Builder $query) use ($keyword): void {
                     $query->where('ten_san_pham', 'like', "%{$keyword}%")
-                        ->orWhere('ten_kho', 'like', "%{$keyword}%")
                         ->orWhereHas('chiTiets', fn (Builder $detail) => $detail->where('mau', 'like', "%{$keyword}%")->orWhere('size', 'like', "%{$keyword}%"));
                 });
             })
             ->when($filters['tu_ngay'] !== '', fn (Builder $query) => $query->whereDate('ngay_hoan_thanh', '>=', $filters['tu_ngay']))
             ->when($filters['den_ngay'] !== '', fn (Builder $query) => $query->whereDate('ngay_hoan_thanh', '<=', $filters['den_ngay']))
-            ->when($filters['ten_kho'] !== '', fn (Builder $query) => $query->where('ten_kho', $filters['ten_kho']))
+            ->when($filters['kenh_ban'] !== '', fn (Builder $query) => $query->where('kenh_ban', $filters['kenh_ban']))
             ->when($filters['nguon'] !== '', fn (Builder $query) => $query->whereHas('chiTiets', fn (Builder $detail) => $detail->where('nguon', $filters['nguon'])))
             ->orderByDesc('ngay_hoan_thanh')->orderByDesc('id')
             ->paginate($filters['per_page'])->withQueryString();
@@ -55,7 +54,6 @@ class DonHangHoanThanhController extends Controller
         return view('content.san-xuat.don-hang-hoan-thanh.index', [
             'orders' => $orders,
             'filters' => $filters,
-            'warehouses' => DonHangHoanThanh::query()->whereNotNull('ten_kho')->distinct()->orderBy('ten_kho')->pluck('ten_kho'),
         ]);
     }
 
@@ -114,6 +112,7 @@ class DonHangHoanThanhController extends Controller
 
     public function preview(PreviewImportRequest $request, XlsxReader $reader, PhanLoaiParser $parser): View
     {
+        $channel = $request->validated('kenh_ban');
         $sheetRows = $reader->rows($request->file('file_excel')->getRealPath());
         $headerIndex = collect($sheetRows)->search(fn (array $row) => $this->isHeader($row['values']));
         if ($headerIndex === false) return back()->withErrors(['file_excel' => 'Không tìm thấy dòng tiêu đề đúng định dạng trong file.']);
@@ -141,8 +140,7 @@ class DonHangHoanThanhController extends Controller
                 'ngay_hoan_thanh' => $date->toDateString(),
                 'thoi_gian_tao_goc' => $date->format('Y-m-d H:i:s'),
                 'ten_san_pham' => $product,
-                'ten_kho' => trim((string) ($values[$columns['warehouse']] ?? '')),
-                'kenh_ban' => 'Online',
+                'kenh_ban' => $channel,
                 'phan_loai_goc' => $variation,
                 'mau' => $split['mau'], 'size' => $split['size'],
                 'so_luong' => (float) $quantity,
@@ -162,23 +160,39 @@ class DonHangHoanThanhController extends Controller
 
     private function isHeader(array $values): bool
     {
-        $normalized = array_map(fn ($value) => strtolower(trim((string) $value)), $values);
-        return in_array('product name', $normalized, true) && in_array('variation', $normalized, true) && in_array('quantity', $normalized, true);
+        $normalized = array_map(fn ($value) => $this->normalizeHeader((string) $value), $values);
+
+        return count(array_intersect(['product name', 'seller sku'], $normalized)) > 0
+            && in_array('variation', $normalized, true)
+            && in_array('quantity', $normalized, true);
     }
 
     private function mapColumns(array $header): array
     {
         $aliases = [
-            'product' => 'product name', 'variation' => 'variation', 'quantity' => 'quantity',
-            'subtotal' => 'sku subtotal after discount', 'created' => 'created time', 'warehouse' => 'warehouse name',
+            'product' => ['product name', 'seller sku'],
+            'variation' => ['variation'],
+            'quantity' => ['quantity'],
+            'subtotal' => ['sku subtotal after discount', 'sku seller discount'],
+            'created' => ['created time'],
         ];
+        $normalized = array_map(fn ($value) => $this->normalizeHeader((string) $value), $header);
         $mapped = [];
-        foreach ($aliases as $key => $label) {
-            $column = array_search($label, array_map(fn ($value) => strtolower(trim((string) $value)), $header), true);
-            if ($column === false) throw new \RuntimeException("Thiếu cột {$label} trong file Excel.");
+        foreach ($aliases as $key => $labels) {
+            $column = false;
+            foreach ($labels as $label) {
+                $column = array_search($label, $normalized, true);
+                if ($column !== false) break;
+            }
+            if ($column === false) throw new \RuntimeException('Thiếu cột '.implode(' hoặc ', $labels).' trong file Excel.');
             $mapped[$key] = $column;
         }
         return $mapped;
+    }
+
+    private function normalizeHeader(string $value): string
+    {
+        return strtolower(preg_replace('/\s+/', ' ', trim($value)) ?? '');
     }
 
     private function parseDate(string $value): ?Carbon

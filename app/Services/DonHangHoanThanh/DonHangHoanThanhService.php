@@ -10,7 +10,8 @@ class DonHangHoanThanhService
     public function saveManual(array $data, ?DonHangHoanThanh $current = null): DonHangHoanThanh
     {
         return DB::transaction(function () use ($data, $current) {
-            $order = $current ?: $this->findOrCreate($data['ngay_hoan_thanh'], $data['ten_san_pham'], $data['ten_kho'] ?? null, $data['kenh_ban']);
+            $data['ten_kho'] = null;
+            $order = $current ?: $this->findOrCreate($data['ngay_hoan_thanh'], $data['ten_san_pham'], $data['kenh_ban']);
             $order->update(collect($data)->only(['ngay_hoan_thanh', 'ten_san_pham', 'ten_kho', 'kenh_ban', 'ghi_chu'])->all());
             if ($current) $order->chiTiets()->delete();
             foreach ($data['chi_tiets'] as $detail) $this->mergeDetail($order, [...$detail, 'nguon' => $detail['nguon'] ?? 'thu_cong']);
@@ -22,7 +23,7 @@ class DonHangHoanThanhService
     {
         return DB::transaction(function () use ($rows) {
             foreach ($rows as $row) {
-                $order = $this->findOrCreate($row['ngay_hoan_thanh'], $row['ten_san_pham'], $row['ten_kho'] ?? null, $row['kenh_ban']);
+                $order = $this->findOrCreate($row['ngay_hoan_thanh'], $row['ten_san_pham'], $row['kenh_ban']);
                 $this->mergeDetail($order, [
                     'mau' => $row['mau'] ?? null, 'size' => $row['size'] ?? null,
                     'phan_loai_goc' => $row['phan_loai_goc'] ?? null,
@@ -34,12 +35,12 @@ class DonHangHoanThanhService
         });
     }
 
-    private function findOrCreate(string $date, string $product, ?string $warehouse, string $channel): DonHangHoanThanh
+    private function findOrCreate(string $date, string $product, string $channel): DonHangHoanThanh
     {
         return DonHangHoanThanh::query()->firstOrCreate([
             'ngay_hoan_thanh' => $date,
             'ten_san_pham' => trim($product),
-            'ten_kho' => ($warehouse = trim((string) $warehouse)) !== '' ? $warehouse : null,
+            'ten_kho' => null,
             'kenh_ban' => trim($channel),
         ]);
     }

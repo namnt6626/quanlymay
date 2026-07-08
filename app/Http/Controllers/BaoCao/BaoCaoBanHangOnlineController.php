@@ -17,14 +17,12 @@ class BaoCaoBanHangOnlineController extends Controller
             'tu_ngay' => ['nullable', 'date'],
             'den_ngay' => ['nullable', 'date', 'after_or_equal:tu_ngay'],
             'q' => ['nullable', 'string', 'max:500'],
-            'ten_kho' => ['nullable', 'string', 'max:255'],
         ]);
 
         $filters = [
             'tu_ngay' => $request->input('tu_ngay') ?: now()->subDays(89)->toDateString(),
             'den_ngay' => $request->input('den_ngay') ?: now()->toDateString(),
             'q' => trim((string) $request->input('q')),
-            'ten_kho' => trim((string) $request->input('ten_kho')),
             'per_page' => paginationPerPage(),
         ];
 
@@ -55,14 +53,13 @@ class BaoCaoBanHangOnlineController extends Controller
             ->groupBy('dhht.ten_san_pham')->orderByDesc('so_luong')->limit(10)->get();
 
         $rows = (clone $base)
-            ->selectRaw('dhht.ten_san_pham, dhht.ten_kho, ct.mau, ct.size, SUM(ct.so_luong) as so_luong, SUM(ct.thanh_tien) as doanh_thu')
-            ->groupBy('dhht.ten_san_pham', 'dhht.ten_kho', 'ct.mau', 'ct.size')
+            ->selectRaw('dhht.ten_san_pham, ct.mau, ct.size, SUM(ct.so_luong) as so_luong, SUM(ct.thanh_tien) as doanh_thu')
+            ->groupBy('dhht.ten_san_pham', 'ct.mau', 'ct.size')
             ->orderByDesc('doanh_thu')->paginate($filters['per_page'])->withQueryString();
 
         return view('content.bao-cao.ban-hang-online.index', [
             'filters' => $filters, 'totals' => $totals, 'revenueChange' => $revenueChange,
             'trend' => $trend, 'topProducts' => $topProducts, 'rows' => $rows,
-            'warehouses' => DB::table('don_hang_hoan_thanh')->whereNull('deleted_at')->whereNotNull('ten_kho')->distinct()->orderBy('ten_kho')->pluck('ten_kho'),
         ]);
     }
 
@@ -77,7 +74,6 @@ class BaoCaoBanHangOnlineController extends Controller
                 $keyword = $filters['q'];
                 $query->where('dhht.ten_san_pham', 'like', "%{$keyword}%")
                     ->orWhere('ct.mau', 'like', "%{$keyword}%")->orWhere('ct.size', 'like', "%{$keyword}%");
-            }))
-            ->when($filters['ten_kho'] !== '', fn (Builder $query) => $query->where('dhht.ten_kho', $filters['ten_kho']));
+            }));
     }
 }

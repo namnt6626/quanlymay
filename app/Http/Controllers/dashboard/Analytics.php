@@ -103,8 +103,10 @@ class Analytics extends Controller
         $onlineFilters = [
             'tu_ngay' => $this->dateInput($request, 'online_tu_ngay', now()->subDays(89)->toDateString()),
             'den_ngay' => $this->dateInput($request, 'online_den_ngay', now()->toDateString()),
-            'q' => trim((string) $request->input('online_q')),
-            'ten_kho' => trim((string) $request->input('online_ten_kho')),
+            'ma_hang' => trim((string) $request->input('online_ma_hang')),
+            'mau' => trim((string) $request->input('online_mau')),
+            'size' => trim((string) $request->input('online_size')),
+            'kenh_ban' => in_array($request->input('online_kenh_ban'), ['Tiktok', 'Shopee'], true) ? $request->input('online_kenh_ban') : '',
             'per_page' => in_array($request->integer('online_per_page'), paginationPerPageOptions(), true)
                 ? $request->integer('online_per_page')
                 : paginationPerPage(),
@@ -160,8 +162,8 @@ class Analytics extends Controller
             ->get();
 
         $onlineRows = (clone $base)
-            ->selectRaw('dhht.ten_san_pham, dhht.ten_kho, ct.mau, ct.size, SUM(ct.so_luong) as so_luong, SUM(ct.thanh_tien) as tong_tien')
-            ->groupBy('dhht.ten_san_pham', 'dhht.ten_kho', 'ct.mau', 'ct.size')
+            ->selectRaw('dhht.ten_san_pham, ct.mau, ct.size, SUM(ct.so_luong) as so_luong, SUM(ct.thanh_tien) as tong_tien')
+            ->groupBy('dhht.ten_san_pham', 'ct.mau', 'ct.size')
             ->orderByDesc('tong_tien')
             ->paginate($onlineFilters['per_page'], ['*'], 'online_page')
             ->withQueryString();
@@ -174,13 +176,31 @@ class Analytics extends Controller
             'onlineDailyRows' => $onlineDailyRows,
             'onlineTopProducts' => $onlineTopProducts,
             'onlineRows' => $onlineRows,
-            'onlineWarehouses' => DB::table('don_hang_hoan_thanh')
+            'onlineProducts' => DB::table('don_hang_hoan_thanh')
                 ->whereNull('deleted_at')
-                ->whereNotNull('ten_kho')
-                ->where('ten_kho', '<>', '')
+                ->whereNotNull('ten_san_pham')
+                ->where('ten_san_pham', '<>', '')
                 ->distinct()
-                ->orderBy('ten_kho')
-                ->pluck('ten_kho'),
+                ->orderBy('ten_san_pham')
+                ->pluck('ten_san_pham'),
+            'onlineMaus' => DB::table('don_hang_hoan_thanh_chi_tiet as ct')
+                ->join('don_hang_hoan_thanh as dhht', 'dhht.id', '=', 'ct.don_hang_hoan_thanh_id')
+                ->whereNull('ct.deleted_at')
+                ->whereNull('dhht.deleted_at')
+                ->whereNotNull('ct.mau')
+                ->where('ct.mau', '<>', '')
+                ->distinct()
+                ->orderBy('ct.mau')
+                ->pluck('ct.mau'),
+            'onlineSizes' => DB::table('don_hang_hoan_thanh_chi_tiet as ct')
+                ->join('don_hang_hoan_thanh as dhht', 'dhht.id', '=', 'ct.don_hang_hoan_thanh_id')
+                ->whereNull('ct.deleted_at')
+                ->whereNull('dhht.deleted_at')
+                ->whereNotNull('ct.size')
+                ->where('ct.size', '<>', '')
+                ->distinct()
+                ->orderBy('ct.size')
+                ->pluck('ct.size'),
         ];
     }
 
@@ -192,13 +212,10 @@ class Analytics extends Controller
             ->whereNull('dhht.deleted_at')
             ->whereDate('dhht.ngay_hoan_thanh', '>=', $filters['tu_ngay'])
             ->whereDate('dhht.ngay_hoan_thanh', '<=', $filters['den_ngay'])
-            ->when($filters['q'] !== '', fn (Builder $query) => $query->where(function (Builder $query) use ($filters) {
-                $keyword = $filters['q'];
-                $query->where('dhht.ten_san_pham', 'like', "%{$keyword}%")
-                    ->orWhere('ct.mau', 'like', "%{$keyword}%")
-                    ->orWhere('ct.size', 'like', "%{$keyword}%");
-            }))
-            ->when($filters['ten_kho'] !== '', fn (Builder $query) => $query->where('dhht.ten_kho', $filters['ten_kho']));
+            ->when($filters['ma_hang'] !== '', fn (Builder $query) => $query->where('dhht.ten_san_pham', $filters['ma_hang']))
+            ->when($filters['mau'] !== '', fn (Builder $query) => $query->where('ct.mau', $filters['mau']))
+            ->when($filters['size'] !== '', fn (Builder $query) => $query->where('ct.size', $filters['size']))
+            ->when($filters['kenh_ban'] !== '', fn (Builder $query) => $query->where('dhht.kenh_ban', $filters['kenh_ban']));
     }
 
     private function orderSummaryReport(Request $request, BaoCaoTongHopDonHangService $service): array

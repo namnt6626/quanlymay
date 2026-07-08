@@ -99,6 +99,81 @@
       min-height: 38px;
     }
 
+    .dashboard-online-filter {
+      padding: 1rem;
+      border: 1px solid var(--bs-border-color);
+      border-radius: .5rem;
+      background: var(--bs-gray-100);
+    }
+
+    .dashboard-online-filter-row {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .dashboard-online-filter-row + .dashboard-online-filter-row {
+      margin-top: 1rem;
+    }
+
+    .dashboard-online-filter-primary {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .dashboard-online-filter-secondary {
+      grid-template-columns: minmax(220px, 2fr) minmax(160px, 1fr) minmax(120px, .8fr) auto;
+      align-items: end;
+    }
+
+    .dashboard-online-filter .form-label {
+      margin-bottom: .35rem;
+      color: var(--bs-secondary-color);
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .01em;
+      text-transform: uppercase;
+    }
+
+    .dashboard-online-filter .form-control,
+    .dashboard-online-filter .form-select {
+      min-height: 42px;
+      background-color: var(--bs-body-bg);
+    }
+
+    .dashboard-online-filter .online-filter-actions {
+      height: 100%;
+      min-height: 42px;
+      align-items: end;
+    }
+
+    .dashboard-online-filter .online-filter-actions .btn {
+      min-height: 42px;
+    }
+
+    .dashboard-online-filter .online-filter-actions .btn-primary {
+      min-width: 96px;
+    }
+
+    @media (max-width: 1199.98px) {
+      .dashboard-online-filter-primary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .dashboard-online-filter-secondary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .dashboard-online-filter-secondary .online-filter-actions {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 575.98px) {
+      .dashboard-online-filter-primary,
+      .dashboard-online-filter-secondary {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .dashboard-report-filter-actions {
       display: flex;
       gap: .5rem;
@@ -184,6 +259,10 @@
 
       .dashboard-report-filter-actions {
         width: 100%;
+      }
+
+      .dashboard-online-filter {
+        padding: .875rem;
       }
 
       .dashboard-stat-card .card-body {
@@ -317,7 +396,7 @@
       'time_size_id',
   ];
   $dailyKeys = ['daily_date_from', 'daily_date_to', 'daily_per_page'];
-  $onlineKeys = ['online_tu_ngay', 'online_den_ngay', 'online_q', 'online_ten_kho', 'online_per_page', 'online_daily_page', 'online_page'];
+  $onlineKeys = ['online_tu_ngay', 'online_den_ngay', 'online_ma_hang', 'online_mau', 'online_size', 'online_kenh_ban', 'online_per_page', 'online_daily_page', 'online_page'];
   $orderKeys = [
       'order_q',
       'order_ma_don',
@@ -749,42 +828,67 @@
       </div>
     </div>
     <div class="card-body border-top">
-      <form action="{{ route('dashboard-analytics') }}" method="GET" class="row g-3 align-items-end dashboard-report-filter">
+      <form action="{{ route('dashboard-analytics') }}" method="GET" class="dashboard-report-filter dashboard-online-filter">
         <input type="hidden" name="tab" value="online">
         @foreach ($onlinePreserved as $name => $value)
           <input type="hidden" name="{{ $name }}" value="{{ $value }}">
         @endforeach
-        <div class="col-6 col-xl-2">
-          <label class="form-label" for="online_tu_ngay">Từ ngày</label>
-          <input type="date" class="form-control" id="online_tu_ngay" name="online_tu_ngay" value="{{ $onlineFilters['tu_ngay'] }}" required>
+        <div class="dashboard-online-filter-row dashboard-online-filter-primary">
+          <div>
+            <label class="form-label" for="online_tu_ngay">Từ ngày</label>
+            <input type="date" class="form-control" id="online_tu_ngay" name="online_tu_ngay" value="{{ $onlineFilters['tu_ngay'] }}" required>
+          </div>
+          <div>
+            <label class="form-label" for="online_den_ngay">Đến ngày</label>
+            <input type="date" class="form-control" id="online_den_ngay" name="online_den_ngay" value="{{ $onlineFilters['den_ngay'] }}" required>
+          </div>
+          <div>
+            <label class="form-label" for="online_kenh_ban">Kênh bán</label>
+            <select class="form-select" id="online_kenh_ban" name="online_kenh_ban">
+              <option value="">Tất cả</option>
+              <option value="Tiktok" @selected(($onlineFilters['kenh_ban'] ?? '') === 'Tiktok')>Tiktok</option>
+              <option value="Shopee" @selected(($onlineFilters['kenh_ban'] ?? '') === 'Shopee')>Shopee</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="online_per_page">Hiển thị</label>
+            <select class="form-select" id="online_per_page" name="online_per_page" onchange="this.form.submit()">
+              @foreach (paginationPerPageOptions() as $option)
+                <option value="{{ $option }}" @selected((int) $onlineFilters['per_page'] === $option)>{{ $option }}</option>
+              @endforeach
+            </select>
+          </div>
         </div>
-        <div class="col-6 col-xl-2">
-          <label class="form-label" for="online_den_ngay">Đến ngày</label>
-          <input type="date" class="form-control" id="online_den_ngay" name="online_den_ngay" value="{{ $onlineFilters['den_ngay'] }}" required>
-        </div>
-        <div class="col-12 col-xl-3">
-          <label class="form-label" for="online_q">Tìm kiếm</label>
-          <input type="text" class="form-control" id="online_q" name="online_q" value="{{ $onlineFilters['q'] }}" placeholder="Sản phẩm, màu, size">
-        </div>
-        <div class="col-6 col-xl-2">
-          <label class="form-label" for="online_ten_kho">Kho</label>
-          <select class="form-select" id="online_ten_kho" name="online_ten_kho">
-            <option value="">Tất cả</option>
-            @foreach ($onlineWarehouses as $warehouse)
-              <option value="{{ $warehouse }}" @selected($onlineFilters['ten_kho'] === $warehouse)>{{ $warehouse }}</option>
-            @endforeach
-          </select>
-        </div>
-        <div class="col-6 col-xl-1">
-          <label class="form-label" for="online_per_page">Hiển thị</label>
-          <select class="form-select" id="online_per_page" name="online_per_page" onchange="this.form.submit()">
-            @foreach (paginationPerPageOptions() as $option)
-              <option value="{{ $option }}" @selected((int) $onlineFilters['per_page'] === $option)>{{ $option }}</option>
-            @endforeach
-          </select>
-        </div>
-        <div class="col-12 col-xl-2">
-          <div class="dashboard-report-filter-actions">
+
+        <div class="dashboard-online-filter-row dashboard-online-filter-secondary">
+          <div>
+            <label class="form-label" for="online_ma_hang">Mã hàng</label>
+            <input class="form-control" id="online_ma_hang" name="online_ma_hang" value="{{ $onlineFilters['ma_hang'] ?? '' }}" list="online_ma_hang_options" placeholder="Tất cả" autocomplete="off">
+            <datalist id="online_ma_hang_options">
+              @foreach ($onlineProducts as $product)
+                <option value="{{ $product }}"></option>
+              @endforeach
+            </datalist>
+          </div>
+          <div>
+            <label class="form-label" for="online_mau">Màu</label>
+            <select class="form-select" id="online_mau" name="online_mau">
+              <option value="">Tất cả</option>
+              @foreach ($onlineMaus as $mau)
+                <option value="{{ $mau }}" @selected(($onlineFilters['mau'] ?? '') === $mau)>{{ $mau }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="online_size">Size</label>
+            <select class="form-select" id="online_size" name="online_size">
+              <option value="">Tất cả</option>
+              @foreach ($onlineSizes as $size)
+                <option value="{{ $size }}" @selected(($onlineFilters['size'] ?? '') === $size)>{{ $size }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div class="dashboard-report-filter-actions online-filter-actions">
             <a href="{{ $onlineResetUrl }}" class="btn btn-outline-secondary" title="Xóa lọc"><i class="icon-base bx bx-refresh"></i></a>
             <button type="submit" class="btn btn-primary"><i class="icon-base bx bx-filter-alt me-1"></i>Lọc</button>
           </div>
@@ -898,7 +1002,6 @@
         <thead>
           <tr>
             <th>Sản phẩm</th>
-            <th>Kho</th>
             <th>Màu</th>
             <th>Size</th>
             <th class="text-end">Số lượng</th>
@@ -910,7 +1013,6 @@
           @forelse ($onlineRows as $row)
             <tr>
               <td><div class="dashboard-product-name fw-semibold" title="{{ $row->ten_san_pham }}">{{ $row->ten_san_pham }}</div></td>
-              <td>{{ $row->ten_kho ?: '-' }}</td>
               <td>{{ $row->mau ?: '-' }}</td>
               <td>{{ $row->size ?: '-' }}</td>
               <td class="text-end">{{ number_format((float) $row->so_luong, 0, ',', '.') }}</td>
@@ -918,7 +1020,7 @@
               <td class="text-end">{{ $onlineRevenue > 0 ? number_format(((float) $row->tong_tien / $onlineRevenue) * 100, 1, ',', '.') : '0' }}%</td>
             </tr>
           @empty
-            <tr><td colspan="7" class="text-center py-4">Không có dữ liệu bán hàng online trong kỳ đã chọn.</td></tr>
+            <tr><td colspan="6" class="text-center py-4">Không có dữ liệu bán hàng online trong kỳ đã chọn.</td></tr>
           @endforelse
         </tbody>
       </table>

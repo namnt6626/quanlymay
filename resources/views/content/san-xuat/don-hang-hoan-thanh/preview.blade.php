@@ -18,7 +18,6 @@
   .excel-preview-table .col-row { width: 70px; }
   .excel-preview-table .col-date { width: 150px; }
   .excel-preview-table .col-product { width: 390px; }
-  .excel-preview-table .col-warehouse { width: 170px; }
   .excel-preview-table .col-variation { width: 260px; }
   .excel-preview-table .col-color { width: 220px; }
   .excel-preview-table .col-size { width: 110px; }
@@ -38,12 +37,11 @@
 @if($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
 <form method="POST" action="{{ route('don-hang-hoan-thanh.commit') }}">@csrf
 <div class="card"><div class="excel-preview-scroll"><table class="table table-sm align-middle excel-preview-table">
-  <thead><tr><th class="col-row">Dòng</th><th class="col-date">Ngày</th><th class="col-product">Sản phẩm</th><th class="col-warehouse">Kho</th><th class="col-variation">Phân loại gốc</th><th class="col-color">Màu</th><th class="col-size">Size</th><th class="col-quantity">SL</th><th class="col-money">Thành tiền</th></tr></thead>
+  <thead><tr><th class="col-row">Dòng</th><th class="col-date">Ngày</th><th class="col-product">Sản phẩm</th><th class="col-variation">Phân loại gốc</th><th class="col-color">Màu</th><th class="col-size">Size</th><th class="col-quantity">SL</th><th class="col-money">Thành tiền</th></tr></thead>
   <tbody>@foreach($rows as $index => $row)<tr>
     <td>{{ $row['dong_excel'] }}<input type="hidden" name="rows[{{ $index }}][dong_excel]" value="{{ $row['dong_excel'] }}"></td>
     <td><input type="date" class="form-control form-control-sm" name="rows[{{ $index }}][ngay_hoan_thanh]" value="{{ $row['ngay_hoan_thanh'] }}" required><input type="hidden" name="rows[{{ $index }}][thoi_gian_tao_goc]" value="{{ $row['thoi_gian_tao_goc'] }}"></td>
-    <td><input class="form-control form-control-sm" name="rows[{{ $index }}][ten_san_pham]" value="{{ $row['ten_san_pham'] }}" required></td>
-    <td><input class="form-control form-control-sm" name="rows[{{ $index }}][ten_kho]" value="{{ $row['ten_kho'] }}"><input type="hidden" name="rows[{{ $index }}][kenh_ban]" value="{{ $row['kenh_ban'] }}"></td>
+    <td><input class="form-control form-control-sm" name="rows[{{ $index }}][ten_san_pham]" value="{{ $row['ten_san_pham'] }}" required><input type="hidden" name="rows[{{ $index }}][kenh_ban]" value="{{ $row['kenh_ban'] }}"></td>
     <td><div class="small excel-preview-original">{{ $row['phan_loai_goc'] ?: '-' }}</div><input type="hidden" name="rows[{{ $index }}][phan_loai_goc]" value="{{ $row['phan_loai_goc'] }}"></td>
     <td><input class="form-control form-control-sm" name="rows[{{ $index }}][mau]" value="{{ $row['mau'] }}"></td>
     <td><input class="form-control form-control-sm" name="rows[{{ $index }}][size]" value="{{ $row['size'] }}"></td>
