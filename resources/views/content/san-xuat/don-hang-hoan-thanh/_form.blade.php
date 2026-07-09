@@ -13,7 +13,7 @@
   <div class="card-header"><h5 class="mb-0">Thông tin chung</h5></div>
   <div class="card-body row g-3">
     <div class="col-md-3">
-      <label class="form-label">Ngày hoàn thành <span class="text-danger">*</span></label>
+      <label class="form-label">Ngày xuất <span class="text-danger">*</span></label>
       <input type="date" name="ngay_hoan_thanh" class="form-control" required
         value="{{ old('ngay_hoan_thanh', isset($order) ? $order->ngay_hoan_thanh?->format('Y-m-d') : now()->format('Y-m-d')) }}">
     </div>

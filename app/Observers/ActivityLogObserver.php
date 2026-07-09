@@ -117,7 +117,7 @@ class ActivityLogObserver
             $model instanceof DmDonViCat => 'Đơn vị cắt',
             $model instanceof DmDonViMay => 'Đơn vị may',
             $model instanceof DonHang => 'Đơn hàng',
-            $model instanceof DonHangHoanThanh => 'Đơn hàng hoàn thành',
+            $model instanceof DonHangHoanThanh => 'Xuất hàng',
             $model instanceof Cat => 'Cắt',
             $model instanceof PhanBoMay => 'Phân bổ may',
             $model instanceof Qc => 'QC',

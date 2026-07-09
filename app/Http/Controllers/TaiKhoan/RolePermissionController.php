@@ -39,6 +39,7 @@ class RolePermissionController extends Controller
       'Cắt',
       'Phân bổ may',
       'QC',
+      'Đơn hàng Online',
       'Nhập kho',
       'Xuất kho',
       'Tồn kho',

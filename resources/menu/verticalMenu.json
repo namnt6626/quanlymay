@@ -52,10 +52,30 @@
       "slug": "don-hangs"
     },
     {
-      "name": "Đơn hàng hoàn thành",
-      "url": "don-hang-hoan-thanh",
-      "icon": "menu-icon icon-base bx bx-check-circle",
-      "slug": "don-hang-hoan-thanh"
+      "name": "Đơn hàng Online",
+      "icon": "menu-icon icon-base bx bx-cart",
+      "slug": [
+        "nhap-hang-online",
+        "don-hang-hoan-thanh",
+        "ton-kho-online"
+      ],
+      "submenu": [
+        {
+          "url": "nhap-hang-online",
+          "name": "Nhập hàng",
+          "slug": "nhap-hang-online.index"
+        },
+        {
+          "url": "don-hang-hoan-thanh",
+          "name": "Xuất hàng",
+          "slug": "don-hang-hoan-thanh.index"
+        },
+        {
+          "url": "ton-kho-online",
+          "name": "Tồn kho",
+          "slug": "ton-kho-online.index"
+        }
+      ]
     },
     {
       "name": "Sản xuất",

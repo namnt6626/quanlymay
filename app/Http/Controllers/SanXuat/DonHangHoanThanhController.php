@@ -8,6 +8,7 @@ use App\Http\Requests\DonHangHoanThanh\PreviewImportRequest;
 use App\Http\Requests\DonHangHoanThanh\StoreDonHangHoanThanhRequest;
 use App\Http\Requests\DonHangHoanThanh\UpdateDonHangHoanThanhRequest;
 use App\Models\DonHangHoanThanh;
+use App\Models\DonHangHoanThanhChiTiet;
 use App\Services\DonHangHoanThanh\DonHangHoanThanhService;
 use App\Services\DonHangHoanThanh\PhanLoaiParser;
 use App\Services\DonHangHoanThanh\XlsxReader;
@@ -25,7 +26,9 @@ class DonHangHoanThanhController extends Controller
     public function index(Request $request): View
     {
         $filters = [
-            'q' => trim((string) $request->input('q')),
+            'ten_san_pham' => trim((string) $request->input('ten_san_pham')),
+            'mau' => trim((string) $request->input('mau')),
+            'size' => trim((string) $request->input('size')),
             'tu_ngay' => trim((string) $request->input('tu_ngay')),
             'den_ngay' => trim((string) $request->input('den_ngay')),
             'kenh_ban' => in_array($request->input('kenh_ban'), ['Tiktok', 'Shopee'], true) ? $request->input('kenh_ban') : '',
@@ -33,27 +36,31 @@ class DonHangHoanThanhController extends Controller
             'per_page' => paginationPerPage(),
         ];
 
+        $detailFilter = function ($detail) use ($filters): void {
+            $detail
+                ->when($filters['mau'] !== '', fn (Builder $query) => $query->where('mau', $filters['mau']))
+                ->when($filters['size'] !== '', fn (Builder $query) => $query->where('size', $filters['size']))
+                ->when($filters['nguon'] !== '', fn (Builder $query) => $query->where('nguon', $filters['nguon']));
+        };
+
         $orders = DonHangHoanThanh::query()
-            ->with('chiTiets')
-            ->withSum('chiTiets as tong_so_luong', 'so_luong')
-            ->withSum('chiTiets as tong_thanh_tien', 'thanh_tien')
-            ->when($filters['q'] !== '', function (Builder $query) use ($filters): void {
-                $keyword = $filters['q'];
-                $query->where(function (Builder $query) use ($keyword): void {
-                    $query->where('ten_san_pham', 'like', "%{$keyword}%")
-                        ->orWhereHas('chiTiets', fn (Builder $detail) => $detail->where('mau', 'like', "%{$keyword}%")->orWhere('size', 'like', "%{$keyword}%"));
-                });
-            })
+            ->with(['chiTiets' => $detailFilter])
+            ->withSum(['chiTiets as tong_so_luong' => $detailFilter], 'so_luong')
+            ->withSum(['chiTiets as tong_thanh_tien' => $detailFilter], 'thanh_tien')
+            ->when($filters['ten_san_pham'] !== '', fn (Builder $query) => $query->where('ten_san_pham', 'like', '%'.$filters['ten_san_pham'].'%'))
+            ->when($filters['mau'] !== '' || $filters['size'] !== '' || $filters['nguon'] !== '', fn (Builder $query) => $query->whereHas('chiTiets', $detailFilter))
             ->when($filters['tu_ngay'] !== '', fn (Builder $query) => $query->whereDate('ngay_hoan_thanh', '>=', $filters['tu_ngay']))
             ->when($filters['den_ngay'] !== '', fn (Builder $query) => $query->whereDate('ngay_hoan_thanh', '<=', $filters['den_ngay']))
             ->when($filters['kenh_ban'] !== '', fn (Builder $query) => $query->where('kenh_ban', $filters['kenh_ban']))
-            ->when($filters['nguon'] !== '', fn (Builder $query) => $query->whereHas('chiTiets', fn (Builder $detail) => $detail->where('nguon', $filters['nguon'])))
             ->orderByDesc('ngay_hoan_thanh')->orderByDesc('id')
             ->paginate($filters['per_page'])->withQueryString();
+
+        $filterOptions = $this->filterOptions();
 
         return view('content.san-xuat.don-hang-hoan-thanh.index', [
             'orders' => $orders,
             'filters' => $filters,
+            'filterOptions' => $filterOptions,
         ]);
     }
 
@@ -65,7 +72,7 @@ class DonHangHoanThanhController extends Controller
     public function store(StoreDonHangHoanThanhRequest $request): RedirectResponse
     {
         $this->service->saveManual($request->validated());
-        return redirect()->route('don-hang-hoan-thanh.index')->with('success', 'Thêm đơn hàng hoàn thành thành công.');
+        return redirect()->route('don-hang-hoan-thanh.index')->with('success', 'Thêm xuất hàng thành công.');
     }
 
     public function edit(DonHangHoanThanh $donHangHoanThanh): View
@@ -77,13 +84,13 @@ class DonHangHoanThanhController extends Controller
     public function update(UpdateDonHangHoanThanhRequest $request, DonHangHoanThanh $donHangHoanThanh): RedirectResponse
     {
         $this->service->saveManual($request->validated(), $donHangHoanThanh);
-        return redirect()->route('don-hang-hoan-thanh.index')->with('success', 'Cập nhật đơn hàng hoàn thành thành công.');
+        return redirect()->route('don-hang-hoan-thanh.index')->with('success', 'Cập nhật xuất hàng thành công.');
     }
 
     public function destroy(DonHangHoanThanh $donHangHoanThanh): RedirectResponse
     {
         $donHangHoanThanh->delete();
-        return back()->with('success', 'Xóa đơn hàng hoàn thành thành công.');
+        return back()->with('success', 'Xóa xuất hàng thành công.');
     }
 
     public function bulkDestroy(Request $request): RedirectResponse
@@ -92,8 +99,8 @@ class DonHangHoanThanhController extends Controller
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['required', 'integer', 'distinct', 'exists:don_hang_hoan_thanh,id'],
         ], [
-            'ids.required' => 'Vui lòng chọn ít nhất một đơn hàng hoàn thành để xóa.',
-            'ids.min' => 'Vui lòng chọn ít nhất một đơn hàng hoàn thành để xóa.',
+            'ids.required' => 'Vui lòng chọn ít nhất một dòng xuất hàng để xóa.',
+            'ids.min' => 'Vui lòng chọn ít nhất một dòng xuất hàng để xóa.',
         ])['ids'];
 
         $orders = DonHangHoanThanh::query()->whereIn('id', $ids)->get();
@@ -102,7 +109,7 @@ class DonHangHoanThanhController extends Controller
 
         return redirect()
             ->route('don-hang-hoan-thanh.index', $request->query())
-            ->with('success', 'Đã xóa '.$orders->count().' đơn hàng hoàn thành.');
+            ->with('success', 'Đã xóa '.$orders->count().' dòng xuất hàng.');
     }
 
     public function importForm(): View
@@ -208,5 +215,31 @@ class DonHangHoanThanhController extends Controller
             } catch (\Throwable) {}
         }
         return null;
+    }
+
+    private function filterOptions(): array
+    {
+        return [
+            'products' => DonHangHoanThanh::query()
+                ->select('ten_san_pham')
+                ->whereNotNull('ten_san_pham')
+                ->distinct()
+                ->orderBy('ten_san_pham')
+                ->pluck('ten_san_pham'),
+            'colors' => DonHangHoanThanhChiTiet::query()
+                ->select('mau')
+                ->whereNotNull('mau')
+                ->where('mau', '<>', '')
+                ->distinct()
+                ->orderBy('mau')
+                ->pluck('mau'),
+            'sizes' => DonHangHoanThanhChiTiet::query()
+                ->select('size')
+                ->whereNotNull('size')
+                ->where('size', '<>', '')
+                ->distinct()
+                ->orderBy('size')
+                ->pluck('size'),
+        ];
     }
 }

@@ -1,7 +1,7 @@
 @extends('layouts/contentNavbarLayout')
-@section('title', 'Import đơn hàng hoàn thành')
+@section('title', 'Import xuất hàng')
 @section('content')
-<h4 class="mb-4">Import đơn hàng hoàn thành</h4>
+<h4 class="mb-4">Import xuất hàng</h4>
 <div class="card"><div class="card-body">
   @if($errors->any())<div class="alert alert-danger">{{ $errors->first() }}</div>@endif
   <form method="POST" enctype="multipart/form-data" action="{{ route('don-hang-hoan-thanh.preview') }}">@csrf

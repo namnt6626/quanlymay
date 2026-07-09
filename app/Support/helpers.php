@@ -63,6 +63,8 @@ if (! function_exists('menuPermissionCode')) {
             'qc.index', 'qc.create', 'qc.edit', 'qc.destroy' => 'QC_VIEW',
             'don-hang-hoan-thanh.index', 'don-hang-hoan-thanh.create', 'don-hang-hoan-thanh.edit', 'don-hang-hoan-thanh.destroy',
             'don-hang-hoan-thanh.import', 'don-hang-hoan-thanh.preview', 'don-hang-hoan-thanh.commit' => 'DON_HANG_HOAN_THANH_VIEW',
+            'nhap-hang-online.index', 'nhap-hang-online.create', 'nhap-hang-online.edit', 'nhap-hang-online.destroy',
+            'ton-kho-online.index' => 'DON_HANG_HOAN_THANH_VIEW',
             'nhap-kho.index', 'nhap-kho.create', 'nhap-kho.edit', 'nhap-kho.destroy' => 'NHAP_KHO_VIEW',
             'xuat-kho.index', 'xuat-kho.create', 'xuat-kho.edit', 'xuat-kho.destroy' => 'XUAT_KHO_VIEW',
             'ton-kho.index' => 'TON_KHO_VIEW',

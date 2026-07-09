@@ -20,6 +20,8 @@ use App\Http\Controllers\BaoCao\BaoCaoBanHangOnlineController;
 use App\Http\Controllers\DanhMuc\MatHangController;
 use App\Http\Controllers\DanhMuc\MauController;
 use App\Http\Controllers\DanhMuc\SizeController;
+use App\Http\Controllers\DonHangOnline\NhapHangOnlineController;
+use App\Http\Controllers\DonHangOnline\TonKhoOnlineController;
 use App\Http\Controllers\DanhMuc\DonViCatController;
 use App\Http\Controllers\DanhMuc\DonViMayController;
 use App\Http\Controllers\DonHang\DonHangController;
@@ -127,6 +129,9 @@ Route::delete('qc/bulk', [QcController::class, 'bulkDestroy'])
 Route::delete('don-hang-hoan-thanh/bulk', [DonHangHoanThanhController::class, 'bulkDestroy'])
   ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_DELETE'])
   ->name('don-hang-hoan-thanh.bulk-destroy');
+Route::delete('nhap-hang-online/bulk', [NhapHangOnlineController::class, 'bulkDestroy'])
+  ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_DELETE'])
+  ->name('nhap-hang-online.bulk-destroy');
 Route::delete('xuat-kho/bulk', [PhieuXuatKhoController::class, 'bulkDestroy'])
   ->middleware(['auth', 'permission:XUAT_KHO_DELETE'])
   ->name('xuat-kho.bulk-destroy');
@@ -161,6 +166,12 @@ $registerCrudRoutes('don-hang-hoan-thanh', DonHangHoanThanhController::class, 'd
   'edit' => 'DON_HANG_HOAN_THANH_EDIT',
   'delete' => 'DON_HANG_HOAN_THANH_DELETE',
 ]);
+$registerCrudRoutes('nhap-hang-online', NhapHangOnlineController::class, 'nhap_hang_online', [
+  'view' => 'DON_HANG_HOAN_THANH_VIEW',
+  'create' => 'DON_HANG_HOAN_THANH_CREATE',
+  'edit' => 'DON_HANG_HOAN_THANH_EDIT',
+  'delete' => 'DON_HANG_HOAN_THANH_DELETE',
+]);
 $registerCrudRoutes('nhap-kho', NhapKhoController::class, 'nhap_kho', [
   'view' => 'NHAP_KHO_VIEW',
   'create' => 'NHAP_KHO_CREATE',
@@ -184,6 +195,9 @@ Route::get('don-hangs/{don_hang}', [DonHangController::class, 'show'])
   ->name('don-hangs.show');
 $registerIndexRoute('ton-kho', TonKhoController::class, [
   'view' => 'TON_KHO_VIEW',
+]);
+$registerIndexRoute('ton-kho-online', TonKhoOnlineController::class, [
+  'view' => 'DON_HANG_HOAN_THANH_VIEW',
 ]);
 Route::get('bao-cao/tong-hop-don-hang', BaoCaoTongHopDonHangController::class)
   ->middleware(['auth', 'permission:BAO_CAO_TONG_HOP_DON_HANG_VIEW'])
