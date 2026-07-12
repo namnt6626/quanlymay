@@ -16,6 +16,13 @@ class CommitImportRequest extends FormRequest
             $rows = json_decode($payload, true);
 
             if (json_last_error() === JSON_ERROR_NONE && is_array($rows)) {
+                foreach ($rows as &$row) {
+                    if (is_array($row) && ($row['thanh_tien'] ?? '') === '') {
+                        $row['thanh_tien'] = 0;
+                    }
+                }
+                unset($row);
+
                 $this->merge(['rows' => $rows]);
             }
         }

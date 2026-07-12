@@ -121,6 +121,14 @@ class DonHangHoanThanhController extends Controller
     {
         $channel = $request->validated('kenh_ban');
         $sheetRows = $reader->rows($request->file('file_excel')->getRealPath());
+
+        if ($this->isProductInfoFile($sheetRows)) {
+            [$rows, $ignored] = $this->parseProductInfoRows($sheetRows, $parser, $channel);
+
+            if ($rows === []) return back()->withErrors(['file_excel' => 'File không có dòng dữ liệu hợp lệ.']);
+            return view('content.san-xuat.don-hang-hoan-thanh.preview', compact('rows', 'ignored'));
+        }
+
         $headerIndex = collect($sheetRows)->search(fn (array $row) => $this->isHeader($row['values']));
         if ($headerIndex === false) return back()->withErrors(['file_excel' => 'Không tìm thấy dòng tiêu đề đúng định dạng trong file.']);
 
@@ -172,6 +180,111 @@ class DonHangHoanThanhController extends Controller
         return count(array_intersect(['product name', 'seller sku'], $normalized)) > 0
             && in_array('variation', $normalized, true)
             && in_array('quantity', $normalized, true);
+    }
+
+    private function isProductInfoFile(array $sheetRows): bool
+    {
+        $firstRow = $sheetRows[0]['values'] ?? [];
+
+        return $this->normalizeHeader((string) ($firstRow['A'] ?? '')) === 'product_info';
+    }
+
+    private function parseProductInfoRows(array $sheetRows, PhanLoaiParser $parser, string $channel): array
+    {
+        $rows = [];
+        $ignored = [];
+        $date = now();
+
+        foreach (array_slice($sheetRows, 1) as $sheetRow) {
+            $text = trim((string) ($sheetRow['values']['A'] ?? ''));
+            if ($text === '') continue;
+
+            $items = $this->splitProductInfoItems($text);
+            $accepted = 0;
+
+            foreach ($items as $item) {
+                $productName = $this->productInfoProductName($item);
+                $variation = $this->productInfoField($item, 'Variation Name');
+                $quantity = $this->parseLocalizedNumber($this->productInfoField($item, 'Quantity'));
+
+                if ($productName === '' || $quantity <= 0) {
+                    continue;
+                }
+
+                $split = $parser->parse($variation);
+
+                $rows[] = [
+                    'dong_excel' => $sheetRow['row'],
+                    'ngay_hoan_thanh' => $date->toDateString(),
+                    'thoi_gian_tao_goc' => $date->format('Y-m-d H:i:s'),
+                    'ten_san_pham' => $productName,
+                    'kenh_ban' => $channel,
+                    'phan_loai_goc' => $variation,
+                    'mau' => $split['mau'],
+                    'size' => $split['size'],
+                    'so_luong' => $quantity,
+                    'thanh_tien' => '',
+                ];
+                $accepted++;
+            }
+
+            if ($accepted === 0) $ignored[] = $sheetRow['row'];
+        }
+
+        return [$rows, $ignored];
+    }
+
+    private function splitProductInfoItems(string $text): array
+    {
+        $text = str_replace(["_x000D_", "\r"], "\n", $text);
+
+        return array_values(array_filter(array_map('trim', preg_split('/(?:^|\n)\s*\[\d+\]\s*/u', $text) ?: [])));
+    }
+
+    private function productInfoProductName(string $item): string
+    {
+        foreach (['Parent SKU Reference No.', 'SKU Reference No.'] as $label) {
+            $value = $this->productInfoField($item, $label);
+            if ($value !== '') return $value;
+        }
+
+        $productName = $this->productInfoField($item, 'Product Name');
+        if (preg_match('/\(([^()]*)\)\s*$/u', $productName, $matches)) {
+            $code = trim($matches[1]);
+            if ($code !== '') return $code;
+        }
+
+        return $productName;
+    }
+
+    private function productInfoField(string $item, string $label): string
+    {
+        $labels = 'Product Name|Variation Name|Price|Quantity|SKU Reference No\.|Parent SKU Reference No\.';
+
+        if (! preg_match('/'.preg_quote($label, '/').'\s*:\s*(.*?)(?=;\s*(?:'.$labels.')\s*:|;\s*$|$)/su', $item, $matches)) {
+            return '';
+        }
+
+        return trim($matches[1]);
+    }
+
+    private function parseLocalizedNumber(string $value): float
+    {
+        $value = preg_replace('/[^\d,.\-]/u', '', trim($value)) ?? '';
+        if ($value === '') return 0;
+
+        $hasComma = str_contains($value, ',');
+        $hasDot = str_contains($value, '.');
+
+        if ($hasComma && $hasDot) {
+            $value = strrpos($value, ',') > strrpos($value, '.')
+                ? str_replace('.', '', str_replace(',', '.', $value))
+                : str_replace(',', '', $value);
+        } elseif ($hasComma) {
+            $value = str_replace(',', '', $value);
+        }
+
+        return is_numeric($value) ? (float) $value : 0;
     }
 
     private function mapColumns(array $header): array

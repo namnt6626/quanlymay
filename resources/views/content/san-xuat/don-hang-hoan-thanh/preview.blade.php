@@ -47,7 +47,7 @@
     <td><input class="form-control form-control-sm" name="rows[{{ $index }}][mau]" value="{{ $row['mau'] }}"></td>
     <td><input class="form-control form-control-sm" name="rows[{{ $index }}][size]" value="{{ $row['size'] }}"></td>
     <td><input type="number" step="0.0001" min="0.0001" class="form-control form-control-sm" name="rows[{{ $index }}][so_luong]" value="{{ $row['so_luong'] }}" required></td>
-    <td><input type="number" step="0.01" min="0" class="form-control form-control-sm" name="rows[{{ $index }}][thanh_tien]" value="{{ $row['thanh_tien'] }}" required><div class="small text-muted">{{ number_format($row['thanh_tien'], 0, ',', '.') }} ₫</div></td>
+    <td><input type="number" step="0.01" min="0" class="form-control form-control-sm" name="rows[{{ $index }}][thanh_tien]" value="{{ $row['thanh_tien'] }}">@if($row['thanh_tien'] !== '')<div class="small text-muted">{{ number_format($row['thanh_tien'], 0, ',', '.') }} ₫</div>@endif</td>
   </tr>@endforeach</tbody>
 </table></div></div>
 <div class="d-flex justify-content-end gap-2 mt-4"><a class="btn btn-outline-secondary" href="{{ route('don-hang-hoan-thanh.import') }}">Chọn file khác</a><button class="btn btn-success"><i class="icon-base bx bx-check me-1"></i>Xác nhận nhập {{ count($rows) }} dòng</button></div>

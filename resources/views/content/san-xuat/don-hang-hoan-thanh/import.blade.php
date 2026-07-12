@@ -16,7 +16,7 @@
       <div class="col-md-8">
         <label class="form-label">File Excel (.xlsx) <span class="text-danger">*</span></label>
         <input type="file" name="file_excel" class="form-control" accept=".xlsx" required>
-        <div class="form-text">Hệ thống tự tìm dòng tiêu đề, tự bỏ dòng giải thích và tách Màu/Size. Tối đa 10 MB.</div>
+        <div class="form-text">Hỗ trợ file xuất hàng Shopee/Tiktok dạng cột chuẩn hoặc file đóng gói có cột product_info. Tự tách Màu/Size. Tối đa 10 MB.</div>
       </div>
     </div>
     <div class="d-flex justify-content-end gap-2 mt-4"><a class="btn btn-outline-secondary" href="{{ route('don-hang-hoan-thanh.index') }}">Hủy</a><button class="btn btn-primary"><i class="icon-base bx bx-search me-1"></i>Đọc và xem trước</button></div>

@@ -1,4 +1,10 @@
 @php
+  $formatQuantity = function ($value) {
+    $number = (float) str_replace(',', '.', (string) $value);
+    $formatted = rtrim(rtrim(number_format($number, 4, '.', ''), '0'), '.');
+
+    return $formatted !== '' ? $formatted : '0';
+  };
   $details = old('chi_tiets', isset($order) ? $order->chiTiets->map(fn ($item) => [
     'mau' => $item->mau, 'size' => $item->size, 'so_luong' => $item->so_luong, 'thanh_tien' => $item->thanh_tien, 'nguon' => $item->nguon,
   ])->all() : [['mau' => '', 'size' => '', 'so_luong' => 1, 'thanh_tien' => '', 'nguon' => 'thu_cong']]);
@@ -49,7 +55,7 @@
           <tr>
             <td><input type="hidden" name="chi_tiets[{{ $index }}][nguon]" value="{{ $detail['nguon'] ?? 'thu_cong' }}"><input class="form-control" name="chi_tiets[{{ $index }}][mau]" value="{{ $detail['mau'] ?? '' }}"></td>
             <td><input class="form-control" name="chi_tiets[{{ $index }}][size]" value="{{ $detail['size'] ?? '' }}"></td>
-            <td><input type="number" min="0.0001" step="0.0001" class="form-control js-qty" name="chi_tiets[{{ $index }}][so_luong]" required value="{{ $detail['so_luong'] ?? 1 }}"></td>
+            <td><input type="number" min="0.0001" step="0.0001" class="form-control js-qty" name="chi_tiets[{{ $index }}][so_luong]" required value="{{ $formatQuantity($detail['so_luong'] ?? 1) }}"></td>
             <td><input type="text" inputmode="numeric" class="form-control js-money" name="chi_tiets[{{ $index }}][thanh_tien]" required value="{{ isset($detail['thanh_tien']) ? number_format((float) $detail['thanh_tien'], 0, ',', '.') : '' }}"></td>
             <td><button type="button" class="btn btn-sm btn-icon btn-outline-danger js-remove"><i class="icon-base bx bx-trash"></i></button></td>
           </tr>
