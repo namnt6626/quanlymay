@@ -193,7 +193,7 @@ class DonHangHoanThanhController extends Controller
     {
         $rows = [];
         $ignored = [];
-        $date = now();
+        $date = now()->subDay();
 
         foreach (array_slice($sheetRows, 1) as $sheetRow) {
             $text = trim((string) ($sheetRow['values']['A'] ?? ''));
