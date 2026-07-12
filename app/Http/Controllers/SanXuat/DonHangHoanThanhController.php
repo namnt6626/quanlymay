@@ -122,15 +122,28 @@ class DonHangHoanThanhController extends Controller
         $channel = $request->validated('kenh_ban');
         $sheetRows = $reader->rows($request->file('file_excel')->getRealPath());
 
-        if ($this->isProductInfoFile($sheetRows)) {
-            [$rows, $ignored] = $this->parseProductInfoRows($sheetRows, $parser, $channel);
+        $productInfoHeaderIndex = $this->findHeaderIndex($sheetRows, fn (array $values) => $this->isProductInfoHeader($values));
+        if ($productInfoHeaderIndex !== false) {
+            [$rows, $ignored] = $this->parseProductInfoRows($sheetRows, $productInfoHeaderIndex, $parser, $channel);
+
+            if ($rows === []) return back()->withErrors(['file_excel' => 'File không có dòng dữ liệu hợp lệ.']);
+            return view('content.san-xuat.don-hang-hoan-thanh.preview', compact('rows', 'ignored'));
+        }
+
+        $vietnameseShopeeHeaderIndex = $this->findHeaderIndex($sheetRows, fn (array $values) => $this->isVietnameseShopeeHeader($values));
+        if ($vietnameseShopeeHeaderIndex !== false) {
+            [$rows, $ignored] = $this->parseVietnameseShopeeRows($sheetRows, $vietnameseShopeeHeaderIndex, $parser, $channel);
 
             if ($rows === []) return back()->withErrors(['file_excel' => 'File không có dòng dữ liệu hợp lệ.']);
             return view('content.san-xuat.don-hang-hoan-thanh.preview', compact('rows', 'ignored'));
         }
 
         $headerIndex = collect($sheetRows)->search(fn (array $row) => $this->isHeader($row['values']));
-        if ($headerIndex === false) return back()->withErrors(['file_excel' => 'Không tìm thấy dòng tiêu đề đúng định dạng trong file.']);
+        if ($headerIndex === false) {
+            return back()->withErrors([
+                'file_excel' => 'Chưa nhận diện được định dạng file. Hiện hỗ trợ: file cột Product Name/Variation/Quantity, file cột product_info, hoặc file Shopee tiếng Việt có Ngày đặt hàng/SKU phân loại hàng/Tên phân loại hàng/Số lượng.',
+            ]);
+        }
 
         $header = $sheetRows[$headerIndex]['values'];
         $columns = $this->mapColumns($header);
@@ -182,21 +195,101 @@ class DonHangHoanThanhController extends Controller
             && in_array('quantity', $normalized, true);
     }
 
-    private function isProductInfoFile(array $sheetRows): bool
+    private function findHeaderIndex(array $sheetRows, callable $matches): int|false
     {
-        $firstRow = $sheetRows[0]['values'] ?? [];
-
-        return $this->normalizeHeader((string) ($firstRow['A'] ?? '')) === 'product_info';
+        return collect($sheetRows)->search(fn (array $row) => $matches($row['values']));
     }
 
-    private function parseProductInfoRows(array $sheetRows, PhanLoaiParser $parser, string $channel): array
+    private function isProductInfoHeader(array $values): bool
+    {
+        return in_array('product_info', array_map(fn ($value) => $this->normalizeHeader((string) $value), $values), true);
+    }
+
+    private function isVietnameseShopeeHeader(array $values): bool
+    {
+        $normalized = array_map(fn ($value) => $this->normalizeHeader((string) $value), $values);
+
+        return in_array('ngày đặt hàng', $normalized, true)
+            && in_array('sku phân loại hàng', $normalized, true)
+            && in_array('tên phân loại hàng', $normalized, true)
+            && in_array('số lượng', $normalized, true);
+    }
+
+    private function parseVietnameseShopeeRows(array $sheetRows, int $headerIndex, PhanLoaiParser $parser, string $channel): array
+    {
+        $header = $sheetRows[$headerIndex]['values'] ?? [];
+        $columns = $this->mapVietnameseShopeeColumns($header);
+        $rows = [];
+        $ignored = [];
+
+        foreach (array_slice($sheetRows, $headerIndex + 1) as $sheetRow) {
+            $values = $sheetRow['values'];
+            $dateText = trim((string) ($values[$columns['created']] ?? ''));
+            $product = trim((string) ($values[$columns['product']] ?? ''));
+            $variation = trim((string) ($values[$columns['variation']] ?? ''));
+            $quantity = trim((string) ($values[$columns['quantity']] ?? ''));
+            $subtotal = trim((string) ($values[$columns['subtotal']] ?? ''));
+
+            if ($dateText === '' && $product === '' && $variation === '' && $quantity === '' && $subtotal === '') continue;
+
+            $date = $this->parseDate($dateText);
+            if (! $date || $variation === '' || ! is_numeric($quantity) || (float) $quantity <= 0) {
+                $ignored[] = $sheetRow['row'];
+                continue;
+            }
+
+            $split = $parser->parse($variation);
+            $rows[] = [
+                'dong_excel' => $sheetRow['row'],
+                'ngay_hoan_thanh' => $date->toDateString(),
+                'thoi_gian_tao_goc' => $date->format('Y-m-d H:i:s'),
+                'ten_san_pham' => $product,
+                'kenh_ban' => $channel,
+                'phan_loai_goc' => $variation,
+                'mau' => $split['mau'],
+                'size' => $split['size'],
+                'so_luong' => (float) $quantity,
+                'thanh_tien' => $subtotal !== '' ? $this->parseLocalizedNumber($subtotal) : '',
+            ];
+        }
+
+        return [$rows, $ignored];
+    }
+
+    private function mapVietnameseShopeeColumns(array $header): array
+    {
+        $aliases = [
+            'created' => ['ngày đặt hàng'],
+            'product' => ['sku phân loại hàng'],
+            'variation' => ['tên phân loại hàng'],
+            'quantity' => ['số lượng'],
+            'subtotal' => ['tổng giá trị đơn hàng (vnd)'],
+        ];
+        $normalized = array_map(fn ($value) => $this->normalizeHeader((string) $value), $header);
+        $mapped = [];
+        foreach ($aliases as $key => $labels) {
+            $column = false;
+            foreach ($labels as $label) {
+                $column = array_search($label, $normalized, true);
+                if ($column !== false) break;
+            }
+            if ($column === false) throw new \RuntimeException('Thiếu cột '.implode(' hoặc ', $labels).' trong file Excel.');
+            $mapped[$key] = $column;
+        }
+        return $mapped;
+    }
+
+    private function parseProductInfoRows(array $sheetRows, int $headerIndex, PhanLoaiParser $parser, string $channel): array
     {
         $rows = [];
         $ignored = [];
         $date = now()->subDay();
 
-        foreach (array_slice($sheetRows, 1) as $sheetRow) {
-            $text = trim((string) ($sheetRow['values']['A'] ?? ''));
+        $productInfoColumn = array_search('product_info', array_map(fn ($value) => $this->normalizeHeader((string) $value), $sheetRows[$headerIndex]['values'] ?? []), true);
+        $productInfoColumn = $productInfoColumn !== false ? $productInfoColumn : 'A';
+
+        foreach (array_slice($sheetRows, $headerIndex + 1) as $sheetRow) {
+            $text = trim((string) ($sheetRow['values'][$productInfoColumn] ?? ''));
             if ($text === '') continue;
 
             $items = $this->splitProductInfoItems($text);
@@ -321,7 +414,7 @@ class DonHangHoanThanhController extends Controller
             return Carbon::create(1899, 12, 30)->addSeconds((int) round((float) $value * 86400));
         }
 
-        foreach (['d/m/Y H:i:s', 'd/m/Y H:i', 'd/m/Y', 'Y-m-d H:i:s', 'Y-m-d'] as $format) {
+        foreach (['d/m/Y H:i:s', 'd/m/Y H:i', 'd/m/Y', 'Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d'] as $format) {
             try {
                 $date = Carbon::createFromFormat($format, $value);
                 if ($date && $date->format($format) === $value) return $date;
