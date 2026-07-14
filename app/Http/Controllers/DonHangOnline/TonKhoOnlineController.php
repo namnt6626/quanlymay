@@ -5,6 +5,7 @@ namespace App\Http\Controllers\DonHangOnline;
 use App\Http\Controllers\Controller;
 use App\Models\DonHangHoanThanhChiTiet;
 use App\Models\NhapHangOnlineChiTiet;
+use App\Models\OnlineColorAlias;
 use App\Models\OnlineProductAlias;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,8 +36,9 @@ class TonKhoOnlineController extends Controller
             ->get();
 
         $productAliases = OnlineProductAlias::query()->pluck('group_name', 'original_name');
+        $colorAliases = OnlineColorAlias::query()->pluck('group_name', 'original_name');
 
-        $rows = $this->mergeRows($this->normalizeStockRows($imports, 'import', $productAliases), $this->normalizeStockRows($exports, 'export', $productAliases))
+        $rows = $this->mergeRows($this->normalizeStockRows($imports, 'import', $productAliases, $colorAliases), $this->normalizeStockRows($exports, 'export', $productAliases, $colorAliases))
             ->filter(function (array $row) use ($filters): bool {
                 if ($filters['ten_san_pham'] !== '' && ! str_contains($this->normalizeText($row['ten_san_pham']), $this->normalizeText($filters['ten_san_pham']))) {
                     return false;
@@ -69,7 +71,13 @@ class TonKhoOnlineController extends Controller
             ->get()
             ->groupBy('group_name');
 
-        return view('content.don-hang-online.ton-kho.index', compact('rows', 'filters', 'totals', 'filterOptions', 'productGroups'));
+        $colorGroups = OnlineColorAlias::query()
+            ->orderBy('group_name')
+            ->orderBy('original_name')
+            ->get()
+            ->groupBy('group_name');
+
+        return view('content.don-hang-online.ton-kho.index', compact('rows', 'filters', 'totals', 'filterOptions', 'productGroups', 'colorGroups'));
     }
 
     public function storeProductGroup(Request $request): RedirectResponse
@@ -125,6 +133,59 @@ class TonKhoOnlineController extends Controller
             ->with('success', 'Đã bỏ gộp nhóm "'.$data['group_name'].'".');
     }
 
+    public function storeColorGroup(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'editing_group_name' => ['nullable', 'string', 'max:255'],
+            'group_name' => ['required', 'string', 'max:255'],
+            'colors' => ['required', 'array', 'min:1'],
+            'colors.*' => ['required', 'string', 'max:255'],
+        ], [
+            'group_name.required' => 'Vui lòng nhập tên màu chung.',
+            'colors.required' => 'Vui lòng chọn ít nhất một màu.',
+            'colors.min' => 'Vui lòng chọn ít nhất một màu.',
+        ]);
+
+        $groupName = trim((string) $data['group_name']);
+        $editingGroupName = trim((string) ($data['editing_group_name'] ?? ''));
+        $colors = collect($data['colors'])
+            ->map(fn (string $color) => trim($color))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($editingGroupName !== '') {
+            OnlineColorAlias::query()
+                ->where('group_name', $editingGroupName)
+                ->whereNotIn('original_name', $colors)
+                ->delete();
+        }
+
+        foreach ($colors as $color) {
+            OnlineColorAlias::query()->updateOrCreate(
+                ['original_name' => $color],
+                ['group_name' => $groupName]
+            );
+        }
+
+        return redirect()
+            ->route('ton-kho-online.index', $request->query())
+            ->with('success', 'Đã gộp màu vào nhóm "'.$groupName.'".');
+    }
+
+    public function destroyColorGroup(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'group_name' => ['required', 'string', 'max:255'],
+        ]);
+
+        OnlineColorAlias::query()->where('group_name', $data['group_name'])->delete();
+
+        return redirect()
+            ->route('ton-kho-online.index', $request->query())
+            ->with('success', 'Đã bỏ gộp màu "'.$data['group_name'].'".');
+    }
+
     private function mergeRows(Collection $imports, Collection $exports): Collection
     {
         return $imports->keys()->merge($exports->keys())->unique()->map(function (string $key) use ($imports, $exports): array {
@@ -149,17 +210,18 @@ class TonKhoOnlineController extends Controller
         });
     }
 
-    private function normalizeStockRows(Collection $rows, string $type, Collection $productAliases): Collection
+    private function normalizeStockRows(Collection $rows, string $type, Collection $productAliases, Collection $colorAliases): Collection
     {
-        return $rows->reduce(function (Collection $carry, object $row) use ($type, $productAliases): Collection {
+        return $rows->reduce(function (Collection $carry, object $row) use ($type, $productAliases, $colorAliases): Collection {
             $productName = $productAliases->get($row->ten_san_pham, $row->ten_san_pham);
-            $key = $this->key($productName, $row->mau_key, $row->size_key);
+            $colorName = $colorAliases->get($row->mau_key, $row->mau_key);
+            $key = $this->key($productName, $colorName, $row->size_key);
             $current = $carry->get($key);
 
             if (! $current) {
                 $current = (object) [
                     'ten_san_pham' => $productName,
-                    'mau_key' => $row->mau_key,
+                    'mau_key' => $colorName,
                     'size_key' => $row->size_key,
                     'so_luong_nhap' => 0,
                     'tien_nhap' => 0,
@@ -218,6 +280,14 @@ class TonKhoOnlineController extends Controller
 
         $importColors = NhapHangOnlineChiTiet::query()->whereNotNull('mau')->where('mau', '<>', '')->pluck('mau');
         $exportColors = DonHangHoanThanhChiTiet::query()->whereNotNull('mau')->where('mau', '<>', '')->pluck('mau');
+        $colorAliases = OnlineColorAlias::query()->pluck('group_name', 'original_name');
+        $sourceColors = $importColors->merge($exportColors)->unique()->sort()->values();
+        $displayColors = $sourceColors
+            ->reject(fn (string $color): bool => $colorAliases->has($color))
+            ->merge($colorAliases->values())
+            ->unique()
+            ->sort()
+            ->values();
 
         $importSizes = NhapHangOnlineChiTiet::query()->whereNotNull('size')->where('size', '<>', '')->pluck('size');
         $exportSizes = DonHangHoanThanhChiTiet::query()->whereNotNull('size')->where('size', '<>', '')->pluck('size');
@@ -225,7 +295,8 @@ class TonKhoOnlineController extends Controller
         return [
             'products' => $importProducts->merge($exportProducts)->merge(OnlineProductAlias::query()->pluck('group_name'))->unique()->sort()->values(),
             'sourceProducts' => $importProducts->merge($exportProducts)->unique()->sort()->values(),
-            'colors' => $importColors->merge($exportColors)->unique()->sort()->values(),
+            'colors' => $displayColors,
+            'sourceColors' => $sourceColors,
             'sizes' => $importSizes->merge($exportSizes)->unique()->sort()->values(),
         ];
     }

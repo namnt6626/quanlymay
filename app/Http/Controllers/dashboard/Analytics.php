@@ -156,6 +156,7 @@ class Analytics extends Controller
         );
 
         $onlineProductName = $this->onlineProductNameExpression();
+        $onlineColorName = $this->onlineColorNameExpression();
 
         $onlineTopProducts = (clone $base)
             ->selectRaw($onlineProductName.' as ten_san_pham, SUM(ct.so_luong) as so_luong, SUM(ct.thanh_tien) as tong_tien')
@@ -165,8 +166,8 @@ class Analytics extends Controller
             ->get();
 
         $onlineRows = (clone $base)
-            ->selectRaw($onlineProductName.' as ten_san_pham, ct.mau, ct.size, SUM(ct.so_luong) as so_luong, SUM(ct.thanh_tien) as tong_tien')
-            ->groupByRaw($onlineProductName.', ct.mau, ct.size')
+            ->selectRaw($onlineProductName.' as ten_san_pham, '.$onlineColorName.' as mau, ct.size, SUM(ct.so_luong) as so_luong, SUM(ct.thanh_tien) as tong_tien')
+            ->groupByRaw($onlineProductName.', '.$onlineColorName.', ct.size')
             ->orderByDesc('tong_tien')
             ->paginate($onlineFilters['per_page'], ['*'], 'online_page')
             ->withQueryString();
@@ -190,13 +191,15 @@ class Analytics extends Controller
                 ->pluck('ten_san_pham'),
             'onlineMaus' => DB::table('don_hang_hoan_thanh_chi_tiet as ct')
                 ->join('don_hang_hoan_thanh as dhht', 'dhht.id', '=', 'ct.don_hang_hoan_thanh_id')
+                ->leftJoin('online_color_aliases as oca', 'oca.original_name', '=', 'ct.mau')
                 ->whereNull('ct.deleted_at')
                 ->whereNull('dhht.deleted_at')
                 ->whereNotNull('ct.mau')
                 ->where('ct.mau', '<>', '')
+                ->selectRaw($onlineColorName.' as mau')
                 ->distinct()
-                ->orderBy('ct.mau')
-                ->pluck('ct.mau'),
+                ->orderBy('mau')
+                ->pluck('mau'),
             'onlineSizes' => DB::table('don_hang_hoan_thanh_chi_tiet as ct')
                 ->join('don_hang_hoan_thanh as dhht', 'dhht.id', '=', 'ct.don_hang_hoan_thanh_id')
                 ->whereNull('ct.deleted_at')
@@ -212,16 +215,18 @@ class Analytics extends Controller
     private function onlineSalesBaseQuery(array $filters): Builder
     {
         $onlineProductName = $this->onlineProductNameExpression();
+        $onlineColorName = $this->onlineColorNameExpression();
 
         return DB::table('don_hang_hoan_thanh_chi_tiet as ct')
             ->join('don_hang_hoan_thanh as dhht', 'dhht.id', '=', 'ct.don_hang_hoan_thanh_id')
             ->leftJoin('online_product_aliases as opa', 'opa.original_name', '=', 'dhht.ten_san_pham')
+            ->leftJoin('online_color_aliases as oca', 'oca.original_name', '=', 'ct.mau')
             ->whereNull('ct.deleted_at')
             ->whereNull('dhht.deleted_at')
             ->whereDate('dhht.ngay_hoan_thanh', '>=', $filters['tu_ngay'])
             ->whereDate('dhht.ngay_hoan_thanh', '<=', $filters['den_ngay'])
             ->when($filters['ma_hang'] !== '', fn (Builder $query) => $query->whereRaw($onlineProductName.' = ?', [$filters['ma_hang']]))
-            ->when($filters['mau'] !== '', fn (Builder $query) => $query->where('ct.mau', $filters['mau']))
+            ->when($filters['mau'] !== '', fn (Builder $query) => $query->whereRaw($onlineColorName.' = ?', [$filters['mau']]))
             ->when($filters['size'] !== '', fn (Builder $query) => $query->where('ct.size', $filters['size']))
             ->when($filters['kenh_ban'] !== '', fn (Builder $query) => $query->where('dhht.kenh_ban', $filters['kenh_ban']));
     }
@@ -229,6 +234,11 @@ class Analytics extends Controller
     private function onlineProductNameExpression(): string
     {
         return 'COALESCE(opa.group_name, dhht.ten_san_pham)';
+    }
+
+    private function onlineColorNameExpression(): string
+    {
+        return 'COALESCE(oca.group_name, ct.mau)';
     }
 
     private function onlineSoldQuantity(array $filters): float

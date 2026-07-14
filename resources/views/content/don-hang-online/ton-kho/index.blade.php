@@ -71,9 +71,14 @@
 <div class="card">
   <div class="card-header d-flex flex-wrap gap-2 align-items-center justify-content-between">
     <h5 class="mb-0">Tồn kho online</h5>
-    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#productGroupModal">
-      <i class="icon-base bx bx-git-merge me-1"></i>Gộp sản phẩm
-    </button>
+    <div class="d-flex flex-wrap gap-2">
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#productGroupModal">
+        <i class="icon-base bx bx-git-merge me-1"></i>Gộp sản phẩm
+      </button>
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#colorGroupModal">
+        <i class="icon-base bx bx-palette me-1"></i>Gộp màu
+      </button>
+    </div>
   </div>
   <div class="card-body">
     @if ($errors->any())
@@ -150,8 +155,8 @@
                   $currentGroup = $productGroups->first(fn ($items) => $items->contains('original_name', $product));
                   $currentGroupName = $currentGroup ? $currentGroup->first()->group_name : '';
                 @endphp
-                <label class="online-product-group-item mb-0 {{ $currentGroupName !== '' ? 'd-none' : '' }}" data-product-group-item data-current-group="{{ $currentGroupName }}">
-                  <input class="form-check-input" type="checkbox" name="products[]" value="{{ $product }}" data-product-checkbox @checked($checkedProducts->contains($product))>
+                <label class="online-product-group-item mb-0 {{ $currentGroupName !== '' ? 'd-none' : '' }}" data-alias-item data-current-group="{{ $currentGroupName }}">
+                  <input class="form-check-input" type="checkbox" name="products[]" value="{{ $product }}" data-alias-checkbox @checked($checkedProducts->contains($product))>
                   <span class="online-product-group-item-name">
                     <span class="fw-semibold">{{ $product }}</span>
                     @if ($currentGroup)
@@ -180,7 +185,7 @@
                   <div class="text-muted small">{{ $aliases->pluck('original_name')->implode(', ') }}</div>
                 </div>
                 <div class="d-flex gap-2">
-                  <button type="button" class="btn btn-sm btn-outline-primary" data-edit-product-group data-group-name="{{ $groupName }}" data-products="{{ $aliases->pluck('original_name')->values()->toJson() }}">
+                  <button type="button" class="btn btn-sm btn-outline-primary" data-edit-alias-group data-group-name="{{ $groupName }}" data-items='@json($aliases->pluck('original_name')->values())'>
                     <i class="icon-base bx bx-edit me-1"></i>Sửa
                   </button>
                   <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -199,59 +204,160 @@
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="colorGroupModal" tabindex="-1" aria-labelledby="colorGroupModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="colorGroupModalLabel">Gộp màu trong thống kê</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+      </div>
+      <div class="modal-body">
+        <form id="store-color-group-form" method="POST" action="{{ route('ton-kho-online.color-groups.store', request()->query()) }}">
+          @csrf
+          <input type="hidden" id="online_color_editing_group_name" name="editing_group_name" value="">
+          <div class="online-product-group-editing align-items-center justify-content-between gap-2 mb-3" id="online_color_group_editing_banner">
+            <div>
+              <div class="fw-semibold">Đang sửa nhóm màu</div>
+              <div class="text-muted small" id="online_color_group_editing_text"></div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="online_color_group_cancel_edit">Hủy sửa</button>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="online_color_group_name">Tên màu chung <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="online_color_group_name" name="group_name" value="{{ old('group_name') }}" required placeholder="Ví dụ: Đỏ đô">
+          </div>
+          <div>
+            <label class="form-label">Chọn màu cần gộp <span class="text-danger">*</span></label>
+            <div class="online-product-group-list d-flex flex-column gap-2">
+              @forelse ($filterOptions['sourceColors'] as $color)
+                @php
+                  $checkedColors = collect(old('colors', []));
+                  $currentGroup = $colorGroups->first(fn ($items) => $items->contains('original_name', $color));
+                  $currentGroupName = $currentGroup ? $currentGroup->first()->group_name : '';
+                @endphp
+                <label class="online-product-group-item mb-0 {{ $currentGroupName !== '' ? 'd-none' : '' }}" data-alias-item data-current-group="{{ $currentGroupName }}">
+                  <input class="form-check-input" type="checkbox" name="colors[]" value="{{ $color }}" data-alias-checkbox @checked($checkedColors->contains($color))>
+                  <span class="online-product-group-item-name">
+                    <span class="fw-semibold">{{ $color }}</span>
+                    @if ($currentGroup)
+                      <span class="text-muted small d-block">Đang thuộc nhóm: {{ $currentGroup->first()->group_name }}</span>
+                    @endif
+                  </span>
+                </label>
+              @empty
+                <div class="text-center text-muted py-4">Chưa có màu để gộp.</div>
+              @endforelse
+            </div>
+          </div>
+        </form>
+
+        @if ($colorGroups->isNotEmpty())
+          <hr>
+          <div class="form-label">Nhóm màu đang có</div>
+          <div class="d-flex flex-column gap-2">
+            @foreach ($colorGroups as $groupName => $aliases)
+              <form method="POST" action="{{ route('ton-kho-online.color-groups.destroy', request()->query()) }}" class="d-flex flex-wrap gap-2 align-items-start justify-content-between border rounded p-2">
+                @csrf
+                @method('DELETE')
+                <input type="hidden" name="group_name" value="{{ $groupName }}">
+                <div>
+                  <div class="fw-semibold">{{ $groupName }}</div>
+                  <div class="text-muted small">{{ $aliases->pluck('original_name')->implode(', ') }}</div>
+                </div>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-sm btn-outline-primary" data-edit-alias-group data-group-name="{{ $groupName }}" data-items='@json($aliases->pluck('original_name')->values())'>
+                    <i class="icon-base bx bx-edit me-1"></i>Sửa
+                  </button>
+                  <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="icon-base bx bx-trash me-1"></i>Bỏ gộp
+                  </button>
+                </div>
+              </form>
+            @endforeach
+          </div>
+        @endif
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Đóng</button>
+        <button type="submit" class="btn btn-primary" form="store-color-group-form"><i class="icon-base bx bx-save me-1"></i>Lưu nhóm</button>
+      </div>
+    </div>
+  </div>
+</div>
 @endsection
 @section('page-script')
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    const modal = document.getElementById('productGroupModal');
-    if (!modal) return;
+    function bindAliasModal(config) {
+      const modal = document.getElementById(config.modalId);
+      if (!modal) return;
 
-    const groupNameInput = document.getElementById('online_product_group_name');
-    const editingInput = document.getElementById('online_product_editing_group_name');
-    const editingBanner = document.getElementById('online_product_group_editing_banner');
-    const editingText = document.getElementById('online_product_group_editing_text');
-    const cancelEditButton = document.getElementById('online_product_group_cancel_edit');
-    const items = Array.from(modal.querySelectorAll('[data-product-group-item]'));
-    const checkboxes = Array.from(modal.querySelectorAll('[data-product-checkbox]'));
+      const groupNameInput = document.getElementById(config.groupNameId);
+      const editingInput = document.getElementById(config.editingInputId);
+      const editingBanner = document.getElementById(config.editingBannerId);
+      const editingText = document.getElementById(config.editingTextId);
+      const cancelEditButton = document.getElementById(config.cancelEditId);
+      const items = Array.from(modal.querySelectorAll('[data-alias-item]'));
+      const checkboxes = Array.from(modal.querySelectorAll('[data-alias-checkbox]'));
 
-    function resetForm() {
-      editingInput.value = '';
-      groupNameInput.value = '';
-      editingBanner.classList.remove('is-active');
-      editingText.textContent = '';
-      checkboxes.forEach((checkbox) => checkbox.checked = false);
-      items.forEach((item) => {
-        item.classList.toggle('d-none', item.dataset.currentGroup !== '');
+      function resetForm() {
+        editingInput.value = '';
+        groupNameInput.value = '';
+        editingBanner.classList.remove('is-active');
+        editingText.textContent = '';
+        checkboxes.forEach((checkbox) => checkbox.checked = false);
+        items.forEach((item) => {
+          item.classList.toggle('d-none', item.dataset.currentGroup !== '');
+        });
+      }
+
+      function editGroup(groupName, values) {
+        const valueSet = new Set(values);
+        editingInput.value = groupName;
+        groupNameInput.value = groupName;
+        editingText.textContent = groupName;
+        editingBanner.classList.add('is-active');
+
+        items.forEach((item) => {
+          const itemGroup = item.dataset.currentGroup || '';
+          item.classList.toggle('d-none', itemGroup !== '' && itemGroup !== groupName);
+        });
+
+        checkboxes.forEach((checkbox) => {
+          checkbox.checked = valueSet.has(checkbox.value);
+        });
+
+        groupNameInput.focus();
+      }
+
+      modal.querySelectorAll('[data-edit-alias-group]').forEach((button) => {
+        button.addEventListener('click', function() {
+          editGroup(this.dataset.groupName || '', JSON.parse(this.dataset.items || '[]'));
+        });
       });
+
+      cancelEditButton?.addEventListener('click', resetForm);
+      modal.addEventListener('hidden.bs.modal', resetForm);
     }
 
-    function editGroup(groupName, products) {
-      const productSet = new Set(products);
-      editingInput.value = groupName;
-      groupNameInput.value = groupName;
-      editingText.textContent = groupName;
-      editingBanner.classList.add('is-active');
-
-      items.forEach((item) => {
-        const itemGroup = item.dataset.currentGroup || '';
-        item.classList.toggle('d-none', itemGroup !== '' && itemGroup !== groupName);
-      });
-
-      checkboxes.forEach((checkbox) => {
-        checkbox.checked = productSet.has(checkbox.value);
-      });
-
-      groupNameInput.focus();
-    }
-
-    modal.querySelectorAll('[data-edit-product-group]').forEach((button) => {
-      button.addEventListener('click', function() {
-        editGroup(this.dataset.groupName || '', JSON.parse(this.dataset.products || '[]'));
-      });
+    bindAliasModal({
+      modalId: 'productGroupModal',
+      groupNameId: 'online_product_group_name',
+      editingInputId: 'online_product_editing_group_name',
+      editingBannerId: 'online_product_group_editing_banner',
+      editingTextId: 'online_product_group_editing_text',
+      cancelEditId: 'online_product_group_cancel_edit',
     });
 
-    cancelEditButton?.addEventListener('click', resetForm);
-    modal.addEventListener('hidden.bs.modal', resetForm);
+    bindAliasModal({
+      modalId: 'colorGroupModal',
+      groupNameId: 'online_color_group_name',
+      editingInputId: 'online_color_editing_group_name',
+      editingBannerId: 'online_color_group_editing_banner',
+      editingTextId: 'online_color_group_editing_text',
+      cancelEditId: 'online_color_group_cancel_edit',
+    });
   });
 </script>
 @endsection
