@@ -75,6 +75,7 @@ class TonKhoOnlineController extends Controller
     public function storeProductGroup(Request $request): RedirectResponse
     {
         $data = $request->validate([
+            'editing_group_name' => ['nullable', 'string', 'max:500'],
             'group_name' => ['required', 'string', 'max:500'],
             'products' => ['required', 'array', 'min:1'],
             'products.*' => ['required', 'string', 'max:500'],
@@ -85,11 +86,19 @@ class TonKhoOnlineController extends Controller
         ]);
 
         $groupName = trim((string) $data['group_name']);
+        $editingGroupName = trim((string) ($data['editing_group_name'] ?? ''));
         $products = collect($data['products'])
             ->map(fn (string $product) => trim($product))
             ->filter()
             ->unique()
             ->values();
+
+        if ($editingGroupName !== '') {
+            OnlineProductAlias::query()
+                ->where('group_name', $editingGroupName)
+                ->whereNotIn('original_name', $products)
+                ->delete();
+        }
 
         foreach ($products as $product) {
             OnlineProductAlias::query()->updateOrCreate(

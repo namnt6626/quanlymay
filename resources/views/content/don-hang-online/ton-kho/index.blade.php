@@ -39,7 +39,6 @@
     border-radius: .375rem;
     display: flex;
     gap: .75rem;
-    min-height: 44px;
     padding: .75rem;
   }
   .online-product-group-item .form-check-input {
@@ -47,8 +46,24 @@
     margin: .2rem 0 0;
   }
   .online-product-group-item-name {
+    display: block;
+    line-height: 1.35;
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+  .online-product-group-item-name .small {
+    line-height: 1.35;
+    margin-top: .2rem;
+  }
+  .online-product-group-editing {
+    background: var(--bs-gray-100);
+    border: 1px solid var(--bs-border-color);
+    border-radius: .375rem;
+    display: none;
+    padding: .75rem;
+  }
+  .online-product-group-editing.is-active {
+    display: flex;
   }
 </style>
 @endsection
@@ -114,6 +129,14 @@
       <div class="modal-body">
         <form id="store-product-group-form" method="POST" action="{{ route('ton-kho-online.product-groups.store', request()->query()) }}">
           @csrf
+          <input type="hidden" id="online_product_editing_group_name" name="editing_group_name" value="">
+          <div class="online-product-group-editing align-items-center justify-content-between gap-2 mb-3" id="online_product_group_editing_banner">
+            <div>
+              <div class="fw-semibold">Đang sửa nhóm</div>
+              <div class="text-muted small" id="online_product_group_editing_text"></div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="online_product_group_cancel_edit">Hủy sửa</button>
+          </div>
           <div class="mb-3">
             <label class="form-label" for="online_product_group_name">Tên chung <span class="text-danger">*</span></label>
             <input type="text" class="form-control" id="online_product_group_name" name="group_name" value="{{ old('group_name') }}" required placeholder="Ví dụ: Áo polo basic">
@@ -125,9 +148,10 @@
                 @php
                   $checkedProducts = collect(old('products', []));
                   $currentGroup = $productGroups->first(fn ($items) => $items->contains('original_name', $product));
+                  $currentGroupName = $currentGroup ? $currentGroup->first()->group_name : '';
                 @endphp
-                <label class="online-product-group-item mb-0">
-                  <input class="form-check-input" type="checkbox" name="products[]" value="{{ $product }}" @checked($checkedProducts->contains($product))>
+                <label class="online-product-group-item mb-0 {{ $currentGroupName !== '' ? 'd-none' : '' }}" data-product-group-item data-current-group="{{ $currentGroupName }}">
+                  <input class="form-check-input" type="checkbox" name="products[]" value="{{ $product }}" data-product-checkbox @checked($checkedProducts->contains($product))>
                   <span class="online-product-group-item-name">
                     <span class="fw-semibold">{{ $product }}</span>
                     @if ($currentGroup)
@@ -155,9 +179,14 @@
                   <div class="fw-semibold">{{ $groupName }}</div>
                   <div class="text-muted small">{{ $aliases->pluck('original_name')->implode(', ') }}</div>
                 </div>
-                <button type="submit" class="btn btn-sm btn-outline-danger">
-                  <i class="icon-base bx bx-trash me-1"></i>Bỏ gộp
-                </button>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-sm btn-outline-primary" data-edit-product-group data-group-name="{{ $groupName }}" data-products="{{ $aliases->pluck('original_name')->values()->toJson() }}">
+                    <i class="icon-base bx bx-edit me-1"></i>Sửa
+                  </button>
+                  <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="icon-base bx bx-trash me-1"></i>Bỏ gộp
+                  </button>
+                </div>
               </form>
             @endforeach
           </div>
@@ -170,4 +199,59 @@
     </div>
   </div>
 </div>
+@endsection
+@section('page-script')
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('productGroupModal');
+    if (!modal) return;
+
+    const groupNameInput = document.getElementById('online_product_group_name');
+    const editingInput = document.getElementById('online_product_editing_group_name');
+    const editingBanner = document.getElementById('online_product_group_editing_banner');
+    const editingText = document.getElementById('online_product_group_editing_text');
+    const cancelEditButton = document.getElementById('online_product_group_cancel_edit');
+    const items = Array.from(modal.querySelectorAll('[data-product-group-item]'));
+    const checkboxes = Array.from(modal.querySelectorAll('[data-product-checkbox]'));
+
+    function resetForm() {
+      editingInput.value = '';
+      groupNameInput.value = '';
+      editingBanner.classList.remove('is-active');
+      editingText.textContent = '';
+      checkboxes.forEach((checkbox) => checkbox.checked = false);
+      items.forEach((item) => {
+        item.classList.toggle('d-none', item.dataset.currentGroup !== '');
+      });
+    }
+
+    function editGroup(groupName, products) {
+      const productSet = new Set(products);
+      editingInput.value = groupName;
+      groupNameInput.value = groupName;
+      editingText.textContent = groupName;
+      editingBanner.classList.add('is-active');
+
+      items.forEach((item) => {
+        const itemGroup = item.dataset.currentGroup || '';
+        item.classList.toggle('d-none', itemGroup !== '' && itemGroup !== groupName);
+      });
+
+      checkboxes.forEach((checkbox) => {
+        checkbox.checked = productSet.has(checkbox.value);
+      });
+
+      groupNameInput.focus();
+    }
+
+    modal.querySelectorAll('[data-edit-product-group]').forEach((button) => {
+      button.addEventListener('click', function() {
+        editGroup(this.dataset.groupName || '', JSON.parse(this.dataset.products || '[]'));
+      });
+    });
+
+    cancelEditButton?.addEventListener('click', resetForm);
+    modal.addEventListener('hidden.bs.modal', resetForm);
+  });
+</script>
 @endsection
