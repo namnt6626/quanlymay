@@ -5,6 +5,8 @@ namespace App\Http\Controllers\DonHangOnline;
 use App\Http\Controllers\Controller;
 use App\Models\DonHangHoanThanhChiTiet;
 use App\Models\NhapHangOnlineChiTiet;
+use App\Models\OnlineProductAlias;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -32,7 +34,9 @@ class TonKhoOnlineController extends Controller
             ->groupBy('don_hang_hoan_thanh.ten_san_pham', DB::raw("COALESCE(don_hang_hoan_thanh_chi_tiet.mau, '')"), DB::raw("COALESCE(don_hang_hoan_thanh_chi_tiet.size, '')"))
             ->get();
 
-        $rows = $this->mergeRows($this->normalizeStockRows($imports, 'import'), $this->normalizeStockRows($exports, 'export'))
+        $productAliases = OnlineProductAlias::query()->pluck('group_name', 'original_name');
+
+        $rows = $this->mergeRows($this->normalizeStockRows($imports, 'import', $productAliases), $this->normalizeStockRows($exports, 'export', $productAliases))
             ->filter(function (array $row) use ($filters): bool {
                 if ($filters['ten_san_pham'] !== '' && ! str_contains($this->normalizeText($row['ten_san_pham']), $this->normalizeText($filters['ten_san_pham']))) {
                     return false;
@@ -59,7 +63,57 @@ class TonKhoOnlineController extends Controller
 
         $filterOptions = $this->filterOptions();
 
-        return view('content.don-hang-online.ton-kho.index', compact('rows', 'filters', 'totals', 'filterOptions'));
+        $productGroups = OnlineProductAlias::query()
+            ->orderBy('group_name')
+            ->orderBy('original_name')
+            ->get()
+            ->groupBy('group_name');
+
+        return view('content.don-hang-online.ton-kho.index', compact('rows', 'filters', 'totals', 'filterOptions', 'productGroups'));
+    }
+
+    public function storeProductGroup(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'group_name' => ['required', 'string', 'max:500'],
+            'products' => ['required', 'array', 'min:1'],
+            'products.*' => ['required', 'string', 'max:500'],
+        ], [
+            'group_name.required' => 'Vui lòng nhập tên chung.',
+            'products.required' => 'Vui lòng chọn ít nhất một sản phẩm.',
+            'products.min' => 'Vui lòng chọn ít nhất một sản phẩm.',
+        ]);
+
+        $groupName = trim((string) $data['group_name']);
+        $products = collect($data['products'])
+            ->map(fn (string $product) => trim($product))
+            ->filter()
+            ->unique()
+            ->values();
+
+        foreach ($products as $product) {
+            OnlineProductAlias::query()->updateOrCreate(
+                ['original_name' => $product],
+                ['group_name' => $groupName]
+            );
+        }
+
+        return redirect()
+            ->route('ton-kho-online.index', $request->query())
+            ->with('success', 'Đã gộp sản phẩm vào nhóm "'.$groupName.'".');
+    }
+
+    public function destroyProductGroup(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'group_name' => ['required', 'string', 'max:500'],
+        ]);
+
+        OnlineProductAlias::query()->where('group_name', $data['group_name'])->delete();
+
+        return redirect()
+            ->route('ton-kho-online.index', $request->query())
+            ->with('success', 'Đã bỏ gộp nhóm "'.$data['group_name'].'".');
     }
 
     private function mergeRows(Collection $imports, Collection $exports): Collection
@@ -86,15 +140,16 @@ class TonKhoOnlineController extends Controller
         });
     }
 
-    private function normalizeStockRows(Collection $rows, string $type): Collection
+    private function normalizeStockRows(Collection $rows, string $type, Collection $productAliases): Collection
     {
-        return $rows->reduce(function (Collection $carry, object $row) use ($type): Collection {
-            $key = $this->key($row->ten_san_pham, $row->mau_key, $row->size_key);
+        return $rows->reduce(function (Collection $carry, object $row) use ($type, $productAliases): Collection {
+            $productName = $productAliases->get($row->ten_san_pham, $row->ten_san_pham);
+            $key = $this->key($productName, $row->mau_key, $row->size_key);
             $current = $carry->get($key);
 
             if (! $current) {
                 $current = (object) [
-                    'ten_san_pham' => $row->ten_san_pham,
+                    'ten_san_pham' => $productName,
                     'mau_key' => $row->mau_key,
                     'size_key' => $row->size_key,
                     'so_luong_nhap' => 0,
@@ -159,7 +214,8 @@ class TonKhoOnlineController extends Controller
         $exportSizes = DonHangHoanThanhChiTiet::query()->whereNotNull('size')->where('size', '<>', '')->pluck('size');
 
         return [
-            'products' => $importProducts->merge($exportProducts)->unique()->sort()->values(),
+            'products' => $importProducts->merge($exportProducts)->merge(OnlineProductAlias::query()->pluck('group_name'))->unique()->sort()->values(),
+            'sourceProducts' => $importProducts->merge($exportProducts)->unique()->sort()->values(),
             'colors' => $importColors->merge($exportColors)->unique()->sort()->values(),
             'sizes' => $importSizes->merge($exportSizes)->unique()->sort()->values(),
         ];

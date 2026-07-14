@@ -49,13 +49,15 @@ class BaoCaoBanHangOnlineController extends Controller
             ->selectRaw('dhht.ngay_hoan_thanh as ngay, SUM(ct.so_luong) as so_luong, SUM(ct.thanh_tien) as doanh_thu')
             ->groupBy('dhht.ngay_hoan_thanh')->orderBy('dhht.ngay_hoan_thanh')->get();
 
+        $onlineProductName = $this->onlineProductNameExpression();
+
         $topProducts = (clone $base)
-            ->selectRaw('dhht.ten_san_pham, SUM(ct.so_luong) as so_luong, SUM(ct.thanh_tien) as doanh_thu')
-            ->groupBy('dhht.ten_san_pham')->orderByDesc('so_luong')->limit(10)->get();
+            ->selectRaw($onlineProductName.' as ten_san_pham, SUM(ct.so_luong) as so_luong, SUM(ct.thanh_tien) as doanh_thu')
+            ->groupByRaw($onlineProductName)->orderByDesc('so_luong')->limit(10)->get();
 
         $rows = (clone $base)
-            ->selectRaw('dhht.ten_san_pham, ct.mau, ct.size, SUM(ct.so_luong) as so_luong, SUM(ct.thanh_tien) as doanh_thu')
-            ->groupBy('dhht.ten_san_pham', 'ct.mau', 'ct.size')
+            ->selectRaw($onlineProductName.' as ten_san_pham, ct.mau, ct.size, SUM(ct.so_luong) as so_luong, SUM(ct.thanh_tien) as doanh_thu')
+            ->groupByRaw($onlineProductName.', ct.mau, ct.size')
             ->orderByDesc('doanh_thu')->paginate($filters['per_page'])->withQueryString();
 
         return view('content.bao-cao.ban-hang-online.index', [
@@ -68,14 +70,20 @@ class BaoCaoBanHangOnlineController extends Controller
     {
         return DB::table('don_hang_hoan_thanh_chi_tiet as ct')
             ->join('don_hang_hoan_thanh as dhht', 'dhht.id', '=', 'ct.don_hang_hoan_thanh_id')
+            ->leftJoin('online_product_aliases as opa', 'opa.original_name', '=', 'dhht.ten_san_pham')
             ->whereNull('ct.deleted_at')->whereNull('dhht.deleted_at')
             ->whereDate('dhht.ngay_hoan_thanh', '>=', $filters['tu_ngay'])
             ->whereDate('dhht.ngay_hoan_thanh', '<=', $filters['den_ngay'])
             ->when($filters['q'] !== '', fn (Builder $query) => $query->where(function (Builder $query) use ($filters) {
                 $keyword = $filters['q'];
-                $query->where('dhht.ten_san_pham', 'like', "%{$keyword}%")
+                $query->whereRaw($this->onlineProductNameExpression().' like ?', ["%{$keyword}%"])
                     ->orWhere('ct.mau', 'like', "%{$keyword}%")->orWhere('ct.size', 'like', "%{$keyword}%");
             }));
+    }
+
+    private function onlineProductNameExpression(): string
+    {
+        return 'COALESCE(opa.group_name, dhht.ten_san_pham)';
     }
 
     private function soldQuantity(array $filters): float

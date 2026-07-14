@@ -29,12 +29,43 @@
   .online-stock-table td {
     vertical-align: top;
   }
+  .online-product-group-list {
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  .online-product-group-item {
+    align-items: flex-start;
+    border: 1px solid var(--bs-border-color);
+    border-radius: .375rem;
+    display: flex;
+    gap: .75rem;
+    min-height: 44px;
+    padding: .75rem;
+  }
+  .online-product-group-item .form-check-input {
+    flex: 0 0 auto;
+    margin: .2rem 0 0;
+  }
+  .online-product-group-item-name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
 </style>
 @endsection
 @section('content')
 <div class="card">
-  <div class="card-header"><h5 class="mb-0">Tồn kho online</h5></div>
+  <div class="card-header d-flex flex-wrap gap-2 align-items-center justify-content-between">
+    <h5 class="mb-0">Tồn kho online</h5>
+    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#productGroupModal">
+      <i class="icon-base bx bx-git-merge me-1"></i>Gộp sản phẩm
+    </button>
+  </div>
   <div class="card-body">
+    @if ($errors->any())
+      <div class="alert alert-danger">
+        {{ $errors->first() }}
+      </div>
+    @endif
     <form method="GET" class="row g-3 align-items-end">
       <div class="col-md-4">
         <label class="form-label">Sản phẩm</label>
@@ -70,6 +101,73 @@
       @endforelse
       </tbody>
     </table>
+  </div>
+</div>
+
+<div class="modal fade" id="productGroupModal" tabindex="-1" aria-labelledby="productGroupModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="productGroupModalLabel">Gộp sản phẩm trong thống kê</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+      </div>
+      <div class="modal-body">
+        <form id="store-product-group-form" method="POST" action="{{ route('ton-kho-online.product-groups.store', request()->query()) }}">
+          @csrf
+          <div class="mb-3">
+            <label class="form-label" for="online_product_group_name">Tên chung <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="online_product_group_name" name="group_name" value="{{ old('group_name') }}" required placeholder="Ví dụ: Áo polo basic">
+          </div>
+          <div>
+            <label class="form-label">Chọn sản phẩm cần gộp <span class="text-danger">*</span></label>
+            <div class="online-product-group-list d-flex flex-column gap-2">
+              @forelse ($filterOptions['sourceProducts'] as $product)
+                @php
+                  $checkedProducts = collect(old('products', []));
+                  $currentGroup = $productGroups->first(fn ($items) => $items->contains('original_name', $product));
+                @endphp
+                <label class="online-product-group-item mb-0">
+                  <input class="form-check-input" type="checkbox" name="products[]" value="{{ $product }}" @checked($checkedProducts->contains($product))>
+                  <span class="online-product-group-item-name">
+                    <span class="fw-semibold">{{ $product }}</span>
+                    @if ($currentGroup)
+                      <span class="text-muted small d-block">Đang thuộc nhóm: {{ $currentGroup->first()->group_name }}</span>
+                    @endif
+                  </span>
+                </label>
+              @empty
+                <div class="text-center text-muted py-4">Chưa có sản phẩm để gộp.</div>
+              @endforelse
+            </div>
+          </div>
+        </form>
+
+        @if ($productGroups->isNotEmpty())
+          <hr>
+          <div class="form-label">Nhóm đang có</div>
+          <div class="d-flex flex-column gap-2">
+            @foreach ($productGroups as $groupName => $aliases)
+              <form method="POST" action="{{ route('ton-kho-online.product-groups.destroy', request()->query()) }}" class="d-flex flex-wrap gap-2 align-items-start justify-content-between border rounded p-2">
+                @csrf
+                @method('DELETE')
+                <input type="hidden" name="group_name" value="{{ $groupName }}">
+                <div>
+                  <div class="fw-semibold">{{ $groupName }}</div>
+                  <div class="text-muted small">{{ $aliases->pluck('original_name')->implode(', ') }}</div>
+                </div>
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                  <i class="icon-base bx bx-trash me-1"></i>Bỏ gộp
+                </button>
+              </form>
+            @endforeach
+          </div>
+        @endif
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Đóng</button>
+        <button type="submit" class="btn btn-primary" form="store-product-group-form"><i class="icon-base bx bx-save me-1"></i>Lưu nhóm</button>
+      </div>
+    </div>
   </div>
 </div>
 @endsection

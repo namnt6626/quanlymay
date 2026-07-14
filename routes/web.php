@@ -199,6 +199,12 @@ $registerIndexRoute('ton-kho', TonKhoController::class, [
 $registerIndexRoute('ton-kho-online', TonKhoOnlineController::class, [
   'view' => 'DON_HANG_HOAN_THANH_VIEW',
 ]);
+Route::post('ton-kho-online/product-groups', [TonKhoOnlineController::class, 'storeProductGroup'])
+  ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_VIEW'])
+  ->name('ton-kho-online.product-groups.store');
+Route::delete('ton-kho-online/product-groups', [TonKhoOnlineController::class, 'destroyProductGroup'])
+  ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_VIEW'])
+  ->name('ton-kho-online.product-groups.destroy');
 Route::get('bao-cao/tong-hop-don-hang', BaoCaoTongHopDonHangController::class)
   ->middleware(['auth', 'permission:BAO_CAO_TONG_HOP_DON_HANG_VIEW'])
   ->name('bao-cao.tong-hop-don-hang');
