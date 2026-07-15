@@ -12,7 +12,7 @@ class PreviewImportRequest extends FormRequest
     {
         return [
             'file_excel' => ['required', 'file', 'mimes:xlsx', 'max:10240'],
-            'kenh_ban' => ['required', 'in:Tiktok,Shopee'],
+            'kenh_ban' => ['required', 'in:Tiktok,Shopee,Bán sỉ'],
         ];
     }
 }

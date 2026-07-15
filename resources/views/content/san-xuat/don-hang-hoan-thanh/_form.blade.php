@@ -8,7 +8,7 @@
   $details = old('chi_tiets', isset($order) ? $order->chiTiets->map(fn ($item) => [
     'mau' => $item->mau, 'size' => $item->size, 'so_luong' => $item->so_luong, 'thanh_tien' => $item->thanh_tien, 'nguon' => $item->nguon,
   ])->all() : [['mau' => '', 'size' => '', 'so_luong' => 1, 'thanh_tien' => '', 'nguon' => 'thu_cong']]);
-  $selectedChannel = old('kenh_ban', isset($order) && in_array($order->kenh_ban ?? '', ['Tiktok', 'Shopee'], true) ? $order->kenh_ban : 'Tiktok');
+  $selectedChannel = old('kenh_ban', isset($order) && in_array($order->kenh_ban ?? '', ['Tiktok', 'Shopee', 'Bán sỉ'], true) ? $order->kenh_ban : 'Tiktok');
 @endphp
 
 @if ($errors->any())
@@ -33,6 +33,7 @@
       <select name="kenh_ban" class="form-select" required>
         <option value="Tiktok" @selected($selectedChannel === 'Tiktok')>Tiktok</option>
         <option value="Shopee" @selected($selectedChannel === 'Shopee')>Shopee</option>
+        <option value="Bán sỉ" @selected($selectedChannel === 'Bán sỉ')>Bán sỉ</option>
       </select>
     </div>
     <div class="col-12">

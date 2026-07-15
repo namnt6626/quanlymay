@@ -31,7 +31,7 @@ class DonHangHoanThanhController extends Controller
             'size' => trim((string) $request->input('size')),
             'tu_ngay' => trim((string) $request->input('tu_ngay')),
             'den_ngay' => trim((string) $request->input('den_ngay')),
-            'kenh_ban' => in_array($request->input('kenh_ban'), ['Tiktok', 'Shopee'], true) ? $request->input('kenh_ban') : '',
+            'kenh_ban' => in_array($request->input('kenh_ban'), ['Tiktok', 'Shopee', 'Bán sỉ'], true) ? $request->input('kenh_ban') : '',
             'nguon' => in_array($request->input('nguon'), ['excel', 'thu_cong'], true) ? $request->input('nguon') : '',
             'per_page' => paginationPerPage(),
         ];

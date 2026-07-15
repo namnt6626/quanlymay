@@ -11,6 +11,7 @@
         <select name="kenh_ban" class="form-select" required>
           <option value="Tiktok" @selected(old('kenh_ban', 'Tiktok') === 'Tiktok')>Tiktok</option>
           <option value="Shopee" @selected(old('kenh_ban') === 'Shopee')>Shopee</option>
+          <option value="Bán sỉ" @selected(old('kenh_ban') === 'Bán sỉ')>Bán sỉ</option>
         </select>
       </div>
       <div class="col-md-8">

@@ -848,6 +848,7 @@
               <option value="">Tất cả</option>
               <option value="Tiktok" @selected(($onlineFilters['kenh_ban'] ?? '') === 'Tiktok')>Tiktok</option>
               <option value="Shopee" @selected(($onlineFilters['kenh_ban'] ?? '') === 'Shopee')>Shopee</option>
+              <option value="Bán sỉ" @selected(($onlineFilters['kenh_ban'] ?? '') === 'Bán sỉ')>Bán sỉ</option>
             </select>
           </div>
           <div>

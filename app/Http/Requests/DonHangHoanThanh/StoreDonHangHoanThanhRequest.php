@@ -29,7 +29,7 @@ class StoreDonHangHoanThanhRequest extends FormRequest
             'ngay_hoan_thanh' => ['required', 'date'],
             'ten_san_pham' => ['required', 'string', 'max:500'],
             'ten_kho' => ['nullable'],
-            'kenh_ban' => ['required', 'in:Tiktok,Shopee'],
+            'kenh_ban' => ['required', 'in:Tiktok,Shopee,Bán sỉ'],
             'ghi_chu' => ['nullable', 'string'],
             'chi_tiets' => ['required', 'array', 'min:1'],
             'chi_tiets.*.mau' => ['nullable', 'string', 'max:255'],

@@ -107,7 +107,7 @@ class Analytics extends Controller
             'ma_hang' => trim((string) $request->input('online_ma_hang')),
             'mau' => trim((string) $request->input('online_mau')),
             'size' => trim((string) $request->input('online_size')),
-            'kenh_ban' => in_array($request->input('online_kenh_ban'), ['Tiktok', 'Shopee'], true) ? $request->input('online_kenh_ban') : '',
+            'kenh_ban' => in_array($request->input('online_kenh_ban'), ['Tiktok', 'Shopee', 'Bán sỉ'], true) ? $request->input('online_kenh_ban') : '',
             'per_page' => in_array($request->integer('online_per_page'), paginationPerPageOptions(), true)
                 ? $request->integer('online_per_page')
                 : paginationPerPage(),
