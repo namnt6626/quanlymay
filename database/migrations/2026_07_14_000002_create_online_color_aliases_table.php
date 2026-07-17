@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('online_color_aliases')) {
+            return;
+        }
+
         Schema::create('online_color_aliases', function (Blueprint $table): void {
             $table->id();
             $table->string('original_name', 255)->unique();

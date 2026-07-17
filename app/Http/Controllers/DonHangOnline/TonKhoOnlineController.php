@@ -392,6 +392,7 @@ class TonKhoOnlineController extends Controller
             'standardProducts' => $importProducts->unique()->sort()->values(),
             'colors' => $displayColors,
             'sourceColors' => $sourceColors,
+            'standardColors' => $importColors->unique()->sort()->values(),
             'sizes' => $importSizes->merge($exportSizes)->unique()->sort()->values(),
         ];
     }

@@ -230,7 +230,12 @@
           </div>
           <div class="mb-3">
             <label class="form-label" for="online_color_group_name">Tên màu chung <span class="text-danger">*</span></label>
-            <input type="text" class="form-control" id="online_color_group_name" name="group_name" value="{{ old('group_name') }}" required placeholder="Ví dụ: Đỏ đô">
+            <select class="form-select" id="online_color_group_name" name="group_name" required>
+              <option value="">-- Chọn màu chuẩn --</option>
+              @foreach ($filterOptions['standardColors'] as $color)
+                <option value="{{ $color }}" @selected(old('group_name') === $color)>{{ $color }}</option>
+              @endforeach
+            </select>
           </div>
           <div>
             <label class="form-label">Chọn màu cần gộp <span class="text-danger">*</span></label>
