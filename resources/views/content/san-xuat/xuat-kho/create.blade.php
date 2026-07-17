@@ -522,7 +522,7 @@
           unit_price: '',
         });
 
-        if (kenhBanInput && !kenhBanInput.value && source.kenh_ban) {
+        if (kenhBanInput && !kenhBanInput.value && ['Tiktok', 'Shopee', 'Bán sỉ'].includes(source.kenh_ban)) {
           kenhBanInput.value = source.kenh_ban;
         }
 
@@ -796,8 +796,12 @@
 
           <div class="col-12 col-md-6 col-xl-3">
             <label class="form-label" for="kenh_ban">Kênh bán <span class="text-danger">*</span></label>
-            <input type="text" class="form-control @error('kenh_ban') is-invalid @enderror" id="kenh_ban"
-              name="kenh_ban" value="{{ old('kenh_ban') }}" required>
+            <select class="form-select @error('kenh_ban') is-invalid @enderror" id="kenh_ban" name="kenh_ban" required>
+              <option value="">-- Chọn kênh bán --</option>
+              <option value="Tiktok" @selected(old('kenh_ban', 'Tiktok') === 'Tiktok')>Tiktok</option>
+              <option value="Shopee" @selected(old('kenh_ban') === 'Shopee')>Shopee</option>
+              <option value="Bán sỉ" @selected(old('kenh_ban') === 'Bán sỉ')>Bán sỉ</option>
+            </select>
             @error('kenh_ban')
               <div class="invalid-feedback">{{ $message }}</div>
             @enderror

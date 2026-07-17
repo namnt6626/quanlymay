@@ -25,12 +25,16 @@ use Illuminate\View\View;
 
 class PhieuXuatKhoController extends Controller
 {
+    private const KENH_BAN_OPTIONS = ['Tiktok', 'Shopee', 'Bán sỉ'];
+
     public function index(Request $request): View
     {
         $keyword = trim((string) $request->input('q'));
         $tuNgay = trim((string) $request->input('tu_ngay'));
         $denNgay = trim((string) $request->input('den_ngay'));
-        $kenhBan = trim((string) $request->input('kenh_ban'));
+        $kenhBan = in_array($request->input('kenh_ban'), self::KENH_BAN_OPTIONS, true)
+            ? $request->input('kenh_ban')
+            : '';
         $maHang = trim((string) $request->input('ma_hang'));
         $maMau = trim((string) $request->input('ma_mau'));
         $maSize = trim((string) $request->input('ma_size'));
@@ -550,7 +554,7 @@ class PhieuXuatKhoController extends Controller
             'product_name' => $nhapKho->source_product_name ?? '',
             'color' => $nhapKho->source_color ?? '',
             'size' => $nhapKho->source_size ?? '',
-            'kenh_ban' => $nhapKho->source_kenh_ban ?? '',
+            'kenh_ban' => in_array($nhapKho->source_kenh_ban ?? '', self::KENH_BAN_OPTIONS, true) ? $nhapKho->source_kenh_ban : '',
             'imported' => (string) $nhapKho->source_total_imported,
             'exported' => (string) $nhapKho->source_total_exported,
             'remaining' => (string) $nhapKho->source_total_remaining,
@@ -783,7 +787,8 @@ class PhieuXuatKhoController extends Controller
                 $representativeNhapKho->setAttribute('source_product_name', $representativeNhapKho->qc?->phanBoMay?->cat?->matHang?->ten_hang ?? $representativeNhapKho->qc?->matHang?->ten_hang);
                 $representativeNhapKho->setAttribute('source_color', $representativeNhapKho->qc?->phanBoMay?->cat?->mau?->ten_mau ?? $representativeNhapKho->qc?->mau?->ten_mau);
                 $representativeNhapKho->setAttribute('source_size', $representativeNhapKho->qc?->phanBoMay?->cat?->size?->ten_size ?? $representativeNhapKho->qc?->size?->ten_size);
-                $representativeNhapKho->setAttribute('source_kenh_ban', $donHangChiTiet?->donHang?->kenh_ban);
+                $sourceKenhBan = $donHangChiTiet?->donHang?->kenh_ban;
+                $representativeNhapKho->setAttribute('source_kenh_ban', in_array($sourceKenhBan, self::KENH_BAN_OPTIONS, true) ? $sourceKenhBan : null);
                 $representativeNhapKho->setAttribute('source_total_imported', max(0, $totalNhap));
                 $representativeNhapKho->setAttribute('source_total_exported', max(0, $totalXuat));
                 $representativeNhapKho->setAttribute('source_total_remaining', max(0, $totalNhap - $totalXuat));

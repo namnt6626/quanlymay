@@ -34,7 +34,7 @@ class UpdateXuatKhoRequest extends FormRequest
                     ->whereNull('deleted_at'),
             ],
             'ngay_xuat' => ['required', 'date'],
-            'kenh_ban' => ['required', 'string', 'max:255'],
+            'kenh_ban' => ['required', 'in:Tiktok,Shopee,Bán sỉ'],
             'nhap_kho_id' => [
                 'required',
                 'integer',
@@ -69,8 +69,7 @@ class UpdateXuatKhoRequest extends FormRequest
             'ngay_xuat.required' => 'Ngày xuất là bắt buộc.',
             'ngay_xuat.date' => 'Ngày xuất không đúng định dạng ngày.',
             'kenh_ban.required' => 'Kênh bán là bắt buộc.',
-            'kenh_ban.string' => 'Kênh bán phải là chuỗi ký tự.',
-            'kenh_ban.max' => 'Kênh bán không được vượt quá :max ký tự.',
+            'kenh_ban.in' => 'Kênh bán không hợp lệ.',
             'nhap_kho_id.required' => 'Nguồn nhập kho là bắt buộc.',
             'nhap_kho_id.integer' => 'Nguồn nhập kho không hợp lệ.',
             'nhap_kho_id.exists' => 'Nguồn nhập kho đã chọn không tồn tại.',

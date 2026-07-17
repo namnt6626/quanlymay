@@ -134,8 +134,12 @@
           <label class="form-label" for="kenh_ban">Kênh bán</label>
           <div class="input-group">
             <span class="input-group-text"><i class="icon-base bx bx-store"></i></span>
-            <input type="text" class="form-control" id="kenh_ban" name="kenh_ban" value="{{ $filters['kenh_ban'] }}"
-              placeholder="Nhập kênh bán">
+            <select class="form-select" id="kenh_ban" name="kenh_ban">
+              <option value="">Tất cả</option>
+              <option value="Tiktok" @selected($filters['kenh_ban'] === 'Tiktok')>Tiktok</option>
+              <option value="Shopee" @selected($filters['kenh_ban'] === 'Shopee')>Shopee</option>
+              <option value="Bán sỉ" @selected($filters['kenh_ban'] === 'Bán sỉ')>Bán sỉ</option>
+            </select>
           </div>
         </div>
         @include('content.shared._per-page-select', ['perPageColumnClass' => 'col-6 col-lg-2 filter-span-2'])

@@ -65,6 +65,10 @@ class ProfileController extends Controller
       Artisan::call('migrate', ['--force' => true]);
 
       $output = trim(Artisan::output());
+      Artisan::call('view:clear');
+      Artisan::call('cache:clear');
+      Artisan::call('route:clear');
+      Artisan::call('config:clear');
 
       return redirect()
         ->route('profile.index')
