@@ -34,6 +34,9 @@
     document.addEventListener('DOMContentLoaded', function() {
       const form = document.getElementById('xuat-kho-form');
       const numberInputs = Array.from(document.querySelectorAll('.js-number-format'));
+      const quantityInput = document.getElementById('so_luong_xuat');
+      const unitPriceInput = document.getElementById('don_gia');
+      const lineTotalText = document.getElementById('xuat-line-total-text');
       const nhapKhoSelect = document.getElementById('nhap_kho_id');
       const kenhBanInput = document.getElementById('kenh_ban');
       const orderNumberText = document.getElementById('xuat-order-number-text');
@@ -118,6 +121,36 @@
         return normalized.replace('.', ',');
       }
 
+      function formatMoney(value) {
+        const normalized = normalizeNumber(value);
+
+        if (!normalized) {
+          return '0 ₫';
+        }
+
+        const number = Number(normalized);
+
+        if (Number.isNaN(number)) {
+          return '0 ₫';
+        }
+
+        return new Intl.NumberFormat('vi-VN', {
+          maximumFractionDigits: 0,
+        }).format(number) + ' ₫';
+      }
+
+      function updateLineTotal() {
+        if (!lineTotalText) {
+          return;
+        }
+
+        const quantity = Number(normalizeNumber(quantityInput?.value));
+        const unitPrice = Number(normalizeNumber(unitPriceInput?.value));
+        const total = !Number.isNaN(quantity) && !Number.isNaN(unitPrice) ? quantity * unitPrice : 0;
+
+        lineTotalText.textContent = formatMoney(String(total));
+      }
+
       function updateNhapKhoInfo() {
         if (!nhapKhoSelect) {
           return;
@@ -157,6 +190,7 @@
       numberInputs.forEach(function(input) {
         input.addEventListener('input', function() {
           input.value = input.value.replace(/[^\d.,]/g, '');
+          updateLineTotal();
         });
 
         input.addEventListener('focus', function() {
@@ -165,10 +199,13 @@
 
         input.addEventListener('blur', function() {
           input.value = formatDisplayNumber(input.value);
+          updateLineTotal();
         });
 
         input.value = formatDisplayNumber(input.value);
       });
+
+      updateLineTotal();
 
       if (nhapKhoSelect) {
         nhapKhoSelect.addEventListener('change', updateNhapKhoInfo);
@@ -222,7 +259,7 @@
     <div class="card-body">
       <form action="{{ route('xuat-kho.update', $phieuXuatKho) }}" method="POST" id="xuat-kho-form">
         @csrf
-        @method('PATCH')
+        @method('PUT')
 
         <div class="row g-4">
           <div class="col-md-6">
@@ -374,6 +411,25 @@
                 @error('so_luong_xuat')
                   <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
+              </div>
+
+              <div class="col-12 col-md-6 col-xl-3">
+                <label class="form-label" for="don_gia">Đơn giá <span class="text-danger">*</span></label>
+                <input type="text" inputmode="numeric" autocomplete="off"
+                  class="form-control js-number-format @error('don_gia') is-invalid @enderror"
+                  id="don_gia" name="don_gia"
+                  value="{{ old('don_gia') !== null && old('don_gia') !== '' ? number_format((float) old('don_gia'), 0, ',', '.') : number_format((float) ($chiTiet?->don_gia ?? 0), 0, ',', '.') }}"
+                  required>
+                @error('don_gia')
+                  <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+              </div>
+
+              <div class="col-12 col-md-6 col-xl-3">
+                <label class="form-label">Thành tiền</label>
+                <div class="form-control bg-light text-end fw-semibold" id="xuat-line-total-text">
+                  {{ number_format((float) (($currentSourceQuantity ?? $chiTiet?->so_luong_xuat) * ($chiTiet?->don_gia ?? 0)), 0, ',', '.') }} ₫
+                </div>
               </div>
             </div>
           </div>

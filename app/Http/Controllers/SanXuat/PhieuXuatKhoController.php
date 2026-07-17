@@ -162,10 +162,16 @@ class PhieuXuatKhoController extends Controller
             return $chiTiet;
         });
 
+        $totals = [
+            'so_luong_xuat' => $chiTiets->getCollection()->sum(fn (PhieuXuatKhoChiTiet $chiTiet): float => (float) $chiTiet->so_luong_xuat),
+            'thanh_tien' => $chiTiets->getCollection()->sum(fn (PhieuXuatKhoChiTiet $chiTiet): float => (float) $chiTiet->thanh_tien),
+        ];
+
         return view('content.san-xuat.xuat-kho.index', [
             'chiTiets' => $chiTiets,
             'keyword' => $keyword,
             'filters' => $filters,
+            'totals' => $totals,
             'matHangs' => MatHang::query()
                 ->where('trang_thai', true)
                 ->whereNotNull('ma_hang')
@@ -225,6 +231,7 @@ class PhieuXuatKhoController extends Controller
                 $rowNumber = $index + 1;
                 $nhapKhoId = (int) $item['nhap_kho_id'];
                 $soLuongXuat = (float) $item['so_luong_xuat'];
+                $donGia = (float) $item['don_gia'];
 
                 if (isset($seen[$nhapKhoId])) {
                     throw ValidationException::withMessages([
@@ -270,7 +277,10 @@ class PhieuXuatKhoController extends Controller
                 }
 
                 foreach ($this->allocateNhapKhoLots($nhapKho, $soLuongXuat) as $allocation) {
-                    $selectedRows[] = $allocation;
+                    $selectedRows[] = [
+                        ...$allocation,
+                        'don_gia' => $donGia,
+                    ];
                 }
             }
 
@@ -292,6 +302,8 @@ class PhieuXuatKhoController extends Controller
                         'nhap_kho_id' => $nhapKho->id,
                         'don_hang_chi_tiet_id' => $this->donHangChiTietFromNhapKho($nhapKho)?->id,
                         'so_luong_xuat' => $row['so_luong_xuat'],
+                        'don_gia' => $row['don_gia'],
+                        'thanh_tien' => (float) $row['so_luong_xuat'] * (float) $row['don_gia'],
                         'ghi_chu' => $data['ghi_chu'] ?? null,
                     ]);
                 }
@@ -307,8 +319,11 @@ class PhieuXuatKhoController extends Controller
                         'items' => collect($selectedRows)->map(fn (array $row): array => [
                             'nhap_kho_id' => $row['nhap_kho']->id,
                             'so_luong_xuat' => $row['so_luong_xuat'],
+                            'don_gia' => $row['don_gia'],
+                            'thanh_tien' => (float) $row['so_luong_xuat'] * (float) $row['don_gia'],
                         ])->values()->all(),
                         'tong_so_luong_xuat' => collect($selectedRows)->sum('so_luong_xuat'),
+                        'tong_thanh_tien' => collect($selectedRows)->sum(fn (array $row): float => (float) $row['so_luong_xuat'] * (float) $row['don_gia']),
                     ],
                     'batch_id' => $batchId,
                 ]);
@@ -378,7 +393,11 @@ class PhieuXuatKhoController extends Controller
             ])
             ->findOrFail((int) $data['nhap_kho_id']);
 
-        $selectedRows = $this->allocateNhapKhoLots($nhapKho, (float) $data['so_luong_xuat'], $xuatKho);
+        $selectedRows = $this->allocateNhapKhoLots($nhapKho, (float) $data['so_luong_xuat'], $xuatKho)
+            ->map(fn (array $row): array => [
+                ...$row,
+                'don_gia' => (float) $data['don_gia'],
+            ]);
 
         DB::transaction(function () use ($data, $xuatKho, $selectedRows) {
             $xuatKho->update([
@@ -398,6 +417,8 @@ class PhieuXuatKhoController extends Controller
                     'nhap_kho_id' => $nhapKho->id,
                     'don_hang_chi_tiet_id' => $this->donHangChiTietFromNhapKho($nhapKho)?->id,
                     'so_luong_xuat' => $row['so_luong_xuat'],
+                    'don_gia' => $row['don_gia'],
+                    'thanh_tien' => (float) $row['so_luong_xuat'] * (float) $row['don_gia'],
                     'ghi_chu' => $data['ghi_chu'] ?? null,
                 ]);
             }
@@ -482,6 +503,7 @@ class PhieuXuatKhoController extends Controller
                     return [
                         ...$this->sourceOptionFromNhapKho($nhapKho),
                         'quantity' => $item['so_luong_xuat'] ?? '',
+                        'unit_price' => $item['don_gia'] ?? '',
                     ];
                 })
                 ->filter()

@@ -144,7 +144,12 @@
           </div>
           <div class="mb-3">
             <label class="form-label" for="online_product_group_name">Tên chung <span class="text-danger">*</span></label>
-            <input type="text" class="form-control" id="online_product_group_name" name="group_name" value="{{ old('group_name') }}" required placeholder="Ví dụ: Áo polo basic">
+            <select class="form-select" id="online_product_group_name" name="group_name" required>
+              <option value="">-- Chọn sản phẩm chuẩn --</option>
+              @foreach ($filterOptions['standardProducts'] as $product)
+                <option value="{{ $product }}" @selected(old('group_name') === $product)>{{ $product }}</option>
+              @endforeach
+            </select>
           </div>
           <div>
             <label class="form-label">Chọn sản phẩm cần gộp <span class="text-danger">*</span></label>

@@ -18,6 +18,7 @@ class StoreXuatKhoRequest extends FormRequest
             ->map(function ($item) {
                 $item = is_array($item) ? $item : [];
                 $item['so_luong_xuat'] = $this->normalizeNumberInput($item['so_luong_xuat'] ?? null);
+                $item['don_gia'] = $this->normalizeNumberInput($item['don_gia'] ?? null);
 
                 return $item;
             })
@@ -48,6 +49,7 @@ class StoreXuatKhoRequest extends FormRequest
                 Rule::exists('nhap_kho', 'id')->whereNull('deleted_at'),
             ],
             'items.*.so_luong_xuat' => ['required', 'numeric', 'min:0.0001'],
+            'items.*.don_gia' => ['required', 'numeric', 'min:0'],
             'ghi_chu' => ['nullable', 'string'],
             'xuat_kho_submit_token' => ['nullable', 'string', 'max:100'],
         ];
@@ -62,6 +64,7 @@ class StoreXuatKhoRequest extends FormRequest
             'items' => 'Danh sách nguồn xuất',
             'items.*.nhap_kho_id' => 'Nguồn xuất',
             'items.*.so_luong_xuat' => 'Số lượng xuất',
+            'items.*.don_gia' => 'Đơn giá',
             'ghi_chu' => 'Ghi chú',
         ];
     }
@@ -86,6 +89,9 @@ class StoreXuatKhoRequest extends FormRequest
             'items.*.so_luong_xuat.required' => 'Số lượng xuất là bắt buộc.',
             'items.*.so_luong_xuat.numeric' => 'Số lượng xuất phải là số.',
             'items.*.so_luong_xuat.min' => 'Số lượng xuất phải lớn hơn 0.',
+            'items.*.don_gia.required' => 'Đơn giá là bắt buộc.',
+            'items.*.don_gia.numeric' => 'Đơn giá phải là số.',
+            'items.*.don_gia.min' => 'Đơn giá không được âm.',
             'ghi_chu.string' => 'Ghi chú phải là chuỗi ký tự.',
         ];
     }

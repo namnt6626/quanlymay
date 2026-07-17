@@ -175,6 +175,8 @@
             <th class="text-end">SL đặt</th>
             <th class="text-end">Nhập kho</th>
             <th class="text-end">SL xuất</th>
+            <th class="text-end">Đơn giá</th>
+            <th class="text-end">Thành tiền</th>
             <th style="width: 120px;">Thao tác</th>
           </tr>
         </thead>
@@ -207,6 +209,8 @@
               <td class="text-end">{{ $chiTiet->source_has_order ? $formatPhanBoNumber($chiTiet->source_order_quantity ?? $chiTiet->donHangChiTiet?->so_luong_dat) : '-' }}</td>
               <td class="text-end">{{ $formatPhanBoNumber($chiTiet->source_total_imported ?? $chiTiet->nhapKho?->so_luong_nhap) }}</td>
               <td class="text-end">{{ $formatPhanBoNumber($chiTiet->so_luong_xuat) }}</td>
+              <td class="text-end">{{ number_format((float) $chiTiet->don_gia, 0, ',', '.') }} ₫</td>
+              <td class="text-end fw-semibold">{{ number_format((float) $chiTiet->thanh_tien, 0, ',', '.') }} ₫</td>
               <td>
                 <div class="d-flex gap-2">
                   @if (hasPermission('XUAT_KHO_EDIT'))
@@ -230,10 +234,21 @@
             </tr>
           @empty
             <tr>
-              <td colspan="{{ hasPermission('XUAT_KHO_DELETE') ? 15 : 14 }}" class="text-center py-4">Chưa có dữ liệu xuất kho.</td>
+              <td colspan="{{ hasPermission('XUAT_KHO_DELETE') ? 17 : 16 }}" class="text-center py-4">Chưa có dữ liệu xuất kho.</td>
             </tr>
           @endforelse
         </tbody>
+        @if ($chiTiets->isNotEmpty())
+          <tfoot>
+            <tr class="fw-semibold">
+              <td colspan="{{ hasPermission('XUAT_KHO_DELETE') ? 13 : 12 }}" class="text-end">Tổng trang</td>
+              <td class="text-end">{{ $formatPhanBoNumber($totals['so_luong_xuat'] ?? 0) }}</td>
+              <td></td>
+              <td class="text-end">{{ number_format((float) ($totals['thanh_tien'] ?? 0), 0, ',', '.') }} ₫</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        @endif
       </table>
     </div>
 
