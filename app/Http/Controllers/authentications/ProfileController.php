@@ -6,8 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Profile\UpdatePasswordRequest;
 use App\Http\Requests\Profile\UpdateProfileRequest;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
+use Throwable;
 
 class ProfileController extends Controller
 {
@@ -52,5 +55,26 @@ class ProfileController extends Controller
     return redirect()
       ->route('profile.change-password')
       ->with('success', 'Đổi mật khẩu thành công.');
+  }
+
+  public function runMigrations(Request $request): RedirectResponse
+  {
+    abort_unless($request->user()?->isAdmin(), 403);
+
+    try {
+      Artisan::call('migrate', ['--force' => true]);
+
+      $output = trim(Artisan::output());
+
+      return redirect()
+        ->route('profile.index')
+        ->with('success', $output !== '' ? 'Cập nhật database thành công. '.$output : 'Cập nhật database thành công.');
+    } catch (Throwable $exception) {
+      report($exception);
+
+      return redirect()
+        ->route('profile.index')
+        ->withErrors(['migrate' => 'Cập nhật database thất bại: '.$exception->getMessage()]);
+    }
   }
 }

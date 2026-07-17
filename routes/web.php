@@ -251,6 +251,7 @@ Route::middleware('auth')->group(function () {
   Route::post('/logout', [LoginBasic::class, 'destroy'])->name('logout');
   Route::get('/profile', [\App\Http\Controllers\authentications\ProfileController::class, 'index'])->middleware('permission:PROFILE_VIEW')->name('profile.index');
   Route::put('/profile', [\App\Http\Controllers\authentications\ProfileController::class, 'update'])->middleware('permission:PROFILE_EDIT')->name('profile.update');
+  Route::post('/profile/run-migrations', [\App\Http\Controllers\authentications\ProfileController::class, 'runMigrations'])->middleware('permission:PROFILE_VIEW')->name('profile.run-migrations');
   Route::get('/profile/change-password', [\App\Http\Controllers\authentications\ProfileController::class, 'changePassword'])->middleware('permission:CHANGE_PASSWORD')->name('profile.change-password');
   Route::put('/profile/change-password', [\App\Http\Controllers\authentications\ProfileController::class, 'updatePassword'])->middleware('permission:CHANGE_PASSWORD')->name('profile.update-password');
 });

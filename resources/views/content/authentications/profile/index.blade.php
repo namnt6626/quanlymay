@@ -37,9 +37,20 @@
       <div class="card mb-4">
         <div class="card-header d-flex flex-column flex-md-row gap-3 justify-content-between align-items-md-center">
           <h5 class="mb-0">Thông tin cá nhân</h5>
-          <a href="{{ route('profile.change-password') }}" class="btn btn-outline-primary">
-            <i class="icon-base bx bx-lock-alt me-1"></i> Đổi mật khẩu
-          </a>
+          <div class="d-flex flex-column gap-2 align-items-stretch align-items-md-end">
+            <a href="{{ route('profile.change-password') }}" class="btn btn-outline-primary">
+              <i class="icon-base bx bx-lock-alt me-1"></i> Đổi mật khẩu
+            </a>
+            @if ($user->isAdmin())
+              <form action="{{ route('profile.run-migrations') }}" method="POST"
+                onsubmit="return confirm('Chạy cập nhật database trên host? Thao tác này sẽ chạy các migration còn thiếu.');">
+                @csrf
+                <button type="submit" class="btn btn-outline-warning w-100">
+                  <i class="icon-base bx bx-data me-1"></i> Cập nhật database
+                </button>
+              </form>
+            @endif
+          </div>
         </div>
         <div class="card-body">
           <form action="{{ route('profile.update') }}" method="POST">
