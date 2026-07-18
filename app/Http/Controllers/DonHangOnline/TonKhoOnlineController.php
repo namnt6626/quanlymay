@@ -288,9 +288,10 @@ class TonKhoOnlineController extends Controller
     private function matchedAliasGroupNames(Collection $values, Collection $aliases): Collection
     {
         return $values->mapWithKeys(function (string $value) use ($aliases): array {
-            $group = $this->aliasName($aliases, $value);
+            $value = trim($value);
+            $group = $aliases->get($value) ?? $aliases->get($this->normalizeText($value));
 
-            return [$value => $group !== trim($value) ? $group : ''];
+            return [$value => $group ?? ''];
         });
     }
 
