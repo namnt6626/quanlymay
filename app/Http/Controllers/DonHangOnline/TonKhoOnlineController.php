@@ -285,6 +285,13 @@ class TonKhoOnlineController extends Controller
             ?? $value;
     }
 
+    private function hasAlias(Collection $aliases, string $value): bool
+    {
+        $value = trim($value);
+
+        return $aliases->has($value) || $aliases->has($this->normalizeText($value));
+    }
+
     private function matchedAliasGroupNames(Collection $values, Collection $aliases): Collection
     {
         return $values->mapWithKeys(function (string $value) use ($aliases): array {
@@ -329,12 +336,21 @@ class TonKhoOnlineController extends Controller
             ->whereNull('don_hang_hoan_thanh.deleted_at')
             ->pluck('don_hang_hoan_thanh.ten_san_pham');
 
+        $sourceProducts = $importProducts->merge($exportProducts)->unique()->sort()->values();
+        $productAliases = $this->aliasLookup(OnlineProductAlias::query()->get(['original_name', 'group_name']));
+        $displayProducts = $sourceProducts
+            ->reject(fn (string $product): bool => $this->hasAlias($productAliases, $product))
+            ->merge($productAliases->values())
+            ->unique()
+            ->sort()
+            ->values();
+
         $importColors = NhapHangOnlineChiTiet::query()->whereNotNull('mau')->where('mau', '<>', '')->pluck('mau');
         $exportColors = DonHangHoanThanhChiTiet::query()->whereNotNull('mau')->where('mau', '<>', '')->pluck('mau');
-        $colorAliases = OnlineColorAlias::query()->pluck('group_name', 'original_name');
+        $colorAliases = $this->aliasLookup(OnlineColorAlias::query()->get(['original_name', 'group_name']));
         $sourceColors = $importColors->merge($exportColors)->unique()->sort()->values();
         $displayColors = $sourceColors
-            ->reject(fn (string $color): bool => $colorAliases->has($color))
+            ->reject(fn (string $color): bool => $this->hasAlias($colorAliases, $color))
             ->merge($colorAliases->values())
             ->unique()
             ->sort()
@@ -344,8 +360,8 @@ class TonKhoOnlineController extends Controller
         $exportSizes = DonHangHoanThanhChiTiet::query()->whereNotNull('size')->where('size', '<>', '')->pluck('size');
 
         return [
-            'products' => $importProducts->merge($exportProducts)->merge(OnlineProductAlias::query()->pluck('group_name'))->unique()->sort()->values(),
-            'sourceProducts' => $importProducts->merge($exportProducts)->unique()->sort()->values(),
+            'products' => $displayProducts,
+            'sourceProducts' => $sourceProducts,
             'colors' => $displayColors,
             'sourceColors' => $sourceColors,
             'sizes' => $importSizes->merge($exportSizes)->unique()->sort()->values(),
