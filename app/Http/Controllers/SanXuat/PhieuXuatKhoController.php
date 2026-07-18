@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SanXuat;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\XuatKho\StoreXuatKhoRequest;
 use App\Http\Requests\XuatKho\UpdateXuatKhoRequest;
+use App\Models\DmKenhBan;
 use App\Models\DmSize;
 use App\Models\DonHangChiTiet;
 use App\Models\MatHang;
@@ -25,14 +26,13 @@ use Illuminate\View\View;
 
 class PhieuXuatKhoController extends Controller
 {
-    private const KENH_BAN_OPTIONS = ['Tiktok', 'Shopee', 'Bán sỉ'];
-
     public function index(Request $request): View
     {
+        $kenhBans = DmKenhBan::activeNames();
         $keyword = trim((string) $request->input('q'));
         $tuNgay = trim((string) $request->input('tu_ngay'));
         $denNgay = trim((string) $request->input('den_ngay'));
-        $kenhBan = in_array($request->input('kenh_ban'), self::KENH_BAN_OPTIONS, true)
+        $kenhBan = $kenhBans->contains($request->input('kenh_ban'))
             ? $request->input('kenh_ban')
             : '';
         $maHang = trim((string) $request->input('ma_hang'));
@@ -193,6 +193,7 @@ class PhieuXuatKhoController extends Controller
                 ->orderBy('ten_size')
                 ->orderBy('ma_size')
                 ->get(),
+            'kenhBans' => $kenhBans,
         ]);
     }
 
@@ -410,9 +411,26 @@ class PhieuXuatKhoController extends Controller
         return $this->redirectToIndex('Cập nhật xuất kho thành công.');
     }
 
-    public function destroy(PhieuXuatKho $phieu_xuat_kho): RedirectResponse
+    public function destroy(Request $request, PhieuXuatKho $phieu_xuat_kho): RedirectResponse
     {
         $xuatKho = $phieu_xuat_kho;
+        $chiTietId = $request->integer('chi_tiet_id');
+
+        if ($chiTietId > 0) {
+            $chiTiet = $xuatKho->chiTiets()->whereKey($chiTietId)->firstOrFail();
+
+            DB::transaction(function () use ($xuatKho, $chiTiet): void {
+                $chiTiet->delete();
+
+                if (! $xuatKho->chiTiets()->exists()) {
+                    $xuatKho->delete();
+                }
+            });
+
+            return redirect()
+                ->route('xuat-kho.index', collect($request->query())->except('chi_tiet_id')->all())
+                ->with('success', 'Xóa dòng xuất kho thành công.');
+        }
 
         DB::transaction(function () use ($xuatKho) {
             $xuatKho->chiTiets()->withTrashed()->get()->each->delete();
@@ -428,24 +446,33 @@ class PhieuXuatKhoController extends Controller
     {
         $ids = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
-            'ids.*' => ['required', 'integer', 'distinct', 'exists:phieu_xuat_kho,id'],
+            'ids.*' => ['required', 'integer', 'distinct', 'exists:phieu_xuat_kho_chi_tiet,id'],
         ], [
-            'ids.required' => 'Vui lòng chọn ít nhất một phiếu xuất kho để xóa.',
-            'ids.min' => 'Vui lòng chọn ít nhất một phiếu xuất kho để xóa.',
+            'ids.required' => 'Vui lòng chọn ít nhất một dòng xuất kho để xóa.',
+            'ids.min' => 'Vui lòng chọn ít nhất một dòng xuất kho để xóa.',
         ])['ids'];
 
-        $phieuXuatKhos = PhieuXuatKho::query()->whereIn('id', $ids)->get();
+        $chiTiets = PhieuXuatKhoChiTiet::query()
+            ->whereIn('id', $ids)
+            ->get();
+        $phieuIds = $chiTiets->pluck('phieu_xuat_kho_id')->unique()->values();
 
-        DB::transaction(function () use ($phieuXuatKhos): void {
-            $phieuXuatKhos->each(function (PhieuXuatKho $phieuXuatKho): void {
-                $phieuXuatKho->chiTiets()->withTrashed()->get()->each->delete();
-                $phieuXuatKho->delete();
-            });
+        DB::transaction(function () use ($chiTiets, $phieuIds): void {
+            $chiTiets->each->delete();
+
+            PhieuXuatKho::query()
+                ->whereIn('id', $phieuIds)
+                ->get()
+                ->each(function (PhieuXuatKho $phieuXuatKho): void {
+                    if (! $phieuXuatKho->chiTiets()->exists()) {
+                        $phieuXuatKho->delete();
+                    }
+                });
         });
 
         return redirect()
             ->route('xuat-kho.index', $request->query())
-            ->with('success', 'Đã xóa '.$phieuXuatKhos->count().' phiếu xuất kho.');
+            ->with('success', 'Đã xóa '.$chiTiets->count().' dòng xuất kho.');
     }
 
     private function formOptions(
@@ -490,6 +517,7 @@ class PhieuXuatKhoController extends Controller
                 })
                 ->filter()
                 ->values(),
+            'kenhBans' => DmKenhBan::activeNames(),
         ];
     }
 
@@ -532,7 +560,7 @@ class PhieuXuatKhoController extends Controller
             'product_name' => $nhapKho->source_product_name ?? '',
             'color' => $nhapKho->source_color ?? '',
             'size' => $nhapKho->source_size ?? '',
-            'kenh_ban' => in_array($nhapKho->source_kenh_ban ?? '', self::KENH_BAN_OPTIONS, true) ? $nhapKho->source_kenh_ban : '',
+            'kenh_ban' => DmKenhBan::activeNames()->contains($nhapKho->source_kenh_ban ?? '') ? $nhapKho->source_kenh_ban : '',
             'imported' => (string) $nhapKho->source_total_imported,
             'exported' => (string) $nhapKho->source_total_exported,
             'remaining' => (string) $nhapKho->source_total_remaining,
@@ -766,7 +794,7 @@ class PhieuXuatKhoController extends Controller
                 $representativeNhapKho->setAttribute('source_color', $representativeNhapKho->qc?->phanBoMay?->cat?->mau?->ten_mau ?? $representativeNhapKho->qc?->mau?->ten_mau);
                 $representativeNhapKho->setAttribute('source_size', $representativeNhapKho->qc?->phanBoMay?->cat?->size?->ten_size ?? $representativeNhapKho->qc?->size?->ten_size);
                 $sourceKenhBan = $donHangChiTiet?->donHang?->kenh_ban;
-                $representativeNhapKho->setAttribute('source_kenh_ban', in_array($sourceKenhBan, self::KENH_BAN_OPTIONS, true) ? $sourceKenhBan : null);
+                $representativeNhapKho->setAttribute('source_kenh_ban', DmKenhBan::activeNames()->contains($sourceKenhBan) ? $sourceKenhBan : null);
                 $representativeNhapKho->setAttribute('source_total_imported', max(0, $totalNhap));
                 $representativeNhapKho->setAttribute('source_total_exported', max(0, $totalXuat));
                 $representativeNhapKho->setAttribute('source_total_remaining', max(0, $totalNhap - $totalXuat));

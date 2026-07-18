@@ -136,9 +136,9 @@
             <span class="input-group-text"><i class="icon-base bx bx-store"></i></span>
             <select class="form-select" id="kenh_ban" name="kenh_ban">
               <option value="">Tất cả</option>
-              <option value="Tiktok" @selected($filters['kenh_ban'] === 'Tiktok')>Tiktok</option>
-              <option value="Shopee" @selected($filters['kenh_ban'] === 'Shopee')>Shopee</option>
-              <option value="Bán sỉ" @selected($filters['kenh_ban'] === 'Bán sỉ')>Bán sỉ</option>
+              @foreach($kenhBans as $kenhBan)
+                <option value="{{ $kenhBan }}" @selected($filters['kenh_ban'] === $kenhBan)>{{ $kenhBan }}</option>
+              @endforeach
             </select>
           </div>
         </div>
@@ -188,7 +188,7 @@
               @if (hasPermission('XUAT_KHO_DELETE'))
                 <td class="bulk-select-cell js-bulk-column d-none">
                   <input class="form-check-input js-bulk-item" type="checkbox"
-                    value="{{ $chiTiet->phieu_xuat_kho_id }}" aria-label="Chọn phiếu xuất {{ $chiTiet->phieu_xuat_kho_id }}">
+                    value="{{ $chiTiet->id }}" aria-label="Chọn dòng xuất {{ $chiTiet->id }}">
                 </td>
               @endif
               <td>{{ $chiTiets->firstItem() + $loop->index }}</td>
@@ -220,8 +220,8 @@
                     </a>
                   @endif
                   @if (hasPermission('XUAT_KHO_DELETE'))
-                    <form action="{{ route('xuat-kho.destroy', ['phieu_xuat_kho' => $chiTiet->phieuXuatKho] + request()->query()) }}" method="POST"
-                      onsubmit="return confirm('Bạn có chắc muốn xóa xuất kho này?');">
+                    <form action="{{ route('xuat-kho.destroy', ['phieu_xuat_kho' => $chiTiet->phieuXuatKho, 'chi_tiet_id' => $chiTiet->id] + request()->query()) }}" method="POST"
+                      onsubmit="return confirm('Bạn có chắc muốn xóa dòng xuất kho này?');">
                       @csrf
                       @method('DELETE')
                       <button type="submit" class="btn btn-sm btn-icon btn-outline-danger" title="Xóa">

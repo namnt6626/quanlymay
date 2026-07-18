@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\dashboard;
 
 use App\Http\Controllers\Controller;
-use App\Models\DonHang;
+use App\Models\DmKenhBan;
 use App\Models\DonHangChiTiet;
 use App\Services\BaoCao\BaoCaoTongHopDonHangService;
 use App\Services\Dashboard\DashboardService;
@@ -107,7 +107,7 @@ class Analytics extends Controller
             'ma_hang' => trim((string) $request->input('online_ma_hang')),
             'mau' => trim((string) $request->input('online_mau')),
             'size' => trim((string) $request->input('online_size')),
-            'kenh_ban' => in_array($request->input('online_kenh_ban'), ['Tiktok', 'Shopee', 'Bán sỉ'], true) ? $request->input('online_kenh_ban') : '',
+            'kenh_ban' => DmKenhBan::activeNames()->contains($request->input('online_kenh_ban')) ? $request->input('online_kenh_ban') : '',
             'per_page' => in_array($request->integer('online_per_page'), paginationPerPageOptions(), true)
                 ? $request->integer('online_per_page')
                 : paginationPerPage(),
@@ -353,8 +353,6 @@ class Analytics extends Controller
 
     private function filterOptions(): array
     {
-        $donHangTable = (new DonHang)->getTable();
-
         return [
             'matHangs' => DB::table('dm_mat_hang')
                 ->whereNull('deleted_at')
@@ -374,13 +372,7 @@ class Analytics extends Controller
                 ->select('id', 'ten_size')
                 ->orderBy('ten_size')
                 ->get(),
-            'kenhBans' => DB::table($donHangTable)
-                ->whereNull('deleted_at')
-                ->whereNotNull('kenh_ban')
-                ->where('kenh_ban', '<>', '')
-                ->distinct()
-                ->orderBy('kenh_ban')
-                ->pluck('kenh_ban'),
+            'kenhBans' => DmKenhBan::activeNames(),
         ];
     }
 }

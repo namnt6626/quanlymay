@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\DonHang\StoreDonHangRequest;
 use App\Http\Requests\DonHang\UpdateDonHangRequest;
 use App\Models\DonHang;
+use App\Models\DmKenhBan;
 use App\Models\MatHang;
 use App\Models\Mau;
 use App\Models\DmSize;
@@ -51,6 +52,7 @@ class DonHangController extends Controller
       'matHangs' => MatHang::query()->orderBy('ten_hang')->get(),
       'maus' => Mau::query()->orderBy('ten_mau')->get(),
       'sizes' => DmSize::query()->orderBy('ten_size')->get(),
+      'kenhBans' => DmKenhBan::activeNames(),
       'detailRows' => [[
         'mat_hang_id' => '',
         'mau_id' => '',
@@ -96,6 +98,7 @@ class DonHangController extends Controller
       'matHangs' => MatHang::query()->orderBy('ten_hang')->get(),
       'maus' => Mau::query()->orderBy('ten_mau')->get(),
       'sizes' => DmSize::query()->orderBy('ten_size')->get(),
+      'kenhBans' => DmKenhBan::activeNames(),
       'detailRows' => $donHang->chiTiets->map(function ($chiTiet): array {
         return [
           'mat_hang_id' => $chiTiet->mat_hang_id,

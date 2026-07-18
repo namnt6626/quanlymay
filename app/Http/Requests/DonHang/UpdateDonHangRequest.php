@@ -3,6 +3,7 @@
 namespace App\Http\Requests\DonHang;
 
 use Illuminate\Foundation\Http\FormRequest;
+use App\Models\DmKenhBan;
 use Illuminate\Validation\Rule;
 
 class UpdateDonHangRequest extends FormRequest
@@ -70,7 +71,7 @@ class UpdateDonHangRequest extends FormRequest
       ],
       'ma_kh' => ['required', 'string', 'max:100'],
       'han_giao' => ['nullable', 'date'],
-      'kenh_ban' => ['nullable', 'in:Tiktok,Shopee,Bán sỉ'],
+      'kenh_ban' => ['nullable', DmKenhBan::activeNameRule()],
       'ghi_chu' => ['nullable', 'string'],
       'chi_tiets' => ['required', 'array', 'min:1'],
       'chi_tiets.*.mat_hang_id' => ['required', Rule::exists('dm_mat_hang', 'id')->whereNull('deleted_at')],
@@ -112,7 +113,7 @@ class UpdateDonHangRequest extends FormRequest
       'ma_kh.string' => 'Mã KH phải là chuỗi ký tự.',
       'ma_kh.max' => 'Mã KH không được vượt quá :max ký tự.',
       'han_giao.date' => 'Hạn giao không hợp lệ.',
-      'kenh_ban.in' => 'Kênh bán không hợp lệ.',
+      'kenh_ban.exists' => 'Kênh bán không hợp lệ.',
       'ghi_chu.string' => 'Ghi chú phải là chuỗi ký tự.',
       'chi_tiets.required' => 'Cần có ít nhất một dòng chi tiết.',
       'chi_tiets.array' => 'Dòng chi tiết không hợp lệ.',

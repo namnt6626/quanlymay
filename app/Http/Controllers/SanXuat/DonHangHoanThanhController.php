@@ -7,6 +7,7 @@ use App\Http\Requests\DonHangHoanThanh\CommitImportRequest;
 use App\Http\Requests\DonHangHoanThanh\PreviewImportRequest;
 use App\Http\Requests\DonHangHoanThanh\StoreDonHangHoanThanhRequest;
 use App\Http\Requests\DonHangHoanThanh\UpdateDonHangHoanThanhRequest;
+use App\Models\DmKenhBan;
 use App\Models\DonHangHoanThanh;
 use App\Models\DonHangHoanThanhChiTiet;
 use App\Services\DonHangHoanThanh\DonHangHoanThanhService;
@@ -31,7 +32,7 @@ class DonHangHoanThanhController extends Controller
             'size' => trim((string) $request->input('size')),
             'tu_ngay' => trim((string) $request->input('tu_ngay')),
             'den_ngay' => trim((string) $request->input('den_ngay')),
-            'kenh_ban' => in_array($request->input('kenh_ban'), ['Tiktok', 'Shopee', 'Bán sỉ'], true) ? $request->input('kenh_ban') : '',
+            'kenh_ban' => DmKenhBan::activeNames()->contains($request->input('kenh_ban')) ? $request->input('kenh_ban') : '',
             'nguon' => in_array($request->input('nguon'), ['excel', 'thu_cong'], true) ? $request->input('nguon') : '',
             'per_page' => paginationPerPage(),
         ];
@@ -66,7 +67,9 @@ class DonHangHoanThanhController extends Controller
 
     public function create(): View
     {
-        return view('content.san-xuat.don-hang-hoan-thanh.create');
+        return view('content.san-xuat.don-hang-hoan-thanh.create', [
+            'kenhBans' => DmKenhBan::activeNames(),
+        ]);
     }
 
     public function store(StoreDonHangHoanThanhRequest $request): RedirectResponse
@@ -78,7 +81,10 @@ class DonHangHoanThanhController extends Controller
     public function edit(DonHangHoanThanh $donHangHoanThanh): View
     {
         $donHangHoanThanh->load('chiTiets');
-        return view('content.san-xuat.don-hang-hoan-thanh.edit', ['order' => $donHangHoanThanh]);
+        return view('content.san-xuat.don-hang-hoan-thanh.edit', [
+            'order' => $donHangHoanThanh,
+            'kenhBans' => DmKenhBan::activeNames(),
+        ]);
     }
 
     public function update(UpdateDonHangHoanThanhRequest $request, DonHangHoanThanh $donHangHoanThanh): RedirectResponse
@@ -114,7 +120,9 @@ class DonHangHoanThanhController extends Controller
 
     public function importForm(): View
     {
-        return view('content.san-xuat.don-hang-hoan-thanh.import');
+        return view('content.san-xuat.don-hang-hoan-thanh.import', [
+            'kenhBans' => DmKenhBan::activeNames(),
+        ]);
     }
 
     public function preview(PreviewImportRequest $request, XlsxReader $reader, PhanLoaiParser $parser): View
@@ -446,6 +454,7 @@ class DonHangHoanThanhController extends Controller
                 ->distinct()
                 ->orderBy('size')
                 ->pluck('size'),
+            'kenhBans' => DmKenhBan::activeNames(),
         ];
     }
 }

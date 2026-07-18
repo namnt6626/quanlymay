@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\XuatKho;
 
+use App\Models\DmKenhBan;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -40,7 +41,7 @@ class StoreXuatKhoRequest extends FormRequest
                 Rule::unique('phieu_xuat_kho', 'so_phieu')->whereNull('deleted_at'),
             ],
             'ngay_xuat' => ['required', 'date'],
-            'kenh_ban' => ['required', 'in:Tiktok,Shopee,Bán sỉ'],
+            'kenh_ban' => ['required', DmKenhBan::activeNameRule()],
             'items' => ['required', 'array'],
             'items.*.nhap_kho_id' => [
                 'required',
@@ -76,7 +77,7 @@ class StoreXuatKhoRequest extends FormRequest
             'ngay_xuat.required' => 'Ngày xuất là bắt buộc.',
             'ngay_xuat.date' => 'Ngày xuất không đúng định dạng ngày.',
             'kenh_ban.required' => 'Kênh bán là bắt buộc.',
-            'kenh_ban.in' => 'Kênh bán không hợp lệ.',
+            'kenh_ban.exists' => 'Kênh bán không hợp lệ.',
             'items.required' => 'Vui lòng chọn ít nhất một nguồn hàng để xuất.',
             'items.array' => 'Danh sách nguồn xuất không hợp lệ.',
             'items.*.nhap_kho_id.required' => 'Nguồn xuất là bắt buộc.',

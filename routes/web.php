@@ -17,6 +17,7 @@ use App\Http\Controllers\authentications\RegisterBasic;
 use App\Http\Controllers\authentications\ForgotPasswordBasic;
 use App\Http\Controllers\BaoCao\BaoCaoTongHopDonHangController;
 use App\Http\Controllers\BaoCao\BaoCaoBanHangOnlineController;
+use App\Http\Controllers\DanhMuc\KenhBanController;
 use App\Http\Controllers\DanhMuc\MatHangController;
 use App\Http\Controllers\DanhMuc\MauController;
 use App\Http\Controllers\DanhMuc\SizeController;
@@ -100,6 +101,12 @@ $registerCrudRoutes('mau', MauController::class, 'mau', [
   'delete' => 'DANH_MUC_DELETE',
 ]);
 $registerCrudRoutes('size', SizeController::class, 'size', [
+  'view' => 'DANH_MUC_VIEW',
+  'create' => 'DANH_MUC_CREATE',
+  'edit' => 'DANH_MUC_EDIT',
+  'delete' => 'DANH_MUC_DELETE',
+]);
+$registerCrudRoutes('kenh-ban', KenhBanController::class, 'kenh_ban', [
   'view' => 'DANH_MUC_VIEW',
   'create' => 'DANH_MUC_CREATE',
   'edit' => 'DANH_MUC_EDIT',

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\DonHangHoanThanh;
 
+use App\Models\DmKenhBan;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CommitImportRequest extends FormRequest
@@ -36,7 +37,7 @@ class CommitImportRequest extends FormRequest
             'rows.*.ngay_hoan_thanh' => ['required', 'date'],
             'rows.*.thoi_gian_tao_goc' => ['nullable', 'date'],
             'rows.*.ten_san_pham' => ['required', 'string', 'max:500'],
-            'rows.*.kenh_ban' => ['required', 'in:Tiktok,Shopee,Bán sỉ'],
+            'rows.*.kenh_ban' => ['required', DmKenhBan::activeNameRule()],
             'rows.*.phan_loai_goc' => ['nullable', 'string', 'max:500'],
             'rows.*.mau' => ['nullable', 'string', 'max:255'],
             'rows.*.size' => ['nullable', 'string', 'max:100'],

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\DonHangHoanThanh;
 
+use App\Models\DmKenhBan;
 use Illuminate\Foundation\Http\FormRequest;
 
 class PreviewImportRequest extends FormRequest
@@ -12,7 +13,7 @@ class PreviewImportRequest extends FormRequest
     {
         return [
             'file_excel' => ['required', 'file', 'mimes:xlsx', 'max:10240'],
-            'kenh_ban' => ['required', 'in:Tiktok,Shopee,Bán sỉ'],
+            'kenh_ban' => ['required', DmKenhBan::activeNameRule()],
         ];
     }
 }

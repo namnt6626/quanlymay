@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Cat;
 use App\Models\DmBanCat;
 use App\Models\DmDonViCat;
+use App\Models\DmKenhBan;
 use App\Models\DmDonViMay;
 use App\Models\DmSize;
 use App\Models\DonHang;
@@ -20,6 +21,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class DemoBusinessSeeder extends Seeder
 {
@@ -31,6 +33,7 @@ class DemoBusinessSeeder extends Seeder
         $maus = $this->seedMaus();
         $sizes = $this->seedSizes();
         $banCats = $this->seedBanCats();
+        $this->seedKenhBans();
         $donViCats = $this->seedDonViCats();
         $donViMays = $this->seedDonViMays();
 
@@ -58,6 +61,7 @@ class DemoBusinessSeeder extends Seeder
             (new DmDonViMay)->getTable(),
             (new DmDonViCat)->getTable(),
             (new DmBanCat)->getTable(),
+            (new DmKenhBan)->getTable(),
             (new DmSize)->getTable(),
             (new Mau)->getTable(),
             (new MatHang)->getTable(),
@@ -117,6 +121,24 @@ class DemoBusinessSeeder extends Seeder
             ['ma_ban' => 'BC002', 'ten_ban' => 'Bàn cắt 2'],
             ['ma_ban' => 'BC003', 'ten_ban' => 'Bàn cắt 3'],
         ])->map(fn (array $data) => DmBanCat::create([...$data, 'trang_thai' => true]))->all();
+    }
+
+    private function seedKenhBans(): array
+    {
+        return collect(['Tiktok', 'Shopee', 'Bán sỉ', 'Online', 'TikTok Shop', 'Đại lý', 'Bán buôn'])
+            ->unique()
+            ->mapWithKeys(function (string $tenKenh, int $index): array {
+                $maKenh = trim((string) preg_replace('/[^A-Z0-9]+/', '_', strtoupper(Str::ascii($tenKenh))), '_');
+
+                return [
+                    $tenKenh => DmKenhBan::create([
+                        'ma_kenh' => $maKenh !== '' ? $maKenh : 'KENH_'.($index + 1),
+                        'ten_kenh' => $tenKenh,
+                        'trang_thai' => true,
+                    ]),
+                ];
+            })
+            ->all();
     }
 
     private function seedDonViCats(): array

@@ -113,7 +113,7 @@
       <div class="col-6 col-lg-2 col-xl-2"><label class="form-label">Size</label><select class="form-select" name="size"><option value="">Tất cả</option>@foreach($filterOptions['sizes'] as $size)<option value="{{ $size }}" @selected($filters['size'] === $size)>{{ $size }}</option>@endforeach</select></div>
       <div class="col-6 col-lg-2 col-xl-2"><label class="form-label">Từ ngày</label><input type="date" class="form-control" name="tu_ngay" value="{{ $filters['tu_ngay'] }}"></div>
       <div class="col-6 col-lg-2 col-xl-2"><label class="form-label">Đến ngày</label><input type="date" class="form-control" name="den_ngay" value="{{ $filters['den_ngay'] }}"></div>
-      <div class="col-6 col-lg-3 col-xl-3"><label class="form-label">Kênh bán</label><select class="form-select" name="kenh_ban"><option value="">Tất cả</option><option value="Tiktok" @selected($filters['kenh_ban']==='Tiktok')>Tiktok</option><option value="Shopee" @selected($filters['kenh_ban']==='Shopee')>Shopee</option><option value="Bán sỉ" @selected($filters['kenh_ban']==='Bán sỉ')>Bán sỉ</option></select></div>
+      <div class="col-6 col-lg-3 col-xl-3"><label class="form-label">Kênh bán</label><select class="form-select" name="kenh_ban"><option value="">Tất cả</option>@foreach($filterOptions['kenhBans'] as $kenhBan)<option value="{{ $kenhBan }}" @selected($filters['kenh_ban'] === $kenhBan)>{{ $kenhBan }}</option>@endforeach</select></div>
       <div class="col-6 col-lg-3 col-xl-3"><label class="form-label">Nguồn</label><select class="form-select" name="nguon"><option value="">Tất cả</option><option value="excel" @selected($filters['nguon']==='excel')>Excel</option><option value="thu_cong" @selected($filters['nguon']==='thu_cong')>Thủ công</option></select></div>
       <div class="col-6 col-lg-2 col-xl-2">@include('content.shared._per-page-select', ['perPageColumnClass' => ''])</div>
       <div class="col-12 col-lg-4 col-xl-4 d-flex gap-2"><button class="btn btn-primary flex-fill"><i class="icon-base bx bx-search me-1"></i>Tìm</button><a href="{{ route('don-hang-hoan-thanh.index') }}" class="btn btn-outline-secondary flex-fill">Mới</a></div>
@@ -143,7 +143,7 @@
             @if($loop->first)
               <td class="text-end fw-semibold completed-number" rowspan="{{ $rowspan }}">{{ number_format((float)$order->tong_so_luong, 0, ',', '.') }}</td>
               <td class="text-end fw-semibold completed-number" rowspan="{{ $rowspan }}">{{ number_format((float)$order->tong_thanh_tien, 0, ',', '.') }} ₫</td>
-              <td class="completed-channel" rowspan="{{ $rowspan }}"><span class="badge {{ $order->kenh_ban === 'Shopee' ? 'bg-label-warning' : ($order->kenh_ban === 'Bán sỉ' ? 'bg-label-success' : 'bg-label-info') }}">{{ in_array($order->kenh_ban, ['Tiktok', 'Shopee', 'Bán sỉ'], true) ? $order->kenh_ban : '-' }}</span></td>
+              <td class="completed-channel" rowspan="{{ $rowspan }}"><span class="badge {{ $order->kenh_ban === 'Shopee' ? 'bg-label-warning' : ($order->kenh_ban === 'Bán sỉ' ? 'bg-label-success' : 'bg-label-info') }}">{{ $order->kenh_ban ?: '-' }}</span></td>
               <td class="completed-source" rowspan="{{ $rowspan }}">@foreach($order->chiTiets->pluck('nguon')->unique() as $source)<span class="badge {{ $source === 'excel' ? 'bg-label-success' : 'bg-label-primary' }}">{{ $source === 'excel' ? 'Excel' : 'Thủ công' }}</span>@endforeach</td>
               <td class="completed-actions" rowspan="{{ $rowspan }}"><div class="d-flex gap-2">
                 @if(hasPermission('DON_HANG_HOAN_THANH_EDIT'))<a class="btn btn-sm btn-icon btn-outline-primary" href="{{ route('don-hang-hoan-thanh.edit', $order) }}"><i class="icon-base bx bx-edit"></i></a>@endif
@@ -160,7 +160,7 @@
             <td class="completed-variant-value">-</td><td class="completed-variant-value">-</td><td class="text-end completed-number">0</td><td class="text-end completed-number">0 ₫</td>
             <td class="text-end fw-semibold completed-number">{{ number_format((float)$order->tong_so_luong, 0, ',', '.') }}</td>
             <td class="text-end fw-semibold completed-number">{{ number_format((float)$order->tong_thanh_tien, 0, ',', '.') }} ₫</td>
-            <td class="completed-channel"><span class="badge {{ $order->kenh_ban === 'Shopee' ? 'bg-label-warning' : ($order->kenh_ban === 'Bán sỉ' ? 'bg-label-success' : 'bg-label-info') }}">{{ in_array($order->kenh_ban, ['Tiktok', 'Shopee', 'Bán sỉ'], true) ? $order->kenh_ban : '-' }}</span></td>
+            <td class="completed-channel"><span class="badge {{ $order->kenh_ban === 'Shopee' ? 'bg-label-warning' : ($order->kenh_ban === 'Bán sỉ' ? 'bg-label-success' : 'bg-label-info') }}">{{ $order->kenh_ban ?: '-' }}</span></td>
             <td class="completed-source">-</td>
             <td class="completed-actions"><div class="d-flex gap-2">
               @if(hasPermission('DON_HANG_HOAN_THANH_EDIT'))<a class="btn btn-sm btn-icon btn-outline-primary" href="{{ route('don-hang-hoan-thanh.edit', $order) }}"><i class="icon-base bx bx-edit"></i></a>@endif

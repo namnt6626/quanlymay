@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\DonHangHoanThanh;
 
+use App\Models\DmKenhBan;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreDonHangHoanThanhRequest extends FormRequest
@@ -18,7 +19,7 @@ class StoreDonHangHoanThanhRequest extends FormRequest
         })->all();
         $this->merge([
             'chi_tiets' => $details,
-            'kenh_ban' => $this->input('kenh_ban') ?: 'Tiktok',
+            'kenh_ban' => $this->input('kenh_ban') ?: DmKenhBan::activeNames()->first(),
             'ten_kho' => null,
         ]);
     }
@@ -29,7 +30,7 @@ class StoreDonHangHoanThanhRequest extends FormRequest
             'ngay_hoan_thanh' => ['required', 'date'],
             'ten_san_pham' => ['required', 'string', 'max:500'],
             'ten_kho' => ['nullable'],
-            'kenh_ban' => ['required', 'in:Tiktok,Shopee,Bán sỉ'],
+            'kenh_ban' => ['required', DmKenhBan::activeNameRule()],
             'ghi_chu' => ['nullable', 'string'],
             'chi_tiets' => ['required', 'array', 'min:1'],
             'chi_tiets.*.mau' => ['nullable', 'string', 'max:255'],

@@ -47,6 +47,7 @@
       const exportedText = document.getElementById('xuat-exported-text');
       const remainingText = document.getElementById('xuat-remaining-text');
       const defaultChannelText = document.getElementById('xuat-default-channel-text');
+      const activeKenhBans = @json($kenhBans->values());
 
       function normalizeNumber(value) {
         let text = String(value || '').trim();
@@ -149,7 +150,7 @@
         if (remainingText) remainingText.textContent = remaining ? formatDisplayNumber(remaining) + ' sản phẩm' : '-';
         if (defaultChannelText) defaultChannelText.textContent = kenhBan || '-';
 
-        if (kenhBanInput && ['Tiktok', 'Shopee', 'Bán sỉ'].includes(kenhBan)) {
+        if (kenhBanInput && activeKenhBans.includes(kenhBan)) {
           kenhBanInput.value = kenhBan;
         }
       }
@@ -358,13 +359,13 @@
               <div class="col-12 col-md-6 col-xl-3">
                 <label class="form-label" for="kenh_ban">Kênh bán <span class="text-danger">*</span></label>
                 @php
-                  $selectedChannel = old('kenh_ban', in_array($phieuXuatKho->kenh_ban ?? '', ['Tiktok', 'Shopee', 'Bán sỉ'], true) ? $phieuXuatKho->kenh_ban : 'Tiktok');
+                  $selectedChannel = old('kenh_ban', $phieuXuatKho->kenh_ban ?? $kenhBans->first());
                 @endphp
                 <select class="form-select @error('kenh_ban') is-invalid @enderror" id="kenh_ban" name="kenh_ban" required>
                   <option value="">-- Chọn kênh bán --</option>
-                  <option value="Tiktok" @selected($selectedChannel === 'Tiktok')>Tiktok</option>
-                  <option value="Shopee" @selected($selectedChannel === 'Shopee')>Shopee</option>
-                  <option value="Bán sỉ" @selected($selectedChannel === 'Bán sỉ')>Bán sỉ</option>
+                  @foreach($kenhBans as $kenhBan)
+                    <option value="{{ $kenhBan }}" @selected($selectedChannel === $kenhBan)>{{ $kenhBan }}</option>
+                  @endforeach
                 </select>
                 @error('kenh_ban')
                   <div class="invalid-feedback">{{ $message }}</div>

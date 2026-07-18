@@ -13,6 +13,7 @@
         "mat-hang",
         "mau",
         "size",
+        "kenh-ban",
         "don-vi-cat",
         "don-vi-may",
         "kho"
@@ -32,6 +33,11 @@
           "url": "size",
           "name": "Size",
           "slug": "size.index"
+        },
+        {
+          "url": "kenh-ban",
+          "name": "Kênh bán",
+          "slug": "kenh-ban.index"
         },
         {
           "url": "don-vi-cat",

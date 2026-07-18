@@ -846,9 +846,9 @@
             <label class="form-label" for="online_kenh_ban">Kênh bán</label>
             <select class="form-select" id="online_kenh_ban" name="online_kenh_ban">
               <option value="">Tất cả</option>
-              <option value="Tiktok" @selected(($onlineFilters['kenh_ban'] ?? '') === 'Tiktok')>Tiktok</option>
-              <option value="Shopee" @selected(($onlineFilters['kenh_ban'] ?? '') === 'Shopee')>Shopee</option>
-              <option value="Bán sỉ" @selected(($onlineFilters['kenh_ban'] ?? '') === 'Bán sỉ')>Bán sỉ</option>
+              @foreach ($kenhBans as $kenhBan)
+                <option value="{{ $kenhBan }}" @selected(($onlineFilters['kenh_ban'] ?? '') === $kenhBan)>{{ $kenhBan }}</option>
+              @endforeach
             </select>
           </div>
           <div>
