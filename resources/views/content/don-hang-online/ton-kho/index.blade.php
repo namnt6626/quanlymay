@@ -152,15 +152,14 @@
               @forelse ($filterOptions['sourceProducts'] as $product)
                 @php
                   $checkedProducts = collect(old('products', []));
-                  $currentGroup = $productGroups->first(fn ($items) => $items->contains('original_name', $product));
-                  $currentGroupName = $currentGroup ? $currentGroup->first()->group_name : '';
+                  $currentGroupName = $productAliasGroupNames->get($product, '');
                 @endphp
                 <label class="online-product-group-item mb-0 {{ $currentGroupName !== '' ? 'd-none' : '' }}" data-alias-item data-current-group="{{ $currentGroupName }}">
                   <input class="form-check-input" type="checkbox" name="products[]" value="{{ $product }}" data-alias-checkbox @checked($checkedProducts->contains($product))>
                   <span class="online-product-group-item-name">
                     <span class="fw-semibold">{{ $product }}</span>
-                    @if ($currentGroup)
-                      <span class="text-muted small d-block">Đang thuộc nhóm: {{ $currentGroup->first()->group_name }}</span>
+                    @if ($currentGroupName !== '')
+                      <span class="text-muted small d-block">Đang thuộc nhóm: {{ $currentGroupName }}</span>
                     @endif
                   </span>
                 </label>
@@ -233,15 +232,14 @@
               @forelse ($filterOptions['sourceColors'] as $color)
                 @php
                   $checkedColors = collect(old('colors', []));
-                  $currentGroup = $colorGroups->first(fn ($items) => $items->contains('original_name', $color));
-                  $currentGroupName = $currentGroup ? $currentGroup->first()->group_name : '';
+                  $currentGroupName = $colorAliasGroupNames->get($color, '');
                 @endphp
                 <label class="online-product-group-item mb-0 {{ $currentGroupName !== '' ? 'd-none' : '' }}" data-alias-item data-current-group="{{ $currentGroupName }}">
                   <input class="form-check-input" type="checkbox" name="colors[]" value="{{ $color }}" data-alias-checkbox @checked($checkedColors->contains($color))>
                   <span class="online-product-group-item-name">
                     <span class="fw-semibold">{{ $color }}</span>
-                    @if ($currentGroup)
-                      <span class="text-muted small d-block">Đang thuộc nhóm: {{ $currentGroup->first()->group_name }}</span>
+                    @if ($currentGroupName !== '')
+                      <span class="text-muted small d-block">Đang thuộc nhóm: {{ $currentGroupName }}</span>
                     @endif
                   </span>
                 </label>
@@ -301,6 +299,17 @@
       const items = Array.from(modal.querySelectorAll('[data-alias-item]'));
       const checkboxes = Array.from(modal.querySelectorAll('[data-alias-checkbox]'));
 
+      function normalizeAliasText(value) {
+        return String(value || '')
+          .trim()
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/đ/g, 'd')
+          .replace(/[^a-z0-9]+/g, ' ')
+          .trim();
+      }
+
       function resetForm() {
         editingInput.value = '';
         groupNameInput.value = '';
@@ -313,7 +322,7 @@
       }
 
       function editGroup(groupName, values) {
-        const valueSet = new Set(values);
+        const valueSet = new Set(values.map(normalizeAliasText));
         editingInput.value = groupName;
         groupNameInput.value = groupName;
         editingText.textContent = groupName;
@@ -325,7 +334,7 @@
         });
 
         checkboxes.forEach((checkbox) => {
-          checkbox.checked = valueSet.has(checkbox.value);
+          checkbox.checked = valueSet.has(normalizeAliasText(checkbox.value));
         });
 
         groupNameInput.focus();

@@ -35,13 +35,23 @@ class TonKhoOnlineController extends Controller
             ->groupBy('don_hang_hoan_thanh.ten_san_pham', DB::raw("COALESCE(don_hang_hoan_thanh_chi_tiet.mau, '')"), DB::raw("COALESCE(don_hang_hoan_thanh_chi_tiet.size, '')"))
             ->get();
 
-        $productAliases = OnlineProductAlias::query()->pluck('group_name', 'original_name');
-        $colorAliases = OnlineColorAlias::query()->pluck('group_name', 'original_name');
+        $productAliasRows = OnlineProductAlias::query()->get(['original_name', 'group_name']);
+        $colorAliasRows = OnlineColorAlias::query()->get(['original_name', 'group_name']);
+        $productAliases = $this->aliasLookup($productAliasRows);
+        $colorAliases = $this->aliasLookup($colorAliasRows);
 
         $rows = $this->mergeRows($this->normalizeStockRows($imports, 'import', $productAliases, $colorAliases), $this->normalizeStockRows($exports, 'export', $productAliases, $colorAliases))
             ->filter(function (array $row) use ($filters): bool {
-                if ($filters['ten_san_pham'] !== '' && ! str_contains($this->normalizeText($row['ten_san_pham']), $this->normalizeText($filters['ten_san_pham']))) {
-                    return false;
+                if ($filters['ten_san_pham'] !== '') {
+                    $productName = (string) $row['ten_san_pham'];
+                    $keyword = $filters['ten_san_pham'];
+
+                    if (
+                        ! str_contains($this->normalizeText($productName), $this->normalizeText($keyword))
+                        && ! str_contains($this->normalizeCompactText($productName), $this->normalizeCompactText($keyword))
+                    ) {
+                        return false;
+                    }
                 }
                 if ($filters['mau'] !== '' && $this->normalizeText((string) $row['mau']) !== $this->normalizeText($filters['mau'])) {
                     return false;
@@ -64,6 +74,8 @@ class TonKhoOnlineController extends Controller
         ];
 
         $filterOptions = $this->filterOptions();
+        $productAliasGroupNames = $this->matchedAliasGroupNames($filterOptions['sourceProducts'], $productAliases);
+        $colorAliasGroupNames = $this->matchedAliasGroupNames($filterOptions['sourceColors'], $colorAliases);
 
         $productGroups = OnlineProductAlias::query()
             ->orderBy('group_name')
@@ -77,7 +89,7 @@ class TonKhoOnlineController extends Controller
             ->get()
             ->groupBy('group_name');
 
-        return view('content.don-hang-online.ton-kho.index', compact('rows', 'filters', 'totals', 'filterOptions', 'productGroups', 'colorGroups'));
+        return view('content.don-hang-online.ton-kho.index', compact('rows', 'filters', 'totals', 'filterOptions', 'productGroups', 'colorGroups', 'productAliasGroupNames', 'colorAliasGroupNames'));
     }
 
     public function storeProductGroup(Request $request): RedirectResponse
@@ -111,7 +123,7 @@ class TonKhoOnlineController extends Controller
         foreach ($products as $product) {
             OnlineProductAlias::query()->updateOrCreate(
                 ['original_name' => $product],
-                ['group_name' => $groupName]
+                ['original_name' => $product, 'group_name' => $groupName]
             );
         }
 
@@ -164,7 +176,7 @@ class TonKhoOnlineController extends Controller
         foreach ($colors as $color) {
             OnlineColorAlias::query()->updateOrCreate(
                 ['original_name' => $color],
-                ['group_name' => $groupName]
+                ['original_name' => $color, 'group_name' => $groupName]
             );
         }
 
@@ -213,8 +225,8 @@ class TonKhoOnlineController extends Controller
     private function normalizeStockRows(Collection $rows, string $type, Collection $productAliases, Collection $colorAliases): Collection
     {
         return $rows->reduce(function (Collection $carry, object $row) use ($type, $productAliases, $colorAliases): Collection {
-            $productName = $productAliases->get($row->ten_san_pham, $row->ten_san_pham);
-            $colorName = $colorAliases->get($row->mau_key, $row->mau_key);
+            $productName = $this->aliasName($productAliases, (string) $row->ten_san_pham);
+            $colorName = $this->aliasName($colorAliases, (string) $row->mau_key);
             $key = $this->key($productName, $colorName, $row->size_key);
             $current = $carry->get($key);
 
@@ -249,6 +261,39 @@ class TonKhoOnlineController extends Controller
         return $this->normalizeText($product).'|'.$this->normalizeText((string) $color).'|'.$this->normalizeSize((string) $size);
     }
 
+    private function aliasLookup(Collection $aliases): Collection
+    {
+        return $aliases->reduce(function (Collection $carry, object $alias): Collection {
+            $original = trim((string) $alias->original_name);
+            $group = trim((string) $alias->group_name);
+
+            if ($original !== '' && $group !== '') {
+                $carry->put($original, $group);
+                $carry->put($this->normalizeText($original), $group);
+            }
+
+            return $carry;
+        }, collect());
+    }
+
+    private function aliasName(Collection $aliases, string $value): string
+    {
+        $value = trim($value);
+
+        return $aliases->get($value)
+            ?? $aliases->get($this->normalizeText($value))
+            ?? $value;
+    }
+
+    private function matchedAliasGroupNames(Collection $values, Collection $aliases): Collection
+    {
+        return $values->mapWithKeys(function (string $value) use ($aliases): array {
+            $group = $this->aliasName($aliases, $value);
+
+            return [$value => $group !== trim($value) ? $group : ''];
+        });
+    }
+
     private function normalizeText(string $value): string
     {
         $value = mb_strtolower(trim($value));
@@ -266,6 +311,11 @@ class TonKhoOnlineController extends Controller
     }
 
     private function normalizeSize(string $value): string
+    {
+        return $this->normalizeCompactText($value);
+    }
+
+    private function normalizeCompactText(string $value): string
     {
         return preg_replace('/[^a-z0-9]+/', '', $this->normalizeText($value)) ?? '';
     }
