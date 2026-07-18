@@ -4,9 +4,9 @@ namespace App\Http\Controllers\DonHangOnline;
 
 use App\Http\Controllers\Controller;
 use App\Models\DonHangHoanThanhChiTiet;
+use App\Models\NhapHangOnlineChiTiet;
 use App\Models\OnlineColorAlias;
 use App\Models\OnlineProductAlias;
-use App\Models\PhieuXuatKhoChiTiet;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -23,7 +23,10 @@ class TonKhoOnlineController extends Controller
             'size' => trim((string) $request->input('size')),
         ];
 
-        $imports = $this->xuatKhoStockRows();
+        $imports = NhapHangOnlineChiTiet::query()
+            ->selectRaw("ten_san_pham, COALESCE(mau, '') as mau_key, COALESCE(size, '') as size_key, SUM(so_luong) as so_luong_nhap, SUM(thanh_tien) as tien_nhap")
+            ->groupBy('ten_san_pham', DB::raw("COALESCE(mau, '')"), DB::raw("COALESCE(size, '')"))
+            ->get();
 
         $exports = DonHangHoanThanhChiTiet::query()
             ->join('don_hang_hoan_thanh', 'don_hang_hoan_thanh.id', '=', 'don_hang_hoan_thanh_chi_tiet.don_hang_hoan_thanh_id')
@@ -183,102 +186,6 @@ class TonKhoOnlineController extends Controller
             ->with('success', 'Đã bỏ gộp màu "'.$data['group_name'].'".');
     }
 
-    private function xuatKhoStockRows(): Collection
-    {
-        return PhieuXuatKhoChiTiet::query()
-            ->whereHas('phieuXuatKho')
-            ->with([
-                'nhapKho.qc.phanBoMay.cat.matHang',
-                'nhapKho.qc.phanBoMay.cat.mau',
-                'nhapKho.qc.phanBoMay.cat.size',
-                'nhapKho.qc.matHang',
-                'nhapKho.qc.mau',
-                'nhapKho.qc.size',
-                'nhapKho.donHangChiTiet.matHang',
-                'nhapKho.donHangChiTiet.mau',
-                'nhapKho.donHangChiTiet.size',
-                'donHangChiTiet.matHang',
-                'donHangChiTiet.mau',
-                'donHangChiTiet.size',
-            ])
-            ->get()
-            ->reduce(function (Collection $carry, PhieuXuatKhoChiTiet $chiTiet): Collection {
-                $productName = $this->productNameFromXuatKho($chiTiet);
-
-                if ($productName === '') {
-                    return $carry;
-                }
-
-                $color = $this->colorNameFromXuatKho($chiTiet);
-                $size = $this->sizeNameFromXuatKho($chiTiet);
-                $key = $productName.'|'.$color.'|'.$size;
-                $current = $carry->get($key);
-
-                if (! $current) {
-                    $current = (object) [
-                        'ten_san_pham' => $productName,
-                        'mau_key' => $color,
-                        'size_key' => $size,
-                        'so_luong_nhap' => 0,
-                        'tien_nhap' => 0,
-                    ];
-                }
-
-                $current->so_luong_nhap += (float) $chiTiet->so_luong_xuat;
-                $current->tien_nhap += (float) $chiTiet->thanh_tien;
-                $carry->put($key, $current);
-
-                return $carry;
-            }, collect());
-    }
-
-    private function productNameFromXuatKho(PhieuXuatKhoChiTiet $chiTiet): string
-    {
-        $code = trim((string) (
-            $chiTiet->donHangChiTiet?->matHang?->ma_hang
-            ?? $chiTiet->nhapKho?->donHangChiTiet?->matHang?->ma_hang
-            ?? $chiTiet->nhapKho?->qc?->phanBoMay?->cat?->matHang?->ma_hang
-            ?? $chiTiet->nhapKho?->qc?->matHang?->ma_hang
-            ?? ''
-        ));
-
-        $name = trim((string) (
-            $chiTiet->donHangChiTiet?->matHang?->ten_hang
-            ?? $chiTiet->nhapKho?->donHangChiTiet?->matHang?->ten_hang
-            ?? $chiTiet->nhapKho?->qc?->phanBoMay?->cat?->matHang?->ten_hang
-            ?? $chiTiet->nhapKho?->qc?->matHang?->ten_hang
-            ?? ''
-        ));
-
-        if ($code !== '' && $name !== '') {
-            return $code.' - '.$name;
-        }
-
-        return $code !== '' ? $code : $name;
-    }
-
-    private function colorNameFromXuatKho(PhieuXuatKhoChiTiet $chiTiet): string
-    {
-        return trim((string) (
-            $chiTiet->donHangChiTiet?->mau?->ten_mau
-            ?? $chiTiet->nhapKho?->donHangChiTiet?->mau?->ten_mau
-            ?? $chiTiet->nhapKho?->qc?->phanBoMay?->cat?->mau?->ten_mau
-            ?? $chiTiet->nhapKho?->qc?->mau?->ten_mau
-            ?? ''
-        ));
-    }
-
-    private function sizeNameFromXuatKho(PhieuXuatKhoChiTiet $chiTiet): string
-    {
-        return trim((string) (
-            $chiTiet->donHangChiTiet?->size?->ten_size
-            ?? $chiTiet->nhapKho?->donHangChiTiet?->size?->ten_size
-            ?? $chiTiet->nhapKho?->qc?->phanBoMay?->cat?->size?->ten_size
-            ?? $chiTiet->nhapKho?->qc?->size?->ten_size
-            ?? ''
-        ));
-    }
-
     private function mergeRows(Collection $imports, Collection $exports): Collection
     {
         return $imports->keys()->merge($exports->keys())->unique()->map(function (string $key) use ($imports, $exports): array {
@@ -365,14 +272,13 @@ class TonKhoOnlineController extends Controller
 
     private function filterOptions(): array
     {
-        $importRows = $this->xuatKhoStockRows();
-        $importProducts = $importRows->pluck('ten_san_pham')->filter();
+        $importProducts = NhapHangOnlineChiTiet::query()->whereNotNull('ten_san_pham')->pluck('ten_san_pham');
         $exportProducts = DonHangHoanThanhChiTiet::query()
             ->join('don_hang_hoan_thanh', 'don_hang_hoan_thanh.id', '=', 'don_hang_hoan_thanh_chi_tiet.don_hang_hoan_thanh_id')
             ->whereNull('don_hang_hoan_thanh.deleted_at')
             ->pluck('don_hang_hoan_thanh.ten_san_pham');
 
-        $importColors = $importRows->pluck('mau_key')->filter();
+        $importColors = NhapHangOnlineChiTiet::query()->whereNotNull('mau')->where('mau', '<>', '')->pluck('mau');
         $exportColors = DonHangHoanThanhChiTiet::query()->whereNotNull('mau')->where('mau', '<>', '')->pluck('mau');
         $colorAliases = OnlineColorAlias::query()->pluck('group_name', 'original_name');
         $sourceColors = $importColors->merge($exportColors)->unique()->sort()->values();
@@ -383,16 +289,14 @@ class TonKhoOnlineController extends Controller
             ->sort()
             ->values();
 
-        $importSizes = $importRows->pluck('size_key')->filter();
+        $importSizes = NhapHangOnlineChiTiet::query()->whereNotNull('size')->where('size', '<>', '')->pluck('size');
         $exportSizes = DonHangHoanThanhChiTiet::query()->whereNotNull('size')->where('size', '<>', '')->pluck('size');
 
         return [
             'products' => $importProducts->merge($exportProducts)->merge(OnlineProductAlias::query()->pluck('group_name'))->unique()->sort()->values(),
             'sourceProducts' => $importProducts->merge($exportProducts)->unique()->sort()->values(),
-            'standardProducts' => $importProducts->unique()->sort()->values(),
             'colors' => $displayColors,
             'sourceColors' => $sourceColors,
-            'standardColors' => $importColors->unique()->sort()->values(),
             'sizes' => $importSizes->merge($exportSizes)->unique()->sort()->values(),
         ];
     }

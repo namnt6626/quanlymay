@@ -16,7 +16,6 @@ class UpdateXuatKhoRequest extends FormRequest
     {
         $this->merge([
             'so_luong_xuat' => $this->normalizeNumberInput($this->input('so_luong_xuat')),
-            'don_gia' => $this->normalizeNumberInput($this->input('don_gia')),
         ]);
     }
 
@@ -41,7 +40,6 @@ class UpdateXuatKhoRequest extends FormRequest
                 Rule::exists('nhap_kho', 'id')->whereNull('deleted_at'),
             ],
             'so_luong_xuat' => ['required', 'numeric', 'min:0.0001'],
-            'don_gia' => ['required', 'numeric', 'min:0'],
             'ghi_chu' => ['nullable', 'string'],
         ];
     }
@@ -54,7 +52,6 @@ class UpdateXuatKhoRequest extends FormRequest
             'kenh_ban' => 'Kênh bán',
             'nhap_kho_id' => 'Nguồn nhập kho',
             'so_luong_xuat' => 'Số lượng xuất',
-            'don_gia' => 'Đơn giá',
             'ghi_chu' => 'Ghi chú',
         ];
     }
@@ -76,9 +73,6 @@ class UpdateXuatKhoRequest extends FormRequest
             'so_luong_xuat.required' => 'Số lượng xuất là bắt buộc.',
             'so_luong_xuat.numeric' => 'Số lượng xuất phải là số.',
             'so_luong_xuat.min' => 'Số lượng xuất phải lớn hơn 0.',
-            'don_gia.required' => 'Đơn giá là bắt buộc.',
-            'don_gia.numeric' => 'Đơn giá phải là số.',
-            'don_gia.min' => 'Đơn giá không được âm.',
             'ghi_chu.string' => 'Ghi chú phải là chuỗi ký tự.',
         ];
     }

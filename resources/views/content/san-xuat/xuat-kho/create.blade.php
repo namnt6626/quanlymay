@@ -65,7 +65,7 @@
     }
 
     .xuat-lines-table {
-      min-width: 1380px;
+      min-width: 1180px;
     }
 
     .xuat-lines-table thead th {
@@ -89,12 +89,6 @@
 
     .xuat-qty-input {
       min-width: 110px;
-      text-align: right;
-      width: 100%;
-    }
-
-    .xuat-price-input {
-      min-width: 120px;
       text-align: right;
       width: 100%;
     }
@@ -285,20 +279,6 @@
         return normalizeNumber(value).replace('.', ',');
       }
 
-      function formatMoney(value) {
-        const normalized = normalizeNumber(value);
-
-        if (!normalized) return '0 ₫';
-
-        const number = Number(normalized);
-
-        if (Number.isNaN(number)) return '0 ₫';
-
-        return new Intl.NumberFormat('vi-VN', {
-          maximumFractionDigits: 0,
-        }).format(number) + ' ₫';
-      }
-
       function selectedIds() {
         return selectedRows.map((row) => Number(row.id));
       }
@@ -380,40 +360,7 @@
             selectedRow.quantity = input.value;
           }
 
-          const priceInput = row.querySelector('.js-xuat-price');
-          if (selectedRow && priceInput) {
-            selectedRow.unit_price = priceInput.value;
-          }
         });
-      }
-
-      function updateTotals() {
-        let totalQuantity = 0;
-        let totalMoney = 0;
-
-        selectedRows.forEach((row) => {
-          const quantity = Number(normalizeNumber(row.quantity));
-          const unitPrice = Number(normalizeNumber(row.unit_price));
-
-          if (!Number.isNaN(quantity)) {
-            totalQuantity += quantity;
-          }
-
-          if (!Number.isNaN(quantity) && !Number.isNaN(unitPrice)) {
-            totalMoney += quantity * unitPrice;
-          }
-        });
-
-        const totalQuantityElement = document.getElementById('xuat-total-quantity');
-        const totalMoneyElement = document.getElementById('xuat-total-money');
-
-        if (totalQuantityElement) {
-          totalQuantityElement.textContent = formatDisplayNumber(String(totalQuantity));
-        }
-
-        if (totalMoneyElement) {
-          totalMoneyElement.textContent = formatMoney(String(totalMoney));
-        }
       }
 
       function filteredSources() {
@@ -519,7 +466,6 @@
         selectedRows.push({
           ...source,
           quantity: '',
-          unit_price: '',
         });
 
         if (kenhBanInput && !kenhBanInput.value && ['Tiktok', 'Shopee', 'Bán sỉ'].includes(source.kenh_ban)) {
@@ -543,9 +489,6 @@
         emptyRow.classList.toggle('d-none', selectedRows.length > 0);
 
         selectedRows.forEach((row, index) => {
-          const quantity = Number(normalizeNumber(row.quantity));
-          const unitPrice = Number(normalizeNumber(row.unit_price));
-          const lineTotal = !Number.isNaN(quantity) && !Number.isNaN(unitPrice) ? quantity * unitPrice : 0;
           const tr = document.createElement('tr');
           tr.dataset.sourceRow = '1';
           tr.dataset.sourceId = row.id;
@@ -570,13 +513,6 @@
                 name="items[${index}][so_luong_xuat]"
                 value="${row.quantity ? formatDisplayNumber(row.quantity) : ''}">
             </td>
-            <td class="col-number" data-label="Đơn giá">
-              <input type="text" inputmode="numeric" autocomplete="off"
-                class="form-control xuat-price-input js-xuat-price"
-                name="items[${index}][don_gia]"
-                value="${row.unit_price ? formatDisplayNumber(row.unit_price) : ''}">
-            </td>
-            <td class="text-end col-number fw-semibold js-line-total" data-label="Thành tiền">${formatMoney(String(lineTotal))}</td>
             <td class="text-center xuat-mobile-remove">
               <button type="button" class="btn btn-sm btn-outline-danger" data-remove-source="${row.id}" title="Xóa">
                 <i class="icon-base bx bx-trash me-1"></i> Xóa
@@ -585,8 +521,6 @@
           `;
           linesBody.appendChild(tr);
         });
-
-        updateTotals();
       }
 
       linesBody.addEventListener('click', function(event) {
@@ -596,55 +530,33 @@
       });
 
       linesBody.addEventListener('input', function(event) {
-        if (!event.target.classList.contains('js-xuat-qty') && !event.target.classList.contains('js-xuat-price')) return;
+        if (!event.target.classList.contains('js-xuat-qty')) return;
 
         event.target.value = event.target.value.replace(/[^\d.,]/g, '');
 
         const row = event.target.closest('tr[data-source-row="1"]');
         const selectedRow = selectedRows.find((item) => Number(item.id) === Number(row?.dataset.sourceId));
 
-        if (selectedRow && event.target.classList.contains('js-xuat-qty')) {
+        if (selectedRow) {
           selectedRow.quantity = event.target.value;
         }
-
-        if (selectedRow && event.target.classList.contains('js-xuat-price')) {
-          selectedRow.unit_price = event.target.value;
-        }
-
-        const quantity = Number(normalizeNumber(selectedRow?.quantity));
-        const unitPrice = Number(normalizeNumber(selectedRow?.unit_price));
-        row?.querySelector('.js-line-total')?.replaceChildren(document.createTextNode(formatMoney(String(
-          !Number.isNaN(quantity) && !Number.isNaN(unitPrice) ? quantity * unitPrice : 0
-        ))));
-        updateTotals();
       });
 
       linesBody.addEventListener('focusin', function(event) {
-        if (!event.target.classList.contains('js-xuat-qty') && !event.target.classList.contains('js-xuat-price')) return;
+        if (!event.target.classList.contains('js-xuat-qty')) return;
         event.target.value = formatEditableNumber(event.target.value);
       });
 
       linesBody.addEventListener('focusout', function(event) {
-        if (!event.target.classList.contains('js-xuat-qty') && !event.target.classList.contains('js-xuat-price')) return;
+        if (!event.target.classList.contains('js-xuat-qty')) return;
         event.target.value = formatDisplayNumber(event.target.value);
 
         const row = event.target.closest('tr[data-source-row="1"]');
         const selectedRow = selectedRows.find((item) => Number(item.id) === Number(row?.dataset.sourceId));
 
-        if (selectedRow && event.target.classList.contains('js-xuat-qty')) {
+        if (selectedRow) {
           selectedRow.quantity = event.target.value;
         }
-
-        if (selectedRow && event.target.classList.contains('js-xuat-price')) {
-          selectedRow.unit_price = event.target.value;
-        }
-
-        const quantity = Number(normalizeNumber(selectedRow?.quantity));
-        const unitPrice = Number(normalizeNumber(selectedRow?.unit_price));
-        row?.querySelector('.js-line-total')?.replaceChildren(document.createTextNode(formatMoney(String(
-          !Number.isNaN(quantity) && !Number.isNaN(unitPrice) ? quantity * unitPrice : 0
-        ))));
-        updateTotals();
       });
 
       sourceInput.addEventListener('focus', renderDropdown);
@@ -705,10 +617,6 @@
           syncSelectedQuantities();
 
           document.querySelectorAll('.js-xuat-qty').forEach((input) => {
-            input.value = normalizeNumber(input.value);
-          });
-
-          document.querySelectorAll('.js-xuat-price').forEach((input) => {
             input.value = normalizeNumber(input.value);
           });
 
@@ -886,25 +794,14 @@
                 <th class="text-end col-number">Đã xuất</th>
                 <th class="text-end col-number">Còn lại</th>
                 <th class="col-number">SL xuất</th>
-                <th class="col-number">Đơn giá</th>
-                <th class="text-end col-number">Thành tiền</th>
                 <th class="text-center" style="width: 80px;">Xóa</th>
               </tr>
             </thead>
             <tbody id="xuat-lines-body">
               <tr id="xuat-empty-row">
-                <td colspan="14" class="text-center py-4 text-muted">Chưa chọn nguồn hàng xuất.</td>
+                <td colspan="12" class="text-center py-4 text-muted">Chưa chọn nguồn hàng xuất.</td>
               </tr>
             </tbody>
-            <tfoot>
-              <tr class="fw-semibold">
-                <td colspan="10" class="text-end">Tổng</td>
-                <td class="text-end" id="xuat-total-quantity">0</td>
-                <td></td>
-                <td class="text-end" id="xuat-total-money">0 ₫</td>
-                <td></td>
-              </tr>
-            </tfoot>
           </table>
         </div>
       </div>

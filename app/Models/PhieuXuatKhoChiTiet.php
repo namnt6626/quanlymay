@@ -17,8 +17,6 @@ class PhieuXuatKhoChiTiet extends Model
         'nhap_kho_id',
         'don_hang_chi_tiet_id',
         'so_luong_xuat',
-        'don_gia',
-        'thanh_tien',
         'ghi_chu',
     ];
 
@@ -26,8 +24,6 @@ class PhieuXuatKhoChiTiet extends Model
     {
         return [
             'so_luong_xuat' => 'decimal:4',
-            'don_gia' => 'decimal:2',
-            'thanh_tien' => 'decimal:2',
         ];
     }
 
