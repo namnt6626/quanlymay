@@ -214,7 +214,7 @@
               <td>
                 <div class="d-flex gap-2">
                   @if (hasPermission('XUAT_KHO_EDIT'))
-                    <a href="{{ route('xuat-kho.edit', $chiTiet->phieuXuatKho) }}"
+                    <a href="{{ route('xuat-kho.edit', ['phieu_xuat_kho' => $chiTiet->phieuXuatKho, 'chi_tiet_id' => $chiTiet->id] + request()->query()) }}"
                       class="btn btn-sm btn-icon btn-outline-primary" title="Sửa">
                       <i class="icon-base bx bx-edit"></i>
                     </a>

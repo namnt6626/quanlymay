@@ -221,7 +221,7 @@
     </div>
 
     <div class="card-body">
-      <form action="{{ route('xuat-kho.update', $phieuXuatKho) }}" method="POST" id="xuat-kho-form">
+      <form action="{{ route('xuat-kho.update', ['phieu_xuat_kho' => $phieuXuatKho, 'chi_tiet_id' => $chiTiet->id]) }}" method="POST" id="xuat-kho-form">
         @csrf
         @method('PUT')
 

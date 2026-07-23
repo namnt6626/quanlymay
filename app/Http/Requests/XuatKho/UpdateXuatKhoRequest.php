@@ -22,7 +22,7 @@ class UpdateXuatKhoRequest extends FormRequest
 
     public function rules(): array
     {
-        $phieuXuatKho = $this->route('xuat_kho');
+        $phieuXuatKho = $this->route('phieu_xuat_kho');
 
         return [
             'so_phieu' => [

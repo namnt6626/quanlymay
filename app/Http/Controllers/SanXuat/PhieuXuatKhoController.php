@@ -329,7 +329,7 @@ class PhieuXuatKhoController extends Controller
         }
     }
 
-    public function edit(PhieuXuatKho $phieu_xuat_kho): View
+    public function edit(Request $request, PhieuXuatKho $phieu_xuat_kho): View
     {
         $xuatKho = $phieu_xuat_kho;
 
@@ -348,7 +348,13 @@ class PhieuXuatKhoController extends Controller
             ])
             ->get();
 
-        $chiTiet = $chiTiets->firstOrFail();
+        $chiTietId = $request->integer('chi_tiet_id');
+        $chiTiet = $chiTietId > 0
+            ? $chiTiets->firstWhere('id', $chiTietId)
+            : $chiTiets->first();
+
+        abort_if(! $chiTiet, 404);
+
         $currentSourceKey = $this->sourceGroupKeyFromNhapKho($chiTiet->nhapKho);
         $currentSourceQuantity = $chiTiets
             ->filter(fn (PhieuXuatKhoChiTiet $item): bool => $this->sourceGroupKeyFromNhapKho($item->nhapKho) === $currentSourceKey)
@@ -366,7 +372,10 @@ class PhieuXuatKhoController extends Controller
     {
         $xuatKho = $phieu_xuat_kho;
         $data = $request->validated();
-        $chiTiet = $xuatKho->chiTiets()->firstOrFail();
+        $chiTietId = $request->integer('chi_tiet_id');
+        $chiTiet = $chiTietId > 0
+            ? $xuatKho->chiTiets()->whereKey($chiTietId)->firstOrFail()
+            : $xuatKho->chiTiets()->firstOrFail();
         $nhapKho = NhapKho::query()
             ->with([
                 'qc.phanBoMay.cat.matHang',
