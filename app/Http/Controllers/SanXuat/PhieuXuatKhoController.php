@@ -650,7 +650,7 @@ class PhieuXuatKhoController extends Controller
                 'qc.donHangChiTiet.donHang',
                 'donHangChiTiet.donHang',
             ])
-            ->where('loai_ton', 'dat')
+            ->whereRaw("COALESCE(loai_ton, 'dat') = 'dat'")
             ->whereNull('deleted_at')
             ->get()
             ->filter(fn (NhapKho $nhapKho): bool => $this->sourceGroupKeyFromNhapKho($nhapKho) === $sourceGroupKey)
@@ -734,7 +734,7 @@ class PhieuXuatKhoController extends Controller
                 'qc.donHangChiTiet.donHang',
                 'donHangChiTiet.donHang',
             ])
-            ->where('loai_ton', 'dat')
+            ->whereRaw("COALESCE(loai_ton, 'dat') = 'dat'")
             ->whereNull('deleted_at')
             ->get();
 
@@ -756,7 +756,7 @@ class PhieuXuatKhoController extends Controller
             ])
             ->whereHas('phieuXuatKho')
             ->whereHas('nhapKho', function (Builder $query) {
-                $query->where('loai_ton', 'dat');
+                $query->whereRaw("COALESCE(loai_ton, 'dat') = 'dat'");
             })
             ->whereNull('deleted_at')
             ->get();

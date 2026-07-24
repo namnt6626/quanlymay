@@ -575,7 +575,7 @@ class QcController extends Controller
         return (float) PhieuXuatKhoChiTiet::query()
             ->whereHas('nhapKho', function (Builder $query) use ($qc): void {
                 $query->where('qc_id', $qc->id)
-                    ->where('loai_ton', 'dat');
+                    ->whereRaw("COALESCE(loai_ton, 'dat') = 'dat'");
             })
             ->whereNull('deleted_at')
             ->sum('so_luong_xuat');
