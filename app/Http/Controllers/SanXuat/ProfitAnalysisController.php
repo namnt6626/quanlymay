@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\ProfitAnalysisPeriod;
 use App\Services\ProfitAnalysis\ProfitAnalysisImportService;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use RuntimeException;
 
@@ -49,8 +52,108 @@ class ProfitAnalysisController extends Controller
 
     public function create(): View
     {
+        $importToken = $this->importToken();
+
         return view('content.san-xuat.phan-tich-lai-lo.create', [
             'months' => $this->monthOptions(),
+            'importToken' => $importToken,
+            'uploadedFiles' => Session::get($this->uploadSessionKey($importToken), []),
+        ]);
+    }
+
+    public function uploadFile(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'import_token' => ['required', 'string', 'max:80'],
+            'file_key' => ['required', 'string', 'in:fob_file,analytics_file,ad_file,settlement_file,order_file'],
+            'upload_id' => ['required', 'string', 'max:120', 'regex:/^[A-Za-z0-9_-]+$/'],
+            'chunk_index' => ['required', 'integer', 'min:0'],
+            'total_chunks' => ['required', 'integer', 'min:1', 'max:10000'],
+            'original_name' => ['required', 'string', 'max:255'],
+            'chunk' => ['required', 'file'],
+        ], [
+            'upload_id.regex' => 'Mã tải lên không hợp lệ.',
+        ]);
+
+        if (! Str::endsWith(Str::lower($validated['original_name']), '.xlsx')) {
+            return response()->json(['message' => 'Chỉ hỗ trợ file có đuôi .xlsx.'], 422);
+        }
+
+        $token = $validated['import_token'];
+        $fileKey = $validated['file_key'];
+        $uploadId = $validated['upload_id'];
+        $chunkIndex = (int) $validated['chunk_index'];
+        $totalChunks = (int) $validated['total_chunks'];
+        $baseDirectory = storage_path('app/profit-analysis-imports/'.$token);
+        $chunkDirectory = $baseDirectory.'/chunks/'.$uploadId;
+        File::ensureDirectoryExists($chunkDirectory);
+
+        $request->file('chunk')->move($chunkDirectory, $chunkIndex.'.part');
+
+        if ($this->uploadedChunkCount($chunkDirectory) < $totalChunks) {
+            return response()->json([
+                'complete' => false,
+                'uploaded_chunks' => $this->uploadedChunkCount($chunkDirectory),
+                'total_chunks' => $totalChunks,
+            ]);
+        }
+
+        $directory = $baseDirectory.'/files';
+        File::ensureDirectoryExists($directory);
+        $filename = $fileKey.'_'.Str::uuid().'.xlsx';
+        $path = $directory.'/'.$filename;
+
+        $output = fopen($path, 'wb');
+        if ($output === false) {
+            return response()->json(['message' => 'Không tạo được file tạm trên server.'], 500);
+        }
+
+        try {
+            for ($index = 0; $index < $totalChunks; $index++) {
+                $chunkPath = $chunkDirectory.'/'.$index.'.part';
+                if (! is_file($chunkPath)) {
+                    fclose($output);
+                    @unlink($path);
+
+                    return response()->json(['message' => 'Thiếu mảnh upload, vui lòng chọn lại file.'], 422);
+                }
+
+                $input = fopen($chunkPath, 'rb');
+                if ($input === false) {
+                    fclose($output);
+                    @unlink($path);
+
+                    return response()->json(['message' => 'Không đọc được mảnh upload.'], 500);
+                }
+                stream_copy_to_stream($input, $output);
+                fclose($input);
+            }
+        } finally {
+            if (is_resource($output)) {
+                fclose($output);
+            }
+        }
+
+        File::deleteDirectory($chunkDirectory);
+
+        $sessionKey = $this->uploadSessionKey($token);
+        $uploads = Session::get($sessionKey, []);
+        if (isset($uploads[$fileKey]['path']) && is_file($uploads[$fileKey]['path'])) {
+            @unlink($uploads[$fileKey]['path']);
+        }
+
+        $uploads[$fileKey] = [
+            'path' => $path,
+            'name' => $validated['original_name'],
+            'size' => filesize($path) ?: 0,
+            'uploaded_at' => now()->toDateTimeString(),
+        ];
+        Session::put($sessionKey, $uploads);
+
+        return response()->json([
+            'complete' => true,
+            'message' => 'Đã tải lên '.$uploads[$fileKey]['name'],
+            'file' => $uploads[$fileKey],
         ]);
     }
 
@@ -58,23 +161,26 @@ class ProfitAnalysisController extends Controller
     {
         $validated = $request->validate([
             'period_month' => ['required', 'date_format:Y-m'],
-            'fob_file' => ['nullable', 'file', 'extensions:xlsx'],
-            'analytics_file' => ['required', 'file', 'extensions:xlsx'],
-            'ad_file' => ['required', 'file', 'extensions:xlsx'],
-            'settlement_file' => ['required', 'file', 'extensions:xlsx'],
-            'order_file' => ['required', 'file', 'extensions:xlsx'],
+            'import_token' => ['required', 'string', 'max:80'],
         ], [
             'period_month.required' => 'Vui lòng chọn tháng phân tích.',
-            '*.required' => 'Vui lòng upload đủ các file bắt buộc.',
-            '*.extensions' => 'Chỉ hỗ trợ file có đuôi .xlsx.',
         ]);
 
-        $files = [];
-        foreach (['fob_file', 'analytics_file', 'ad_file', 'settlement_file', 'order_file'] as $key) {
-            if ($request->hasFile($key)) {
-                $files[$key] = $request->file($key)->getRealPath();
+        $uploads = Session::get($this->uploadSessionKey($validated['import_token']), []);
+        $missing = [];
+        foreach (['analytics_file', 'ad_file', 'settlement_file', 'order_file'] as $requiredKey) {
+            if (! isset($uploads[$requiredKey]['path']) || ! is_file($uploads[$requiredKey]['path'])) {
+                $missing[] = $requiredKey;
             }
         }
+        if ($missing !== []) {
+            return back()->withInput()->withErrors(['files' => 'Vui lòng tải lên đủ 4 file bắt buộc trước khi kiểm tra dữ liệu.']);
+        }
+
+        $files = collect($uploads)
+            ->filter(fn (array $file): bool => isset($file['path']) && is_file($file['path']))
+            ->map(fn (array $file): string => $file['path'])
+            ->all();
 
         try {
             $preview = $service->preview($files, Carbon::createFromFormat('Y-m', $validated['period_month'])->startOfMonth());
@@ -82,6 +188,7 @@ class ProfitAnalysisController extends Controller
             return back()->withInput()->withErrors(['files' => $exception->getMessage()]);
         }
 
+        $preview['import_token'] = $validated['import_token'];
         $previewKey = 'profit_analysis_preview_'.str()->uuid()->toString();
         Session::put($previewKey, $preview);
 
@@ -117,6 +224,7 @@ class ProfitAnalysisController extends Controller
         }
 
         Session::forget($validated['preview_key']);
+        $this->clearTempUploads((string) ($preview['import_token'] ?? ''));
 
         return redirect()
             ->route('phan-tich-lai-lo.index', ['period' => $period->id])
@@ -148,6 +256,38 @@ class ProfitAnalysisController extends Controller
         }
 
         return array_reverse($months, true);
+    }
+
+    private function importToken(): string
+    {
+        $token = Session::get('profit_analysis_import_token');
+        if (! is_string($token) || $token === '') {
+            $token = Str::uuid()->toString();
+            Session::put('profit_analysis_import_token', $token);
+        }
+
+        return $token;
+    }
+
+    private function uploadSessionKey(string $token): string
+    {
+        return 'profit_analysis_uploads_'.$token;
+    }
+
+    private function clearTempUploads(string $token): void
+    {
+        if ($token === '') {
+            return;
+        }
+
+        File::deleteDirectory(storage_path('app/profit-analysis-imports/'.$token));
+        Session::forget($this->uploadSessionKey($token));
+        Session::forget('profit_analysis_import_token');
+    }
+
+    private function uploadedChunkCount(string $chunkDirectory): int
+    {
+        return count(glob($chunkDirectory.'/*.part') ?: []);
     }
 
     private function totalPeriod(): ?object

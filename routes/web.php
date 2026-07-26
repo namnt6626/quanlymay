@@ -168,6 +168,9 @@ Route::get('phan-tich-lai-lo', [ProfitAnalysisController::class, 'index'])
 Route::get('phan-tich-lai-lo/import', [ProfitAnalysisController::class, 'create'])
   ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_CREATE'])
   ->name('phan-tich-lai-lo.create');
+Route::post('phan-tich-lai-lo/import/upload-file', [ProfitAnalysisController::class, 'uploadFile'])
+  ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_CREATE'])
+  ->name('phan-tich-lai-lo.upload-file');
 Route::post('phan-tich-lai-lo/import/preview', [ProfitAnalysisController::class, 'preview'])
   ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_CREATE'])
   ->name('phan-tich-lai-lo.preview');
