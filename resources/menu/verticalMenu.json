@@ -84,6 +84,12 @@
       ]
     },
     {
+      "name": "Phân tích lãi lỗ",
+      "url": "phan-tich-lai-lo",
+      "icon": "menu-icon icon-base bx bx-line-chart",
+      "slug": "phan-tich-lai-lo.index"
+    },
+    {
       "name": "Sản xuất",
       "icon": "menu-icon icon-base bx bx-cog",
       "slug": [

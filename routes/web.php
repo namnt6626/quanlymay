@@ -31,6 +31,7 @@ use App\Http\Controllers\SanXuat\DonHangHoanThanhController;
 use App\Http\Controllers\SanXuat\NhapKhoController;
 use App\Http\Controllers\SanXuat\PhanBoMayController;
 use App\Http\Controllers\SanXuat\PhieuXuatKhoController;
+use App\Http\Controllers\SanXuat\ProfitAnalysisController;
 use App\Http\Controllers\SanXuat\QcController;
 use App\Http\Controllers\SanXuat\TonKhoController;
 use App\Http\Controllers\TaiKhoan\RolePermissionController;
@@ -161,6 +162,21 @@ $registerCrudRoutes('qc', QcController::class, 'qc', [
   'edit' => 'QC_EDIT',
   'delete' => 'QC_DELETE',
 ]);
+Route::get('phan-tich-lai-lo', [ProfitAnalysisController::class, 'index'])
+  ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_VIEW'])
+  ->name('phan-tich-lai-lo.index');
+Route::get('phan-tich-lai-lo/import', [ProfitAnalysisController::class, 'create'])
+  ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_CREATE'])
+  ->name('phan-tich-lai-lo.create');
+Route::post('phan-tich-lai-lo/import/preview', [ProfitAnalysisController::class, 'preview'])
+  ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_CREATE'])
+  ->name('phan-tich-lai-lo.preview');
+Route::post('phan-tich-lai-lo/import/commit', [ProfitAnalysisController::class, 'commit'])
+  ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_CREATE'])
+  ->name('phan-tich-lai-lo.commit');
+Route::delete('phan-tich-lai-lo/{profitAnalysisPeriod}', [ProfitAnalysisController::class, 'destroy'])
+  ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_DELETE'])
+  ->name('phan-tich-lai-lo.destroy');
 Route::get('don-hang-hoan-thanh/import', [DonHangHoanThanhController::class, 'importForm'])
   ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_CREATE'])->name('don-hang-hoan-thanh.import');
 Route::post('don-hang-hoan-thanh/import/preview', [DonHangHoanThanhController::class, 'preview'])
