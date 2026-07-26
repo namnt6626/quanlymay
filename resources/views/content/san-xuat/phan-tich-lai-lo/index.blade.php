@@ -144,7 +144,14 @@
           @endif
         </div>
       </div>
-      <span class="badge bg-label-success">Đã chốt {{ optional($selectedPeriod->confirmed_at)->format('d/m/Y H:i') }}</span>
+      <div class="d-flex gap-2 align-items-center">
+        @if(!$isTotalView && hasPermission('PHAN_TICH_LAI_LO_EDIT'))
+          <a class="btn btn-sm btn-outline-primary" href="{{ route('phan-tich-lai-lo.edit', $selectedPeriod->id) }}">
+            <i class="icon-base bx bx-edit me-1"></i>Sửa dữ liệu
+          </a>
+        @endif
+        <span class="badge bg-label-success">Đã chốt {{ optional($selectedPeriod->confirmed_at)->format('d/m/Y H:i') }}</span>
+      </div>
     </div>
     <div class="card-body">
       <div class="profit-kpi-grid">
@@ -337,17 +344,22 @@
             <td class="text-end profit-number">{{ number_format($period->sku_count, 0, ',', '.') }}</td>
             <td>{{ $period->confirmedBy?->name ?: '-' }}</td>
             <td class="text-end">
-              @if (hasPermission('PHAN_TICH_LAI_LO_DELETE'))
-                <form method="POST" action="{{ route('phan-tich-lai-lo.destroy', $period) }}" onsubmit="return confirm('Xóa dữ liệu {{ $period->label }}? Thao tác này chỉ xóa bộ thống kê của tháng, không xóa file gốc.')">
-                  @csrf
-                  @method('DELETE')
-                  <button class="btn btn-sm btn-icon btn-outline-danger" aria-label="Xóa {{ $period->label }}">
-                    <i class="icon-base bx bx-trash"></i>
-                  </button>
-                </form>
-              @else
-                -
-              @endif
+              <div class="d-flex justify-content-end gap-2">
+                @if (hasPermission('PHAN_TICH_LAI_LO_EDIT'))
+                  <a class="btn btn-sm btn-icon btn-outline-primary" href="{{ route('phan-tich-lai-lo.edit', $period) }}" aria-label="Sửa {{ $period->label }}">
+                    <i class="icon-base bx bx-edit"></i>
+                  </a>
+                @endif
+                @if (hasPermission('PHAN_TICH_LAI_LO_DELETE'))
+                  <form method="POST" action="{{ route('phan-tich-lai-lo.destroy', $period) }}" onsubmit="return confirm('Xóa dữ liệu {{ $period->label }}? Thao tác này chỉ xóa bộ thống kê của tháng, không xóa file gốc.')">
+                    @csrf
+                    @method('DELETE')
+                    <button class="btn btn-sm btn-icon btn-outline-danger" aria-label="Xóa {{ $period->label }}">
+                      <i class="icon-base bx bx-trash"></i>
+                    </button>
+                  </form>
+                @endif
+              </div>
             </td>
           </tr>
         @empty

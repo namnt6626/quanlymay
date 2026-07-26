@@ -231,6 +231,70 @@ class ProfitAnalysisController extends Controller
             ->with('success', 'Đã cập nhật dữ liệu '.$period->label.' thành công.');
     }
 
+    public function edit(ProfitAnalysisPeriod $profitAnalysisPeriod): View
+    {
+        $profitAnalysisPeriod->load(['skuSummaries' => fn ($query) => $query->orderByDesc('net_quantity')]);
+
+        return view('content.san-xuat.phan-tich-lai-lo.edit', [
+            'period' => $profitAnalysisPeriod,
+        ]);
+    }
+
+    public function update(Request $request, ProfitAnalysisPeriod $profitAnalysisPeriod): RedirectResponse
+    {
+        $validated = $request->validate([
+            'sku_costs' => ['required', 'array'],
+            'sku_costs.*' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $profitAnalysisPeriod->load('skuSummaries');
+
+        $totalRevenue = (float) $profitAnalysisPeriod->total_revenue;
+        $marketplaceFees = (float) $profitAnalysisPeriod->marketplace_fees;
+        $adCost = (float) $profitAnalysisPeriod->ad_cost;
+        $orderCount = max(1, (int) $profitAnalysisPeriod->order_count);
+        $skuRevenue = max(0.01, (float) $profitAnalysisPeriod->skuSummaries->sum('revenue'));
+        $totalCogs = 0.0;
+
+        foreach ($profitAnalysisPeriod->skuSummaries as $summary) {
+            $unitCost = $this->number($validated['sku_costs'][$summary->id] ?? $summary->unit_cost);
+            $cogs = (float) $summary->net_quantity * $unitCost;
+            $share = (float) $summary->revenue / $skuRevenue;
+            $allocatedFees = $marketplaceFees * $share;
+            $allocatedAdCost = $adCost * $share;
+            $profit = (float) $summary->revenue - $cogs - $allocatedFees - $allocatedAdCost;
+
+            $summary->update([
+                'unit_cost' => $unitCost,
+                'cogs' => $cogs,
+                'allocated_fees' => $allocatedFees,
+                'allocated_ad_cost' => $allocatedAdCost,
+                'profit' => $profit,
+                'profit_per_unit' => (float) $summary->net_quantity > 0 ? $profit / (float) $summary->net_quantity : 0,
+                'status' => $profit >= 0 ? 'profit' : 'loss',
+            ]);
+
+            $totalCogs += $cogs;
+        }
+
+        $totalCost = $totalCogs + $marketplaceFees + $adCost;
+        $profit = $totalRevenue - $totalCost;
+
+        $profitAnalysisPeriod->update([
+            'cogs' => $totalCogs,
+            'total_cost' => $totalCost,
+            'profit' => $profit,
+            'profit_per_order' => $profit / $orderCount,
+            'ad_breakeven' => $totalRevenue - $marketplaceFees - $totalCogs,
+            'confirmed_by' => (int) $request->user()->id,
+            'confirmed_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('phan-tich-lai-lo.index', ['period' => $profitAnalysisPeriod->id])
+            ->with('success', 'Đã cập nhật dữ liệu '.$profitAnalysisPeriod->label.'.');
+    }
+
     public function destroy(ProfitAnalysisPeriod $profitAnalysisPeriod): RedirectResponse
     {
         $label = $profitAnalysisPeriod->label;
@@ -288,6 +352,62 @@ class ProfitAnalysisController extends Controller
     private function uploadedChunkCount(string $chunkDirectory): int
     {
         return count(glob($chunkDirectory.'/*.part') ?: []);
+    }
+
+    private function number(mixed $value): float
+    {
+        $text = trim((string) $value);
+        if ($text === '') {
+            return 0.0;
+        }
+
+        $text = preg_replace('/[^\d,\.\-]/', '', $text) ?? '';
+        if ($text === '' || $text === '-') {
+            return 0.0;
+        }
+
+        $commaCount = substr_count($text, ',');
+        $dotCount = substr_count($text, '.');
+
+        if ($commaCount > 0 && $dotCount > 0) {
+            $lastComma = strrpos($text, ',');
+            $lastDot = strrpos($text, '.');
+            $decimalSeparator = $lastComma > $lastDot ? ',' : '.';
+            $thousandSeparator = $decimalSeparator === ',' ? '.' : ',';
+            $decimalLength = strlen($text) - max($lastComma, $lastDot) - 1;
+
+            if ($decimalLength === 3) {
+                return (float) str_replace([',', '.'], '', $text);
+            }
+
+            return (float) str_replace($decimalSeparator, '.', str_replace($thousandSeparator, '', $text));
+        }
+
+        if ($commaCount > 0) {
+            return (float) $this->normalizeSingleSeparatorNumber($text, ',');
+        }
+
+        if ($dotCount > 0) {
+            return (float) $this->normalizeSingleSeparatorNumber($text, '.');
+        }
+
+        return is_numeric($text) ? (float) $text : 0.0;
+    }
+
+    private function normalizeSingleSeparatorNumber(string $text, string $separator): string
+    {
+        $parts = explode($separator, $text);
+        if (count($parts) > 2) {
+            $validThousands = collect(array_slice($parts, 1))->every(fn (string $part): bool => strlen($part) === 3);
+
+            return $validThousands ? implode('', $parts) : str_replace($separator, '', $text);
+        }
+
+        if (strlen($parts[1] ?? '') === 3) {
+            return implode('', $parts);
+        }
+
+        return $separator === ',' ? str_replace(',', '.', $text) : $text;
     }
 
     private function totalPeriod(): ?object

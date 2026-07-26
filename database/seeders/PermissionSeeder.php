@@ -32,6 +32,7 @@ class PermissionSeeder extends Seeder
 
             ['ma_quyen' => 'PHAN_TICH_LAI_LO_VIEW', 'ten_quyen' => 'Xem Phân tích lãi lỗ', 'module' => 'Phân tích lãi lỗ', 'action' => 'VIEW'],
             ['ma_quyen' => 'PHAN_TICH_LAI_LO_CREATE', 'ten_quyen' => 'Nhập Phân tích lãi lỗ', 'module' => 'Phân tích lãi lỗ', 'action' => 'CREATE'],
+            ['ma_quyen' => 'PHAN_TICH_LAI_LO_EDIT', 'ten_quyen' => 'Sửa Phân tích lãi lỗ', 'module' => 'Phân tích lãi lỗ', 'action' => 'EDIT'],
             ['ma_quyen' => 'PHAN_TICH_LAI_LO_DELETE', 'ten_quyen' => 'Xóa Phân tích lãi lỗ', 'module' => 'Phân tích lãi lỗ', 'action' => 'DELETE'],
 
             ['ma_quyen' => 'DON_HANG_HOAN_THANH_VIEW', 'ten_quyen' => 'Xem Đơn hàng Online', 'module' => 'Đơn hàng Online', 'action' => 'VIEW'],

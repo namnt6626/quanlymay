@@ -177,6 +177,12 @@ Route::post('phan-tich-lai-lo/import/preview', [ProfitAnalysisController::class,
 Route::post('phan-tich-lai-lo/import/commit', [ProfitAnalysisController::class, 'commit'])
   ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_CREATE'])
   ->name('phan-tich-lai-lo.commit');
+Route::get('phan-tich-lai-lo/{profitAnalysisPeriod}/edit', [ProfitAnalysisController::class, 'edit'])
+  ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_EDIT'])
+  ->name('phan-tich-lai-lo.edit');
+Route::put('phan-tich-lai-lo/{profitAnalysisPeriod}', [ProfitAnalysisController::class, 'update'])
+  ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_EDIT'])
+  ->name('phan-tich-lai-lo.update');
 Route::delete('phan-tich-lai-lo/{profitAnalysisPeriod}', [ProfitAnalysisController::class, 'destroy'])
   ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_DELETE'])
   ->name('phan-tich-lai-lo.destroy');
