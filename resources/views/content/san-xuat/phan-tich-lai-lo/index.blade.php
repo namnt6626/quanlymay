@@ -164,6 +164,14 @@
           <div class="profit-kpi-value">{{ number_format((float) ($selectedPeriod->sku_revenue_total ?? 0), 0, ',', '.') }} ₫</div>
         </div>
         <div class="profit-kpi">
+          <div class="profit-kpi-label">DT đơn hàng trước khi trừ hoàn/trả</div>
+          <div class="profit-kpi-value">{{ number_format((float) ($selectedPeriod->sku_gross_revenue_total ?? 0), 0, ',', '.') }} ₫</div>
+        </div>
+        <div class="profit-kpi">
+          <div class="profit-kpi-label">Tiền hoàn/trả hệ thống đã trừ</div>
+          <div class="profit-kpi-value text-danger">{{ number_format((float) ($selectedPeriod->sku_refund_total ?? 0), 0, ',', '.') }} ₫</div>
+        </div>
+        <div class="profit-kpi">
           <div class="profit-kpi-label">Chênh lệch đã chia về từng mã</div>
           <div class="profit-kpi-value {{ abs((float) ($selectedPeriod->revenue_adjustment ?? 0)) > 0 ? 'text-warning' : 'text-success' }}">{{ number_format((float) ($selectedPeriod->revenue_adjustment ?? 0), 0, ',', '.') }} ₫</div>
         </div>

@@ -101,6 +101,14 @@
         <div class="value">{{ number_format((float) ($period->sku_revenue_total ?? 0), 0, ',', '.') }} ₫</div>
       </div>
       <div class="profit-readonly-metric">
+        <div class="label">DT đơn hàng trước khi trừ hoàn/trả</div>
+        <div class="value">{{ number_format((float) ($period->sku_gross_revenue_total ?? 0), 0, ',', '.') }} ₫</div>
+      </div>
+      <div class="profit-readonly-metric">
+        <div class="label">Tiền hoàn/trả hệ thống đã trừ</div>
+        <div class="value">{{ number_format((float) ($period->sku_refund_total ?? 0), 0, ',', '.') }} ₫</div>
+      </div>
+      <div class="profit-readonly-metric">
         <div class="label">Chênh lệch đã chia về từng mã</div>
         <div class="value">{{ number_format((float) ($period->revenue_adjustment ?? 0), 0, ',', '.') }} ₫</div>
       </div>

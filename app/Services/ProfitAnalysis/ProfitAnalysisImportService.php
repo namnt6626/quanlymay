@@ -83,6 +83,8 @@ class ProfitAnalysisImportService
                 'item_count' => (int) ($analytics['items_sold'] ?: collect($skuRows)->sum('quantity_sold')),
                 'gmv' => (float) $analytics['gmv'],
                 'settlement_revenue' => (float) $settlement['total_revenue'],
+                'sku_gross_revenue_total' => (float) collect($skuRows)->sum(fn (array $row): float => $row['revenue'] + $row['refund_amount']),
+                'sku_refund_total' => (float) collect($skuRows)->sum('refund_amount'),
                 'sku_revenue_total' => (float) collect($skuRows)->sum('revenue'),
                 'revenue_adjustment' => (float) $settlement['total_revenue'] - (float) collect($skuRows)->sum('revenue'),
                 'marketplace_fees' => abs((float) $settlement['total_fees']),
@@ -159,6 +161,8 @@ class ProfitAnalysisImportService
                 'item_count' => $totals['item_count'],
                 'gmv' => $totals['gmv'],
                 'settlement_revenue' => $totals['settlement_revenue'],
+                'sku_gross_revenue_total' => $totals['sku_gross_revenue_total'],
+                'sku_refund_total' => $totals['sku_refund_total'],
                 'sku_revenue_total' => $totals['sku_revenue_total'],
                 'revenue_adjustment' => $totals['revenue_adjustment'],
                 'marketplace_fees' => $totals['marketplace_fees'],
@@ -192,6 +196,8 @@ class ProfitAnalysisImportService
     {
         $summary = $preview['summary'];
         $skuRevenue = (float) collect($skuRows)->sum('revenue');
+        $skuRefundTotal = (float) collect($skuRows)->sum('refund_amount');
+        $skuGrossRevenue = $skuRevenue + $skuRefundTotal;
         $marketplaceFees = (float) $summary['marketplace_fees'];
         $adCost = (float) $summary['ad_cost'];
         $cogs = (float) collect($skuRows)->sum(fn (array $row): float => $row['net_quantity'] * $row['unit_cost']);
@@ -239,6 +245,8 @@ class ProfitAnalysisImportService
             'item_count' => (int) $summary['item_count'],
             'gmv' => (float) $summary['gmv'],
             'settlement_revenue' => (float) $summary['settlement_revenue'],
+            'sku_gross_revenue_total' => $skuGrossRevenue,
+            'sku_refund_total' => $skuRefundTotal,
             'sku_revenue_total' => $skuRevenue,
             'revenue_adjustment' => $revenueAdjustment,
             'marketplace_fees' => $marketplaceFees,

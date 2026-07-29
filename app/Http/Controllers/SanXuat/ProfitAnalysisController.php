@@ -444,6 +444,8 @@ class ProfitAnalysisController extends Controller
             'item_count' => (int) $periods->sum('item_count'),
             'gmv' => (float) $periods->sum('gmv'),
             'settlement_revenue' => (float) $periods->sum('settlement_revenue'),
+            'sku_gross_revenue_total' => (float) $periods->sum('sku_gross_revenue_total'),
+            'sku_refund_total' => (float) $periods->sum('sku_refund_total'),
             'sku_revenue_total' => (float) $periods->sum('sku_revenue_total'),
             'revenue_adjustment' => (float) $periods->sum('revenue_adjustment'),
             'marketplace_fees' => (float) $periods->sum('marketplace_fees'),

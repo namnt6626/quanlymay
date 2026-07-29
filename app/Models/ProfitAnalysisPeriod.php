@@ -19,6 +19,8 @@ class ProfitAnalysisPeriod extends Model
         'item_count',
         'gmv',
         'settlement_revenue',
+        'sku_gross_revenue_total',
+        'sku_refund_total',
         'sku_revenue_total',
         'revenue_adjustment',
         'marketplace_fees',
