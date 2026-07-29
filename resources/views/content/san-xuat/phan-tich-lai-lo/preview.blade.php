@@ -106,8 +106,16 @@
         <div class="value">{{ number_format((float) $preview['summary']['gmv'], 0, ',', '.') }} ₫</div>
       </div>
       <div class="profit-preview-metric">
-        <div class="label">Doanh thu quyết toán</div>
+        <div class="label">Doanh thu từ file quyết toán TikTok</div>
         <div class="value">{{ number_format((float) $preview['summary']['settlement_revenue'], 0, ',', '.') }} ₫</div>
+      </div>
+      <div class="profit-preview-metric">
+        <div class="label">Doanh thu từ file tất cả đơn hàng/SKU</div>
+        <div class="value">{{ number_format((float) $preview['summary']['sku_revenue_total'], 0, ',', '.') }} ₫</div>
+      </div>
+      <div class="profit-preview-metric">
+        <div class="label">Chênh lệch đã chia về từng mã</div>
+        <div class="value {{ abs((float) $preview['summary']['revenue_adjustment']) > 0 ? 'text-warning' : 'text-success' }}">{{ number_format((float) $preview['summary']['revenue_adjustment'], 0, ',', '.') }} ₫</div>
       </div>
       <div class="profit-preview-metric">
         <div class="label">Phí sàn</div>
@@ -118,8 +126,12 @@
         <div class="value">{{ number_format((float) $preview['summary']['ad_cost'], 0, ',', '.') }} ₫</div>
       </div>
       <div class="profit-preview-metric">
-        <div class="label">Đơn hàng</div>
-        <div class="value">{{ number_format((float) $preview['summary']['order_count'], 0, ',', '.') }}</div>
+        <div class="label">Đơn hoàn tất</div>
+        <div class="value">{{ number_format((float) $preview['summary']['completed_order_count'], 0, ',', '.') }}</div>
+      </div>
+      <div class="profit-preview-metric">
+        <div class="label">Đơn theo file phân tích</div>
+        <div class="value">{{ number_format((float) $preview['summary']['analytics_order_count'], 0, ',', '.') }}</div>
       </div>
       <div class="profit-preview-metric">
         <div class="label">SKU cần bổ sung</div>
@@ -151,7 +163,7 @@
           <th class="text-end">SL bán</th>
           <th class="text-end">SL hoàn</th>
           <th class="text-end">SL ròng</th>
-          <th class="text-end">Doanh thu</th>
+          <th class="text-end">Doanh thu từ file tất cả đơn hàng/SKU</th>
           <th>Giá vốn/sp</th>
           <th>Map</th>
           <th>Trạng thái</th>

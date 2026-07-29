@@ -156,8 +156,16 @@
     <div class="card-body">
       <div class="profit-kpi-grid">
         <div class="profit-kpi">
-          <div class="profit-kpi-label">Tổng doanh thu</div>
+          <div class="profit-kpi-label">Doanh thu từ file quyết toán TikTok</div>
           <div class="profit-kpi-value">{{ number_format((float) $selectedPeriod->total_revenue, 0, ',', '.') }} ₫</div>
+        </div>
+        <div class="profit-kpi">
+          <div class="profit-kpi-label">Doanh thu từ file tất cả đơn hàng/SKU</div>
+          <div class="profit-kpi-value">{{ number_format((float) ($selectedPeriod->sku_revenue_total ?? 0), 0, ',', '.') }} ₫</div>
+        </div>
+        <div class="profit-kpi">
+          <div class="profit-kpi-label">Chênh lệch đã chia về từng mã</div>
+          <div class="profit-kpi-value {{ abs((float) ($selectedPeriod->revenue_adjustment ?? 0)) > 0 ? 'text-warning' : 'text-success' }}">{{ number_format((float) ($selectedPeriod->revenue_adjustment ?? 0), 0, ',', '.') }} ₫</div>
         </div>
         <div class="profit-kpi">
           <div class="profit-kpi-label">Tổng chi phí</div>
@@ -172,7 +180,15 @@
           <div class="profit-kpi-value {{ $selectedPeriod->profit_per_order >= 0 ? 'text-success' : 'text-danger' }}">{{ number_format((float) $selectedPeriod->profit_per_order, 0, ',', '.') }} ₫</div>
         </div>
         <div class="profit-kpi">
-          <div class="profit-kpi-label">QC hòa vốn</div>
+          <div class="profit-kpi-label">Đơn hoàn tất</div>
+          <div class="profit-kpi-value">{{ number_format((float) ($selectedPeriod->completed_order_count ?: $selectedPeriod->order_count), 0, ',', '.') }}</div>
+        </div>
+        <div class="profit-kpi">
+          <div class="profit-kpi-label">Đơn theo file phân tích</div>
+          <div class="profit-kpi-value">{{ number_format((float) ($selectedPeriod->analytics_order_count ?? 0), 0, ',', '.') }}</div>
+        </div>
+        <div class="profit-kpi">
+          <div class="profit-kpi-label">QC tối đa hòa vốn</div>
           <div class="profit-kpi-value">{{ number_format((float) $selectedPeriod->ad_breakeven, 0, ',', '.') }} ₫</div>
         </div>
         <div class="profit-kpi">
@@ -266,7 +282,9 @@
             <th>Seller SKU</th>
             <th>Sản phẩm</th>
             <th class="text-end">SL bán ròng</th>
-            <th class="text-end">Doanh thu</th>
+            <th class="text-end">DT từ file tất cả đơn hàng/SKU</th>
+            <th class="text-end">Chênh lệch chia về từng mã</th>
+            <th class="text-end">DT sau khi chia chênh lệch</th>
             <th class="text-end">Giá vốn/sp</th>
             <th class="text-end">Tổng giá vốn</th>
             <th class="text-end">Phí phân bổ</th>
@@ -283,6 +301,8 @@
               <td class="profit-sku-name">{{ $sku->seller_sku }}</td>
               <td><div class="profit-product-name" title="{{ $sku->product_name }}">{{ $sku->product_name ?: '-' }}</div></td>
               <td class="text-end profit-number">{{ number_format((float) $sku->net_quantity, 0, ',', '.') }}</td>
+              <td class="text-end profit-number">{{ number_format((float) ($sku->original_revenue ?: $sku->revenue), 0, ',', '.') }} ₫</td>
+              <td class="text-end profit-number {{ (float) ($sku->allocated_revenue_adjustment ?? 0) >= 0 ? 'text-success' : 'text-danger' }}">{{ number_format((float) ($sku->allocated_revenue_adjustment ?? 0), 0, ',', '.') }} ₫</td>
               <td class="text-end profit-number">{{ number_format((float) $sku->revenue, 0, ',', '.') }} ₫</td>
               <td class="text-end profit-number">{{ number_format((float) $sku->unit_cost, 0, ',', '.') }} ₫</td>
               <td class="text-end profit-number">{{ number_format((float) $sku->cogs, 0, ',', '.') }} ₫</td>
@@ -293,7 +313,7 @@
               <td><span class="badge {{ $sku->status === 'profit' ? 'bg-label-success' : 'bg-label-danger' }}">{{ $sku->status === 'profit' ? 'Đang lãi' : 'Đang lỗ' }}</span></td>
             </tr>
           @empty
-            <tr><td colspan="12" class="text-center py-4">Chưa có dữ liệu SKU.</td></tr>
+            <tr><td colspan="14" class="text-center py-4">Chưa có dữ liệu SKU.</td></tr>
           @endforelse
         </tbody>
       </table>

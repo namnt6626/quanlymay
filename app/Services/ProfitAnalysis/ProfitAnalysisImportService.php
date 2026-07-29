@@ -77,10 +77,14 @@ class ProfitAnalysisImportService
                 'sku_count' => count($skuRows),
                 'missing_cost_count' => collect($skuRows)->where('needs_cost', true)->count(),
                 'auto_mapped_count' => collect($skuRows)->whereIn('confidence', ['HIGH', 'SAVED'])->where('needs_cost', false)->count(),
-                'order_count' => (int) ($analytics['orders'] ?: $orders['unique_orders']),
+                'order_count' => (int) $orders['unique_orders'],
+                'completed_order_count' => (int) $orders['unique_orders'],
+                'analytics_order_count' => (int) $analytics['orders'],
                 'item_count' => (int) ($analytics['items_sold'] ?: collect($skuRows)->sum('quantity_sold')),
                 'gmv' => (float) $analytics['gmv'],
                 'settlement_revenue' => (float) $settlement['total_revenue'],
+                'sku_revenue_total' => (float) collect($skuRows)->sum('revenue'),
+                'revenue_adjustment' => (float) $settlement['total_revenue'] - (float) collect($skuRows)->sum('revenue'),
                 'marketplace_fees' => abs((float) $settlement['total_fees']),
                 'ad_cost' => (float) $ads['ad_cost'],
             ],
@@ -155,6 +159,8 @@ class ProfitAnalysisImportService
                 'item_count' => $totals['item_count'],
                 'gmv' => $totals['gmv'],
                 'settlement_revenue' => $totals['settlement_revenue'],
+                'sku_revenue_total' => $totals['sku_revenue_total'],
+                'revenue_adjustment' => $totals['revenue_adjustment'],
                 'marketplace_fees' => $totals['marketplace_fees'],
                 'ad_cost' => $totals['ad_cost'],
                 'cogs' => $totals['cogs'],
@@ -163,6 +169,8 @@ class ProfitAnalysisImportService
                 'profit' => $totals['profit'],
                 'profit_per_order' => $totals['profit_per_order'],
                 'ad_breakeven' => $totals['ad_breakeven'],
+                'completed_order_count' => $totals['completed_order_count'],
+                'analytics_order_count' => $totals['analytics_order_count'],
                 'source_totals' => $preview['source_totals'],
                 'confirmed_by' => $userId,
                 'confirmed_at' => now(),
@@ -187,18 +195,22 @@ class ProfitAnalysisImportService
         $marketplaceFees = (float) $summary['marketplace_fees'];
         $adCost = (float) $summary['ad_cost'];
         $cogs = (float) collect($skuRows)->sum(fn (array $row): float => $row['net_quantity'] * $row['unit_cost']);
-        $totalRevenue = (float) ($summary['settlement_revenue'] ?: $summary['gmv']);
+        $totalRevenue = (float) ($summary['settlement_revenue'] ?: ($skuRevenue ?: $summary['gmv']));
+        $revenueAdjustment = $totalRevenue - $skuRevenue;
         $totalCost = $cogs + $marketplaceFees + $adCost;
         $profit = $totalRevenue - $totalCost;
-        $orderCount = max(1, (int) $summary['order_count']);
+        $completedOrderCount = (int) ($summary['completed_order_count'] ?? $summary['order_count']);
+        $orderCount = max(1, $completedOrderCount);
 
         $skuSummaries = [];
         foreach ($skuRows as $row) {
             $share = $skuRevenue > 0 ? $row['revenue'] / $skuRevenue : 0;
+            $allocatedRevenueAdjustment = $revenueAdjustment * $share;
+            $finalRevenue = $row['revenue'] + $allocatedRevenueAdjustment;
             $allocatedFees = $marketplaceFees * $share;
             $allocatedAdCost = $adCost * $share;
             $rowCogs = $row['net_quantity'] * $row['unit_cost'];
-            $rowProfit = $row['revenue'] - $rowCogs - $allocatedFees - $allocatedAdCost;
+            $rowProfit = $finalRevenue - $rowCogs - $allocatedFees - $allocatedAdCost;
 
             $skuSummaries[] = [
                 'seller_sku' => $row['seller_sku'],
@@ -208,8 +220,11 @@ class ProfitAnalysisImportService
                 'quantity_sold' => $row['quantity_sold'],
                 'quantity_returned' => $row['quantity_returned'],
                 'net_quantity' => $row['net_quantity'],
-                'revenue' => $row['revenue'],
+                'original_revenue' => $row['revenue'],
+                'revenue' => $finalRevenue,
                 'refund_amount' => $row['refund_amount'],
+                'allocated_revenue_adjustment' => $allocatedRevenueAdjustment,
+                'final_revenue' => $finalRevenue,
                 'cogs' => $rowCogs,
                 'allocated_fees' => $allocatedFees,
                 'allocated_ad_cost' => $allocatedAdCost,
@@ -220,10 +235,12 @@ class ProfitAnalysisImportService
         }
 
         return [
-            'order_count' => $orderCount,
+            'order_count' => $completedOrderCount,
             'item_count' => (int) $summary['item_count'],
             'gmv' => (float) $summary['gmv'],
             'settlement_revenue' => (float) $summary['settlement_revenue'],
+            'sku_revenue_total' => $skuRevenue,
+            'revenue_adjustment' => $revenueAdjustment,
             'marketplace_fees' => $marketplaceFees,
             'ad_cost' => $adCost,
             'cogs' => $cogs,
@@ -232,6 +249,8 @@ class ProfitAnalysisImportService
             'profit' => $profit,
             'profit_per_order' => $profit / $orderCount,
             'ad_breakeven' => $totalRevenue - $marketplaceFees - $cogs,
+            'completed_order_count' => $completedOrderCount,
+            'analytics_order_count' => (int) ($summary['analytics_order_count'] ?? $summary['order_count']),
             'sku_summaries' => $skuSummaries,
         ];
     }

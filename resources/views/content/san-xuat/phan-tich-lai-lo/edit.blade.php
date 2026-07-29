@@ -93,8 +93,16 @@
   <div class="card-body">
     <div class="profit-edit-grid">
       <div class="profit-readonly-metric">
-        <div class="label">Tổng doanh thu</div>
+        <div class="label">Doanh thu từ file quyết toán TikTok</div>
         <div class="value">{{ number_format((float) $period->total_revenue, 0, ',', '.') }} ₫</div>
+      </div>
+      <div class="profit-readonly-metric">
+        <div class="label">Doanh thu từ file tất cả đơn hàng/SKU</div>
+        <div class="value">{{ number_format((float) ($period->sku_revenue_total ?? 0), 0, ',', '.') }} ₫</div>
+      </div>
+      <div class="profit-readonly-metric">
+        <div class="label">Chênh lệch đã chia về từng mã</div>
+        <div class="value">{{ number_format((float) ($period->revenue_adjustment ?? 0), 0, ',', '.') }} ₫</div>
       </div>
       <div class="profit-readonly-metric">
         <div class="label">Phí sàn</div>
@@ -105,8 +113,12 @@
         <div class="value">{{ number_format((float) $period->ad_cost, 0, ',', '.') }} ₫</div>
       </div>
       <div class="profit-readonly-metric">
-        <div class="label">Số đơn</div>
-        <div class="value">{{ number_format((float) $period->order_count, 0, ',', '.') }}</div>
+        <div class="label">Đơn hoàn tất</div>
+        <div class="value">{{ number_format((float) ($period->completed_order_count ?: $period->order_count), 0, ',', '.') }}</div>
+      </div>
+      <div class="profit-readonly-metric">
+        <div class="label">Đơn theo file phân tích</div>
+        <div class="value">{{ number_format((float) ($period->analytics_order_count ?? 0), 0, ',', '.') }}</div>
       </div>
       <div class="profit-readonly-metric">
         <div class="label">Số món bán</div>
@@ -131,7 +143,9 @@
           <th>Seller SKU</th>
           <th>Sản phẩm</th>
           <th class="text-end">SL ròng</th>
-          <th class="text-end">Doanh thu</th>
+          <th class="text-end">DT từ file tất cả đơn hàng/SKU</th>
+          <th class="text-end">Chênh lệch chia về từng mã</th>
+          <th class="text-end">DT sau khi chia chênh lệch</th>
           <th>Giá vốn/sp</th>
           <th class="text-end">Lãi/lỗ hiện tại</th>
         </tr>
@@ -143,6 +157,8 @@
             <td class="fw-semibold">{{ $sku->seller_sku }}</td>
             <td><div class="profit-product-name" title="{{ $sku->product_name }}">{{ $sku->product_name ?: '-' }}</div></td>
             <td class="text-end profit-number">{{ number_format((float) $sku->net_quantity, 0, ',', '.') }}</td>
+            <td class="text-end profit-number">{{ number_format((float) ($sku->original_revenue ?: $sku->revenue), 0, ',', '.') }} ₫</td>
+            <td class="text-end profit-number">{{ number_format((float) ($sku->allocated_revenue_adjustment ?? 0), 0, ',', '.') }} ₫</td>
             <td class="text-end profit-number">{{ number_format((float) $sku->revenue, 0, ',', '.') }} ₫</td>
             <td>
               <input class="form-control form-control-sm profit-cost-input" name="sku_costs[{{ $sku->id }}]" inputmode="decimal" value="{{ old('sku_costs.'.$sku->id, number_format((float) $sku->unit_cost, 0, ',', '.')) }}">

@@ -252,20 +252,30 @@ class ProfitAnalysisController extends Controller
         $totalRevenue = (float) $profitAnalysisPeriod->total_revenue;
         $marketplaceFees = (float) $profitAnalysisPeriod->marketplace_fees;
         $adCost = (float) $profitAnalysisPeriod->ad_cost;
-        $orderCount = max(1, (int) $profitAnalysisPeriod->order_count);
-        $skuRevenue = max(0.01, (float) $profitAnalysisPeriod->skuSummaries->sum('revenue'));
+        $orderCount = max(1, (int) ($profitAnalysisPeriod->completed_order_count ?: $profitAnalysisPeriod->order_count));
+        $skuRevenue = max(0.01, (float) $profitAnalysisPeriod->skuSummaries->sum(function ($summary): float {
+            return (float) ($summary->original_revenue ?: $summary->revenue);
+        }));
+        $revenueAdjustment = $totalRevenue - $skuRevenue;
         $totalCogs = 0.0;
 
         foreach ($profitAnalysisPeriod->skuSummaries as $summary) {
             $unitCost = $this->number($validated['sku_costs'][$summary->id] ?? $summary->unit_cost);
             $cogs = (float) $summary->net_quantity * $unitCost;
-            $share = (float) $summary->revenue / $skuRevenue;
+            $originalRevenue = (float) ($summary->original_revenue ?: $summary->revenue);
+            $share = $originalRevenue / $skuRevenue;
+            $allocatedRevenueAdjustment = $revenueAdjustment * $share;
+            $finalRevenue = $originalRevenue + $allocatedRevenueAdjustment;
             $allocatedFees = $marketplaceFees * $share;
             $allocatedAdCost = $adCost * $share;
-            $profit = (float) $summary->revenue - $cogs - $allocatedFees - $allocatedAdCost;
+            $profit = $finalRevenue - $cogs - $allocatedFees - $allocatedAdCost;
 
             $summary->update([
                 'unit_cost' => $unitCost,
+                'original_revenue' => $originalRevenue,
+                'revenue' => $finalRevenue,
+                'allocated_revenue_adjustment' => $allocatedRevenueAdjustment,
+                'final_revenue' => $finalRevenue,
                 'cogs' => $cogs,
                 'allocated_fees' => $allocatedFees,
                 'allocated_ad_cost' => $allocatedAdCost,
@@ -281,6 +291,8 @@ class ProfitAnalysisController extends Controller
         $profit = $totalRevenue - $totalCost;
 
         $profitAnalysisPeriod->update([
+            'sku_revenue_total' => $skuRevenue,
+            'revenue_adjustment' => $revenueAdjustment,
             'cogs' => $totalCogs,
             'total_cost' => $totalCost,
             'profit' => $profit,
@@ -432,6 +444,8 @@ class ProfitAnalysisController extends Controller
             'item_count' => (int) $periods->sum('item_count'),
             'gmv' => (float) $periods->sum('gmv'),
             'settlement_revenue' => (float) $periods->sum('settlement_revenue'),
+            'sku_revenue_total' => (float) $periods->sum('sku_revenue_total'),
+            'revenue_adjustment' => (float) $periods->sum('revenue_adjustment'),
             'marketplace_fees' => (float) $periods->sum('marketplace_fees'),
             'ad_cost' => (float) $periods->sum('ad_cost'),
             'cogs' => (float) $periods->sum('cogs'),
@@ -440,6 +454,8 @@ class ProfitAnalysisController extends Controller
             'profit' => $profit,
             'profit_per_order' => $profit / $orderCount,
             'ad_breakeven' => (float) $periods->sum('ad_breakeven'),
+            'completed_order_count' => (int) $periods->sum('completed_order_count'),
+            'analytics_order_count' => (int) $periods->sum('analytics_order_count'),
             'confirmed_at' => $periods->max('confirmed_at'),
             'confirmedBy' => null,
             'skuSummaries' => $skuSummaries,
@@ -463,8 +479,11 @@ class ProfitAnalysisController extends Controller
                     'quantity_sold' => (float) $rows->sum('quantity_sold'),
                     'quantity_returned' => (float) $rows->sum('quantity_returned'),
                     'net_quantity' => $netQuantity,
+                    'original_revenue' => (float) $rows->sum('original_revenue'),
                     'revenue' => (float) $rows->sum('revenue'),
                     'refund_amount' => (float) $rows->sum('refund_amount'),
+                    'allocated_revenue_adjustment' => (float) $rows->sum('allocated_revenue_adjustment'),
+                    'final_revenue' => (float) $rows->sum('final_revenue'),
                     'cogs' => (float) $rows->sum('cogs'),
                     'allocated_fees' => (float) $rows->sum('allocated_fees'),
                     'allocated_ad_cost' => (float) $rows->sum('allocated_ad_cost'),
