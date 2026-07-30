@@ -191,10 +191,18 @@
           <div class="profit-kpi-label">Đơn hoàn tất</div>
           <div class="profit-kpi-value">{{ number_format((float) ($selectedPeriod->completed_order_count ?: $selectedPeriod->order_count), 0, ',', '.') }}</div>
         </div>
-        <div class="profit-kpi">
-          <div class="profit-kpi-label">Đơn theo file phân tích</div>
-          <div class="profit-kpi-value">{{ number_format((float) ($selectedPeriod->analytics_order_count ?? 0), 0, ',', '.') }}</div>
-        </div>
+        @if((float) ($selectedPeriod->analytics_order_count ?? 0) > 0)
+          <div class="profit-kpi">
+            <div class="profit-kpi-label">Đơn theo file phân tích</div>
+            <div class="profit-kpi-value">{{ number_format((float) ($selectedPeriod->analytics_order_count ?? 0), 0, ',', '.') }}</div>
+          </div>
+        @endif
+        @if((float) data_get($selectedPeriod->source_totals, 'ads.cost_per_order', 0) > 0)
+          <div class="profit-kpi">
+            <div class="profit-kpi-label">QC mỗi đơn hàng</div>
+            <div class="profit-kpi-value">{{ number_format((float) data_get($selectedPeriod->source_totals, 'ads.cost_per_order', 0), 0, ',', '.') }} ₫</div>
+          </div>
+        @endif
         <div class="profit-kpi">
           <div class="profit-kpi-label">QC tối đa hòa vốn</div>
           <div class="profit-kpi-value">{{ number_format((float) $selectedPeriod->ad_breakeven, 0, ',', '.') }} ₫</div>
@@ -331,7 +339,7 @@
   <div class="card mb-4">
     <div class="card-body text-center py-5">
       <h5 class="mb-2">Chưa có kỳ phân tích nào</h5>
-      <div class="text-muted mb-3">Upload 5 file để tạo bộ thống kê đầu tiên.</div>
+      <div class="text-muted mb-3">Upload 3 file và nhập chi phí QC mỗi đơn hàng để tạo bộ thống kê đầu tiên.</div>
       @if (hasPermission('PHAN_TICH_LAI_LO_CREATE'))
         <a href="{{ route('phan-tich-lai-lo.create') }}" class="btn btn-primary">Nhập dữ liệu tháng</a>
       @endif

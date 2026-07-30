@@ -117,17 +117,25 @@
         <div class="value">{{ number_format((float) $period->marketplace_fees, 0, ',', '.') }} ₫</div>
       </div>
       <div class="profit-readonly-metric">
-        <div class="label">Chi phí QC</div>
+        <div class="label">Tổng chi phí QC</div>
         <div class="value">{{ number_format((float) $period->ad_cost, 0, ',', '.') }} ₫</div>
       </div>
+      @if((float) data_get($period->source_totals, 'ads.cost_per_order', 0) > 0)
+        <div class="profit-readonly-metric">
+          <div class="label">Chi phí QC mỗi đơn hàng</div>
+          <div class="value">{{ number_format((float) data_get($period->source_totals, 'ads.cost_per_order', 0), 0, ',', '.') }} ₫</div>
+        </div>
+      @endif
       <div class="profit-readonly-metric">
         <div class="label">Đơn hoàn tất</div>
         <div class="value">{{ number_format((float) ($period->completed_order_count ?: $period->order_count), 0, ',', '.') }}</div>
       </div>
-      <div class="profit-readonly-metric">
-        <div class="label">Đơn theo file phân tích</div>
-        <div class="value">{{ number_format((float) ($period->analytics_order_count ?? 0), 0, ',', '.') }}</div>
-      </div>
+      @if((float) ($period->analytics_order_count ?? 0) > 0)
+        <div class="profit-readonly-metric">
+          <div class="label">Đơn theo file phân tích</div>
+          <div class="value">{{ number_format((float) ($period->analytics_order_count ?? 0), 0, ',', '.') }}</div>
+        </div>
+      @endif
       <div class="profit-readonly-metric">
         <div class="label">Số món bán</div>
         <div class="value">{{ number_format((float) $period->item_count, 0, ',', '.') }}</div>

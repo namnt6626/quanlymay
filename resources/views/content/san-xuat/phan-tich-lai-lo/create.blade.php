@@ -42,7 +42,7 @@
 <div class="d-flex flex-column flex-md-row gap-3 justify-content-between align-items-md-center mb-4">
   <div>
     <h4 class="mb-1">Nhập dữ liệu phân tích lãi lỗ</h4>
-    <div class="text-muted">Chọn tháng trước, upload 4 file bắt buộc; FOB chỉ dùng để gợi ý giá vốn nếu có.</div>
+    <div class="text-muted">Chọn tháng, upload 3 file bắt buộc và nhập chi phí QC mỗi đơn hàng.</div>
   </div>
   <a href="{{ route('phan-tich-lai-lo.index') }}" class="btn btn-outline-secondary">
     <i class="icon-base bx bx-arrow-back me-1"></i>Quay lại
@@ -66,12 +66,17 @@
         <label class="form-label">Tháng phân tích</label>
         <select class="form-select" name="period_month" required>
           @foreach($months as $value => $label)
-            <option value="{{ $value }}" @selected(old('period_month', now()->subMonth()->format('Y-m')) === $value)>{{ $label }}</option>
+            <option value="{{ $value }}" @selected(old('period_month', now()->format('Y-m')) === $value)>{{ $label }}</option>
           @endforeach
         </select>
       </div>
       <div class="col-12 col-md-8 col-xl-9 text-muted">
         Lần upload mới sẽ cần xác nhận lại giá vốn; dữ liệu tháng cũ chỉ bị thay thế sau khi bấm xác nhận cập nhật.
+      </div>
+      <div class="col-12 col-md-4 col-xl-3">
+        <label class="form-label">Chi phí QC mỗi đơn hàng</label>
+        <input type="text" class="form-control js-money-input" name="ad_cost_per_order" inputmode="numeric" value="{{ old('ad_cost_per_order') }}" required>
+        <div class="form-text">Hệ thống sẽ nhân số này với số đơn hoàn tất đã lọc theo file quyết toán.</div>
       </div>
     </div>
   </div>
@@ -79,8 +84,8 @@
   <div class="card-body">
     <div class="profit-upload-grid">
       <div class="profit-upload-box">
-        <label class="form-label">File giá vốn FOB <span class="text-muted fw-normal">(tùy chọn)</span></label>
-        <div class="profit-upload-note">Dùng để tự gợi ý mã FOB và giá vốn cho SKU chưa lưu.</div>
+        <label class="form-label">1. File giá vốn FOB</label>
+        <div class="profit-upload-note">Dùng để tự gợi ý mã FOB và giá vốn cho SKU.</div>
         <input type="file" class="form-control js-profit-file" data-file-key="fob_file" accept=".xlsx">
         <div class="form-text">Ví dụ: Copy of FOB-MỚI NHẤT.xlsx</div>
         <div class="profit-upload-status js-profit-file-status" data-file-key="fob_file">
@@ -88,37 +93,19 @@
         </div>
       </div>
       <div class="profit-upload-box">
-        <label class="form-label">1. File số liệu phân tích</label>
-        <div class="profit-upload-note">Lấy tổng doanh số đặt hàng (GMV), số món bán, đơn hàng, khách hàng, traffic.</div>
-        <input type="file" class="form-control js-profit-file" data-file-key="analytics_file" accept=".xlsx">
-        <div class="form-text">Ví dụ: SỐ LIỆU PHÂN TÍCH.xlsx</div>
-        <div class="profit-upload-status js-profit-file-status" data-file-key="analytics_file">
-          @if(isset($uploadedFiles['analytics_file']))<span class="is-ready">Đã tải lên: {{ $uploadedFiles['analytics_file']['name'] }}</span>@endif
-        </div>
-      </div>
-      <div class="profit-upload-box">
-        <label class="form-label">2. File chi phí QC</label>
-        <div class="profit-upload-note">Lấy tổng tiền quảng cáo, CPA, doanh thu gộp, ROI.</div>
-        <input type="file" class="form-control js-profit-file" data-file-key="ad_file" accept=".xlsx">
-        <div class="form-text">Ví dụ: CHI PHÍ QC.xlsx</div>
-        <div class="profit-upload-status js-profit-file-status" data-file-key="ad_file">
-          @if(isset($uploadedFiles['ad_file']))<span class="is-ready">Đã tải lên: {{ $uploadedFiles['ad_file']['name'] }}</span>@endif
-        </div>
-      </div>
-      <div class="profit-upload-box">
-        <label class="form-label">3. File quyết toán TikTok</label>
+        <label class="form-label">2. File quyết toán TikTok</label>
         <div class="profit-upload-note">Lấy doanh thu quyết toán, phí sàn, phí giao dịch, tiền thực nhận.</div>
         <input type="file" class="form-control js-profit-file" data-file-key="settlement_file" accept=".xlsx">
-        <div class="form-text">Ví dụ: 16-306.xlsx</div>
+        <div class="form-text">Ví dụ: quyết toán 20-6-26.xlsx</div>
         <div class="profit-upload-status js-profit-file-status" data-file-key="settlement_file">
           @if(isset($uploadedFiles['settlement_file']))<span class="is-ready">Đã tải lên: {{ $uploadedFiles['settlement_file']['name'] }}</span>@endif
         </div>
       </div>
       <div class="profit-upload-box">
-        <label class="form-label">4. File tất cả đơn hàng/SKU</label>
+        <label class="form-label">3. File tất cả đơn hàng/SKU</label>
         <div class="profit-upload-note">Lấy Seller SKU, số lượng bán, hoàn/trả, doanh thu từng SKU.</div>
         <input type="file" class="form-control js-profit-file" data-file-key="order_file" accept=".xlsx">
-        <div class="form-text">Ví dụ: Tất cả đơn hàng-2026-07-26-15_58.xlsx</div>
+        <div class="form-text">Ví dụ: Tất cả đơn hàng-2026-07-30-08_33.xlsx</div>
         <div class="profit-upload-status js-profit-file-status" data-file-key="order_file">
           @if(isset($uploadedFiles['order_file']))<span class="is-ready">Đã tải lên: {{ $uploadedFiles['order_file']['name'] }}</span>@endif
         </div>
@@ -141,12 +128,24 @@
     const token = @json($importToken);
     const uploadUrl = @json(route('phan-tich-lai-lo.upload-file'));
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
-    const requiredKeys = ['analytics_file', 'ad_file', 'settlement_file', 'order_file'];
+    const requiredKeys = ['fob_file', 'settlement_file', 'order_file'];
     const uploaded = new Set(@json(array_keys($uploadedFiles)));
     const uploading = new Set();
     const chunkSize = 1024 * 1024;
     const previewForm = document.getElementById('profit-preview-form');
     const previewButton = document.getElementById('profit-preview-button');
+
+    function formatMoney(value) {
+      const digits = String(value || '').replace(/\D/g, '');
+      return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
+    document.querySelectorAll('.js-money-input').forEach((input) => {
+      input.value = formatMoney(input.value);
+      input.addEventListener('input', () => {
+        input.value = formatMoney(input.value);
+      });
+    });
 
     function statusFor(key) {
       return document.querySelector(`.js-profit-file-status[data-file-key="${key}"]`);
@@ -245,7 +244,7 @@
       const missing = requiredKeys.filter((key) => !uploaded.has(key));
       if (missing.length > 0) {
         event.preventDefault();
-        alert('Vui lòng tải lên đủ 4 file bắt buộc trước khi kiểm tra dữ liệu.');
+        alert('Vui lòng tải lên đủ 3 file bắt buộc trước khi kiểm tra dữ liệu.');
       } else if (uploading.size > 0) {
         event.preventDefault();
         alert('File đang tải lên, vui lòng đợi hoàn tất.');

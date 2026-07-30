@@ -65,7 +65,7 @@ class ProfitAnalysisController extends Controller
     {
         $validated = $request->validate([
             'import_token' => ['required', 'string', 'max:80'],
-            'file_key' => ['required', 'string', 'in:fob_file,analytics_file,ad_file,settlement_file,order_file'],
+            'file_key' => ['required', 'string', 'in:fob_file,settlement_file,order_file'],
             'upload_id' => ['required', 'string', 'max:120', 'regex:/^[A-Za-z0-9_-]+$/'],
             'chunk_index' => ['required', 'integer', 'min:0'],
             'total_chunks' => ['required', 'integer', 'min:1', 'max:10000'],
@@ -162,19 +162,26 @@ class ProfitAnalysisController extends Controller
         $validated = $request->validate([
             'period_month' => ['required', 'date_format:Y-m'],
             'import_token' => ['required', 'string', 'max:80'],
+            'ad_cost_per_order' => ['required', 'string', 'max:50'],
         ], [
             'period_month.required' => 'Vui lòng chọn tháng phân tích.',
+            'ad_cost_per_order.required' => 'Vui lòng nhập chi phí QC mỗi đơn hàng.',
         ]);
+
+        $adCostPerOrder = $this->number($validated['ad_cost_per_order']);
+        if ($adCostPerOrder < 0) {
+            return back()->withInput()->withErrors(['ad_cost_per_order' => 'Chi phí QC mỗi đơn hàng không được âm.']);
+        }
 
         $uploads = Session::get($this->uploadSessionKey($validated['import_token']), []);
         $missing = [];
-        foreach (['analytics_file', 'ad_file', 'settlement_file', 'order_file'] as $requiredKey) {
+        foreach (['fob_file', 'settlement_file', 'order_file'] as $requiredKey) {
             if (! isset($uploads[$requiredKey]['path']) || ! is_file($uploads[$requiredKey]['path'])) {
                 $missing[] = $requiredKey;
             }
         }
         if ($missing !== []) {
-            return back()->withInput()->withErrors(['files' => 'Vui lòng tải lên đủ 4 file bắt buộc trước khi kiểm tra dữ liệu.']);
+            return back()->withInput()->withErrors(['files' => 'Vui lòng tải lên đủ 3 file bắt buộc trước khi kiểm tra dữ liệu.']);
         }
 
         $files = collect($uploads)
@@ -183,7 +190,11 @@ class ProfitAnalysisController extends Controller
             ->all();
 
         try {
-            $preview = $service->preview($files, Carbon::createFromFormat('Y-m', $validated['period_month'])->startOfMonth());
+            $preview = $service->preview(
+                $files,
+                Carbon::createFromFormat('Y-m', $validated['period_month'])->startOfMonth(),
+                $adCostPerOrder
+            );
         } catch (RuntimeException $exception) {
             return back()->withInput()->withErrors(['files' => $exception->getMessage()]);
         }

@@ -100,14 +100,39 @@
 @php
   $settlementFilter = data_get($preview, 'source_totals.orders.settlement_filter', []);
   $missingSettlementRevenue = abs((float) data_get($settlementFilter, 'missing_revenue', 0));
+  $settlementOrderCount = (int) data_get($settlementFilter, 'settlement_order_count', 0);
+  $matchedOrderCount = (int) data_get($settlementFilter, 'matched_order_count', 0);
+  $missingOrderCount = (int) data_get($settlementFilter, 'missing_order_count', 0);
+  $settlementCreatedStart = data_get($preview, 'source_totals.settlement.order_created_start');
+  $settlementCreatedEnd = data_get($preview, 'source_totals.settlement.order_created_end');
 @endphp
 @if(data_get($settlementFilter, 'enabled'))
   <div class="alert {{ $missingSettlementRevenue > 0.5 ? 'alert-danger' : (data_get($settlementFilter, 'missing_order_count', 0) > 0 ? 'alert-warning' : 'alert-success') }}">
-    File tất cả đơn hàng/SKU đã lọc theo mã đơn trong file quyết toán TikTok:
-    tìm thấy {{ number_format((float) data_get($settlementFilter, 'matched_order_count', 0), 0, ',', '.') }}/{{ number_format((float) data_get($settlementFilter, 'settlement_order_count', 0), 0, ',', '.') }} đơn.
-    @if(data_get($settlementFilter, 'missing_order_count', 0) > 0)
-      Còn thiếu {{ number_format((float) data_get($settlementFilter, 'missing_order_count', 0), 0, ',', '.') }} đơn,
-      doanh thu thiếu {{ number_format((float) data_get($settlementFilter, 'missing_revenue', 0), 0, ',', '.') }} ₫.
+    @if($settlementOrderCount > 0 && $matchedOrderCount === 0)
+      <div class="fw-semibold mb-1">Không lấy được số liệu bán hàng vì file tất cả đơn hàng/SKU không có mã đơn nào trùng với file quyết toán TikTok.</div>
+      <div>
+        File quyết toán có {{ number_format($settlementOrderCount, 0, ',', '.') }} đơn.
+        @if($settlementCreatedStart && $settlementCreatedEnd)
+          Các đơn trong file quyết toán được tạo từ {{ \Carbon\Carbon::parse($settlementCreatedStart)->format('d/m/Y') }} đến {{ \Carbon\Carbon::parse($settlementCreatedEnd)->format('d/m/Y') }}.
+          Vui lòng xuất lại file tất cả đơn hàng/SKU theo cột Thời gian tạo đơn hàng trong khoảng này.
+        @else
+          Vui lòng xuất lại file tất cả đơn hàng/SKU theo khoảng Thời gian tạo đơn hàng của các đơn trong file quyết toán.
+        @endif
+        File quyết toán gồm {{ number_format((float) data_get($preview, 'source_totals.settlement.positive_order_count', 0), 0, ',', '.') }} đơn dương tiền
+        và {{ number_format((float) data_get($preview, 'source_totals.settlement.negative_order_count', 0), 0, ',', '.') }} đơn âm tiền.
+      </div>
+    @else
+      File tất cả đơn hàng/SKU đã lọc theo mã đơn trong file quyết toán TikTok:
+      tìm thấy {{ number_format($matchedOrderCount, 0, ',', '.') }}/{{ number_format($settlementOrderCount, 0, ',', '.') }} đơn.
+      @if($missingOrderCount > 0)
+        Còn thiếu {{ number_format($missingOrderCount, 0, ',', '.') }} đơn,
+        doanh thu thiếu {{ number_format((float) data_get($settlementFilter, 'missing_revenue', 0), 0, ',', '.') }} ₫.
+        @if($settlementCreatedStart && $settlementCreatedEnd)
+          Vui lòng xuất lại file tất cả đơn hàng/SKU theo cột Thời gian tạo đơn hàng từ {{ \Carbon\Carbon::parse($settlementCreatedStart)->format('d/m/Y') }} đến {{ \Carbon\Carbon::parse($settlementCreatedEnd)->format('d/m/Y') }}.
+        @else
+          Vui lòng xuất lại file tất cả đơn hàng/SKU bao phủ đủ ngày tạo đơn trong file quyết toán.
+        @endif
+      @endif
     @endif
   </div>
 @endif
@@ -116,10 +141,12 @@
   <div class="card-header"><h5 class="mb-0">Tổng quan file đã đọc</h5></div>
   <div class="card-body">
     <div class="profit-preview-grid">
-      <div class="profit-preview-metric">
-        <div class="label">Tổng doanh số đặt hàng (GMV)</div>
-        <div class="value">{{ number_format((float) $preview['summary']['gmv'], 0, ',', '.') }} ₫</div>
-      </div>
+      @if((float) $preview['summary']['gmv'] > 0)
+        <div class="profit-preview-metric">
+          <div class="label">Tổng doanh số đặt hàng (GMV)</div>
+          <div class="value">{{ number_format((float) $preview['summary']['gmv'], 0, ',', '.') }} ₫</div>
+        </div>
+      @endif
       <div class="profit-preview-metric">
         <div class="label">Doanh thu từ file quyết toán TikTok</div>
         <div class="value">{{ number_format((float) $preview['summary']['settlement_revenue'], 0, ',', '.') }} ₫</div>
@@ -131,6 +158,22 @@
       <div class="profit-preview-metric">
         <div class="label">Đơn trong file quyết toán TikTok</div>
         <div class="value">{{ number_format((float) data_get($settlementFilter, 'settlement_order_count', 0), 0, ',', '.') }}</div>
+      </div>
+      <div class="profit-preview-metric">
+        <div class="label">Đơn quyết toán dương tiền</div>
+        <div class="value text-success">{{ number_format((float) data_get($preview, 'source_totals.settlement.positive_order_count', 0), 0, ',', '.') }}</div>
+      </div>
+      <div class="profit-preview-metric">
+        <div class="label">Tổng tiền đơn dương</div>
+        <div class="value text-success">{{ number_format((float) data_get($preview, 'source_totals.settlement.positive_order_revenue', 0), 0, ',', '.') }} ₫</div>
+      </div>
+      <div class="profit-preview-metric">
+        <div class="label">Đơn quyết toán âm tiền</div>
+        <div class="value text-danger">{{ number_format((float) data_get($preview, 'source_totals.settlement.negative_order_count', 0), 0, ',', '.') }}</div>
+      </div>
+      <div class="profit-preview-metric">
+        <div class="label">Tổng tiền đơn âm</div>
+        <div class="value text-danger">{{ number_format((float) data_get($preview, 'source_totals.settlement.negative_order_revenue', 0), 0, ',', '.') }} ₫</div>
       </div>
       <div class="profit-preview-metric">
         <div class="label">Đơn quyết toán tìm thấy trong file SKU</div>
@@ -161,17 +204,23 @@
         <div class="value">{{ number_format((float) $preview['summary']['marketplace_fees'], 0, ',', '.') }} ₫</div>
       </div>
       <div class="profit-preview-metric">
-        <div class="label">Chi phí QC</div>
+        <div class="label">Chi phí QC mỗi đơn hàng</div>
+        <div class="value">{{ number_format((float) ($preview['summary']['ad_cost_per_order'] ?? data_get($preview, 'source_totals.ads.cost_per_order', 0)), 0, ',', '.') }} ₫</div>
+      </div>
+      <div class="profit-preview-metric">
+        <div class="label">Tổng chi phí QC</div>
         <div class="value">{{ number_format((float) $preview['summary']['ad_cost'], 0, ',', '.') }} ₫</div>
       </div>
       <div class="profit-preview-metric">
         <div class="label">Đơn hoàn tất</div>
         <div class="value">{{ number_format((float) $preview['summary']['completed_order_count'], 0, ',', '.') }}</div>
       </div>
-      <div class="profit-preview-metric">
-        <div class="label">Đơn theo file phân tích</div>
-        <div class="value">{{ number_format((float) $preview['summary']['analytics_order_count'], 0, ',', '.') }}</div>
-      </div>
+      @if((float) $preview['summary']['analytics_order_count'] > 0)
+        <div class="profit-preview-metric">
+          <div class="label">Đơn theo file phân tích</div>
+          <div class="value">{{ number_format((float) $preview['summary']['analytics_order_count'], 0, ',', '.') }}</div>
+        </div>
+      @endif
       <div class="profit-preview-metric">
         <div class="label">SKU cần bổ sung</div>
         <div class="value {{ $preview['summary']['missing_cost_count'] > 0 ? 'text-danger' : 'text-success' }}">{{ number_format($preview['summary']['missing_cost_count'], 0, ',', '.') }}</div>

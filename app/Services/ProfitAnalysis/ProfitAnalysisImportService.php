@@ -18,17 +18,14 @@ class ProfitAnalysisImportService
      * @param array<string, string> $files
      * @return array<string, mixed>
      */
-    public function preview(array $files, Carbon $periodMonth): array
+    public function preview(array $files, Carbon $periodMonth, float $adCostPerOrder = 0): array
     {
-        $fob = isset($files['fob_file']) ? $this->parseFob($files['fob_file']) : [
-            'items' => [],
-            'byCandidate' => [],
-            'byNumber' => [],
-        ];
-        $analytics = $this->parseAnalytics($files['analytics_file']);
-        $ads = $this->parseAds($files['ad_file']);
+        $fob = $this->parseFob($files['fob_file']);
+        $analytics = $this->emptyAnalytics();
         $settlement = $this->parseSettlement($files['settlement_file']);
         $orders = $this->parseOrderSkuList($files['order_file'], $settlement['orders_by_id'] ?? []);
+        $adCost = max(0, $adCostPerOrder) * (int) $orders['unique_orders'];
+        $ads = $this->manualAds($adCostPerOrder, (int) $orders['unique_orders'], $adCost);
         $settlementSource = $settlement;
         unset($settlementSource['orders_by_id']);
 
@@ -93,6 +90,7 @@ class ProfitAnalysisImportService
                 'revenue_adjustment' => (float) $settlement['total_revenue'] - (float) collect($skuRows)->sum('revenue'),
                 'marketplace_fees' => abs((float) $settlement['total_fees']),
                 'ad_cost' => (float) $ads['ad_cost'],
+                'ad_cost_per_order' => (float) $ads['cost_per_order'],
             ],
             'sku_rows' => $skuRows,
         ];
@@ -359,6 +357,39 @@ class ProfitAnalysisImportService
     /**
      * @return array<string, mixed>
      */
+    private function emptyAnalytics(): array
+    {
+        return [
+            'gmv' => 0,
+            'items_sold' => 0,
+            'sku_orders' => 0,
+            'orders' => 0,
+            'customers' => 0,
+            'visitors' => 0,
+            'product_impressions' => 0,
+            'unique_product_impressions' => 0,
+            'source' => 'not_used',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function manualAds(float $costPerOrder, int $orderCount, float $adCost): array
+    {
+        return [
+            'ad_cost' => $adCost,
+            'sku_order_count' => $orderCount,
+            'cost_per_order' => $costPerOrder,
+            'gross_revenue' => 0,
+            'roi' => 0,
+            'source' => 'manual_cost_per_order',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     private function parseSettlement(string $path): array
     {
         $rows = $this->reader->rows($path, 'Báo cáo');
@@ -408,6 +439,30 @@ class ProfitAnalysisImportService
         $totals['order_revenue'] = (float) collect($totals['orders_by_id'])->sum('revenue');
         $totals['order_subtotal_after_discount'] = (float) collect($totals['orders_by_id'])->sum('subtotal_after_discount');
         $totals['order_refund_after_discount'] = (float) collect($totals['orders_by_id'])->sum('refund_after_discount');
+        $positiveOrders = collect($totals['orders_by_id'])->filter(fn (array $order): bool => (float) $order['revenue'] > 0);
+        $negativeOrders = collect($totals['orders_by_id'])->filter(fn (array $order): bool => (float) $order['revenue'] < 0);
+        $zeroOrders = collect($totals['orders_by_id'])->filter(fn (array $order): bool => abs((float) $order['revenue']) < 0.01);
+        $totals['positive_order_count'] = $positiveOrders->count();
+        $totals['positive_order_revenue'] = (float) $positiveOrders->sum('revenue');
+        $totals['negative_order_count'] = $negativeOrders->count();
+        $totals['negative_order_revenue'] = (float) $negativeOrders->sum('revenue');
+        $totals['zero_order_count'] = $zeroOrders->count();
+        $totals['sample_positive_order_ids'] = $positiveOrders->keys()->take(10)->values()->all();
+        $totals['sample_negative_order_ids'] = $negativeOrders->keys()->take(10)->values()->all();
+        $createdDates = collect($totals['orders_by_id'])
+            ->pluck('created_at')
+            ->map(fn (string $date): ?string => $this->parseDate($date)?->toDateString())
+            ->filter()
+            ->values();
+        $settledDates = collect($totals['orders_by_id'])
+            ->pluck('settled_at')
+            ->map(fn (string $date): ?string => $this->parseDate($date)?->toDateString())
+            ->filter()
+            ->values();
+        $totals['order_created_start'] = $createdDates->isNotEmpty() ? $createdDates->min() : null;
+        $totals['order_created_end'] = $createdDates->isNotEmpty() ? $createdDates->max() : null;
+        $totals['order_settled_start'] = $settledDates->isNotEmpty() ? $settledDates->min() : null;
+        $totals['order_settled_end'] = $settledDates->isNotEmpty() ? $settledDates->max() : null;
 
         return $totals;
     }
