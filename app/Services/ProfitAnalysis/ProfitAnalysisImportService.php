@@ -28,7 +28,9 @@ class ProfitAnalysisImportService
         $analytics = $this->parseAnalytics($files['analytics_file']);
         $ads = $this->parseAds($files['ad_file']);
         $settlement = $this->parseSettlement($files['settlement_file']);
-        $orders = $this->parseOrderSkuList($files['order_file']);
+        $orders = $this->parseOrderSkuList($files['order_file'], $settlement['orders_by_id'] ?? []);
+        $settlementSource = $settlement;
+        unset($settlementSource['orders_by_id']);
 
         $skuRows = [];
         foreach ($orders['sku_rows'] as $sellerSku => $row) {
@@ -62,12 +64,14 @@ class ProfitAnalysisImportService
             'source_totals' => [
                 'analytics' => $analytics,
                 'ads' => $ads,
-                'settlement' => $settlement,
+                'settlement' => $settlementSource,
                 'orders' => [
                     'row_count' => $orders['row_count'],
                     'unique_orders' => $orders['unique_orders'],
+                    'file_unique_orders' => $orders['file_unique_orders'],
                     'sku_count' => count($skuRows),
                     'status_counts' => $orders['status_counts'],
+                    'settlement_filter' => $orders['settlement_filter'],
                 ],
                 'fob' => [
                     'sku_count' => count($fob['items']),
@@ -80,7 +84,7 @@ class ProfitAnalysisImportService
                 'order_count' => (int) $orders['unique_orders'],
                 'completed_order_count' => (int) $orders['unique_orders'],
                 'analytics_order_count' => (int) $analytics['orders'],
-                'item_count' => (int) ($analytics['items_sold'] ?: collect($skuRows)->sum('quantity_sold')),
+                'item_count' => (int) collect($skuRows)->sum('quantity_sold'),
                 'gmv' => (float) $analytics['gmv'],
                 'settlement_revenue' => (float) $settlement['total_revenue'],
                 'sku_gross_revenue_total' => (float) collect($skuRows)->sum(fn (array $row): float => $row['revenue'] + $row['refund_amount']),
@@ -102,6 +106,11 @@ class ProfitAnalysisImportService
     {
         $skuRows = [];
         $missing = [];
+        $missingSettlementRevenue = abs((float) data_get($preview, 'source_totals.orders.settlement_filter.missing_revenue', 0));
+
+        if ($missingSettlementRevenue > 0.5) {
+            throw new RuntimeException('File tất cả đơn hàng/SKU đang thiếu đơn có doanh thu trong file quyết toán. Vui lòng upload file đơn hàng bao phủ đủ các mã đơn quyết toán.');
+        }
 
         foreach ($preview['sku_rows'] as $row) {
             $input = $skuInputs[$row['key']] ?? [];
@@ -394,13 +403,79 @@ class ProfitAnalysisImportService
             throw new RuntimeException('File quyết toán chưa nhận diện được dòng Tổng doanh thu.');
         }
 
+        $totals['orders_by_id'] = $this->parseSettlementOrderDetails($path);
+        $totals['order_count'] = count($totals['orders_by_id']);
+        $totals['order_revenue'] = (float) collect($totals['orders_by_id'])->sum('revenue');
+        $totals['order_subtotal_after_discount'] = (float) collect($totals['orders_by_id'])->sum('subtotal_after_discount');
+        $totals['order_refund_after_discount'] = (float) collect($totals['orders_by_id'])->sum('refund_after_discount');
+
         return $totals;
     }
 
     /**
+     * @return array<string, array<string, mixed>>
+     */
+    private function parseSettlementOrderDetails(string $path): array
+    {
+        $rows = $this->reader->rows($path, 'Chi tiết đơn hàng');
+        $header = $rows[1] ?? [];
+        $columns = $this->mapHeaderColumns($header);
+
+        foreach (['Loại giao dịch', 'ID đơn hàng liên quan', 'Tổng doanh thu', 'Tổng phụ sau giảm giá của người bán', 'Tổng phụ của khoản hoàn tiền sau giảm giá của người bán'] as $required) {
+            if (! isset($columns[$required])) {
+                throw new RuntimeException('File quyết toán thiếu cột '.$required.' trong sheet Chi tiết đơn hàng.');
+            }
+        }
+
+        $orders = [];
+        foreach ($rows as $rowNumber => $row) {
+            if ($rowNumber <= 1) {
+                continue;
+            }
+
+            if (trim((string) ($row[$columns['Loại giao dịch']] ?? '')) !== 'Đơn hàng') {
+                continue;
+            }
+
+            $orderId = trim((string) ($row[$columns['ID đơn hàng liên quan']] ?? ''));
+            if ($orderId === '' || $orderId === '/') {
+                continue;
+            }
+
+            if (! isset($orders[$orderId])) {
+                $orders[$orderId] = [
+                    'order_id' => $orderId,
+                    'rows' => 0,
+                    'revenue' => 0.0,
+                    'subtotal_after_discount' => 0.0,
+                    'refund_after_discount' => 0.0,
+                    'settlement_amount' => 0.0,
+                    'fees' => 0.0,
+                    'created_at' => trim((string) ($row[$columns['Thời gian tạo đơn hàng'] ?? 0] ?? '')),
+                    'settled_at' => trim((string) ($row[$columns['Thời gian quyết toán đơn hàng'] ?? 0] ?? '')),
+                ];
+            }
+
+            $orders[$orderId]['rows']++;
+            $orders[$orderId]['revenue'] += $this->number($row[$columns['Tổng doanh thu']] ?? 0);
+            $orders[$orderId]['subtotal_after_discount'] += $this->number($row[$columns['Tổng phụ sau giảm giá của người bán']] ?? 0);
+            $orders[$orderId]['refund_after_discount'] += $this->number($row[$columns['Tổng phụ của khoản hoàn tiền sau giảm giá của người bán']] ?? 0);
+            $orders[$orderId]['settlement_amount'] += $this->number($row[$columns['Tổng số tiền quyết toán'] ?? 0] ?? 0);
+            $orders[$orderId]['fees'] += $this->number($row[$columns['Tổng phí'] ?? 0] ?? 0);
+        }
+
+        if ($orders === []) {
+            throw new RuntimeException('File quyết toán chưa có danh sách ID đơn hàng trong sheet Chi tiết đơn hàng.');
+        }
+
+        return $orders;
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $settlementOrders
      * @return array<string, mixed>
      */
-    private function parseOrderSkuList(string $path): array
+    private function parseOrderSkuList(string $path, array $settlementOrders = []): array
     {
         $rows = $this->reader->rows($path, 'OrderSKUList');
         $header = $rows[1] ?? [];
@@ -414,9 +489,11 @@ class ProfitAnalysisImportService
 
         $skuRows = [];
         $uniqueOrders = [];
+        $fileUniqueOrders = [];
         $statusCounts = [];
         $dates = [];
         $rowCount = 0;
+        $matchedSettlementOrders = [];
 
         foreach ($rows as $rowNumber => $row) {
             if ($rowNumber <= 2) {
@@ -428,14 +505,27 @@ class ProfitAnalysisImportService
                 continue;
             }
 
+            $orderId = trim((string) ($row[$columns['Order ID']] ?? ''));
+            if ($orderId !== '') {
+                $fileUniqueOrders[$orderId] = true;
+            }
+
             $status = trim((string) ($row[$columns['Order Status']] ?? ''));
             $statusCounts[$status] = ($statusCounts[$status] ?? 0) + 1;
+
+            if ($settlementOrders !== [] && ($orderId === '' || ! isset($settlementOrders[$orderId]))) {
+                continue;
+            }
+
+            if ($orderId !== '') {
+                $matchedSettlementOrders[$orderId] = true;
+            }
+
             if ($this->normalize($status) === 'da huy') {
                 continue;
             }
 
             $rowCount++;
-            $orderId = trim((string) ($row[$columns['Order ID']] ?? ''));
             if ($orderId !== '') {
                 $uniqueOrders[$orderId] = true;
             }
@@ -472,10 +562,27 @@ class ProfitAnalysisImportService
             $skuRows[$sellerSku]['refund_amount'] += $refund;
         }
 
+        $missingSettlementOrders = array_diff_key($settlementOrders, $matchedSettlementOrders);
+        $missingRevenue = (float) collect($missingSettlementOrders)->sum('revenue');
+        $missingSubtotal = (float) collect($missingSettlementOrders)->sum('subtotal_after_discount');
+        $missingRefund = (float) collect($missingSettlementOrders)->sum('refund_after_discount');
+
         return [
             'row_count' => $rowCount,
             'unique_orders' => count($uniqueOrders),
+            'file_unique_orders' => count($fileUniqueOrders),
             'status_counts' => $statusCounts,
+            'settlement_filter' => [
+                'enabled' => $settlementOrders !== [],
+                'settlement_order_count' => count($settlementOrders),
+                'matched_order_count' => count($matchedSettlementOrders),
+                'missing_order_count' => count($missingSettlementOrders),
+                'missing_revenue' => $missingRevenue,
+                'missing_subtotal_after_discount' => $missingSubtotal,
+                'missing_refund_after_discount' => $missingRefund,
+                'missing_net_subtotal_after_discount' => $missingSubtotal + $missingRefund,
+                'sample_missing_order_ids' => array_slice(array_keys($missingSettlementOrders), 0, 10),
+            ],
             'period_start' => $dates !== [] ? min($dates) : null,
             'period_end' => $dates !== [] ? max($dates) : null,
             'sku_rows' => $skuRows,

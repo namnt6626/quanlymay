@@ -97,12 +97,27 @@
   </div>
 @endif
 
+@php
+  $settlementFilter = data_get($preview, 'source_totals.orders.settlement_filter', []);
+  $missingSettlementRevenue = abs((float) data_get($settlementFilter, 'missing_revenue', 0));
+@endphp
+@if(data_get($settlementFilter, 'enabled'))
+  <div class="alert {{ $missingSettlementRevenue > 0.5 ? 'alert-danger' : (data_get($settlementFilter, 'missing_order_count', 0) > 0 ? 'alert-warning' : 'alert-success') }}">
+    File tất cả đơn hàng/SKU đã lọc theo mã đơn trong file quyết toán TikTok:
+    tìm thấy {{ number_format((float) data_get($settlementFilter, 'matched_order_count', 0), 0, ',', '.') }}/{{ number_format((float) data_get($settlementFilter, 'settlement_order_count', 0), 0, ',', '.') }} đơn.
+    @if(data_get($settlementFilter, 'missing_order_count', 0) > 0)
+      Còn thiếu {{ number_format((float) data_get($settlementFilter, 'missing_order_count', 0), 0, ',', '.') }} đơn,
+      doanh thu thiếu {{ number_format((float) data_get($settlementFilter, 'missing_revenue', 0), 0, ',', '.') }} ₫.
+    @endif
+  </div>
+@endif
+
 <div class="card mb-4">
   <div class="card-header"><h5 class="mb-0">Tổng quan file đã đọc</h5></div>
   <div class="card-body">
     <div class="profit-preview-grid">
       <div class="profit-preview-metric">
-        <div class="label">GMV</div>
+        <div class="label">Tổng doanh số đặt hàng (GMV)</div>
         <div class="value">{{ number_format((float) $preview['summary']['gmv'], 0, ',', '.') }} ₫</div>
       </div>
       <div class="profit-preview-metric">
@@ -112,6 +127,22 @@
       <div class="profit-preview-metric">
         <div class="label">Doanh thu từ file tất cả đơn hàng/SKU</div>
         <div class="value">{{ number_format((float) $preview['summary']['sku_revenue_total'], 0, ',', '.') }} ₫</div>
+      </div>
+      <div class="profit-preview-metric">
+        <div class="label">Đơn trong file quyết toán TikTok</div>
+        <div class="value">{{ number_format((float) data_get($settlementFilter, 'settlement_order_count', 0), 0, ',', '.') }}</div>
+      </div>
+      <div class="profit-preview-metric">
+        <div class="label">Đơn quyết toán tìm thấy trong file SKU</div>
+        <div class="value">{{ number_format((float) data_get($settlementFilter, 'matched_order_count', 0), 0, ',', '.') }}</div>
+      </div>
+      <div class="profit-preview-metric">
+        <div class="label">Đơn quyết toán còn thiếu trong file SKU</div>
+        <div class="value {{ data_get($settlementFilter, 'missing_order_count', 0) > 0 ? 'text-warning' : 'text-success' }}">{{ number_format((float) data_get($settlementFilter, 'missing_order_count', 0), 0, ',', '.') }}</div>
+      </div>
+      <div class="profit-preview-metric">
+        <div class="label">Doanh thu của đơn còn thiếu</div>
+        <div class="value {{ $missingSettlementRevenue > 0.5 ? 'text-danger' : 'text-success' }}">{{ number_format((float) data_get($settlementFilter, 'missing_revenue', 0), 0, ',', '.') }} ₫</div>
       </div>
       <div class="profit-preview-metric">
         <div class="label">DT đơn hàng trước khi trừ hoàn/trả</div>
@@ -210,7 +241,7 @@
     <div class="text-muted">Sau khi xác nhận, dữ liệu {{ $preview['period']['label'] }} sẽ trở thành bộ thống kê chính của tháng.</div>
     <div class="d-flex gap-2">
       <a href="{{ route('phan-tich-lai-lo.create') }}" class="btn btn-outline-secondary">Hủy</a>
-      <button class="btn btn-primary" onclick="return confirm('Xác nhận cập nhật dữ liệu {{ $preview['period']['label'] }}?')">
+      <button class="btn btn-primary" @disabled($missingSettlementRevenue > 0.5) onclick="return confirm('Xác nhận cập nhật dữ liệu {{ $preview['period']['label'] }}?')">
         <i class="icon-base bx bx-check me-1"></i>Xác nhận cập nhật tháng
       </button>
     </div>

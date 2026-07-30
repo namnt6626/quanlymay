@@ -89,7 +89,7 @@
       </div>
       <div class="profit-upload-box">
         <label class="form-label">1. File số liệu phân tích</label>
-        <div class="profit-upload-note">Lấy GMV, số món bán, đơn hàng, khách hàng, traffic.</div>
+        <div class="profit-upload-note">Lấy tổng doanh số đặt hàng (GMV), số món bán, đơn hàng, khách hàng, traffic.</div>
         <input type="file" class="form-control js-profit-file" data-file-key="analytics_file" accept=".xlsx">
         <div class="form-text">Ví dụ: SỐ LIỆU PHÂN TÍCH.xlsx</div>
         <div class="profit-upload-status js-profit-file-status" data-file-key="analytics_file">
