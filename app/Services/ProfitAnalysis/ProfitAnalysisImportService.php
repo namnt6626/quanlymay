@@ -628,6 +628,16 @@ class ProfitAnalysisImportService
         $missingRevenue = (float) collect($missingSettlementOrders)->sum('revenue');
         $missingSubtotal = (float) collect($missingSettlementOrders)->sum('subtotal_after_discount');
         $missingRefund = (float) collect($missingSettlementOrders)->sum('refund_after_discount');
+        $missingOrders = collect($missingSettlementOrders)
+            ->map(fn (array $order, string $orderId): array => [
+                'order_id' => $orderId,
+                'created_at' => $order['created_at'] ?? null,
+                'settled_at' => $order['settled_at'] ?? null,
+                'revenue' => (float) ($order['revenue'] ?? 0),
+                'settlement_amount' => (float) ($order['settlement_amount'] ?? 0),
+            ])
+            ->values()
+            ->all();
 
         return [
             'row_count' => $rowCount,
@@ -644,6 +654,7 @@ class ProfitAnalysisImportService
                 'missing_refund_after_discount' => $missingRefund,
                 'missing_net_subtotal_after_discount' => $missingSubtotal + $missingRefund,
                 'sample_missing_order_ids' => array_slice(array_keys($missingSettlementOrders), 0, 10),
+                'missing_orders' => $missingOrders,
             ],
             'period_start' => $dates !== [] ? min($dates) : null,
             'period_end' => $dates !== [] ? max($dates) : null,

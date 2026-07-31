@@ -59,6 +59,19 @@
   .profit-map-input {
     min-width: 130px;
   }
+  .profit-missing-orders-scroll {
+    max-height: 65vh;
+    overflow: auto;
+  }
+  .profit-missing-orders-table {
+    min-width: 760px;
+  }
+  .profit-missing-orders-table th {
+    position: sticky;
+    top: 0;
+    background: var(--bs-gray-100);
+    z-index: 1;
+  }
 </style>
 @endsection
 
@@ -103,6 +116,7 @@
   $settlementOrderCount = (int) data_get($settlementFilter, 'settlement_order_count', 0);
   $matchedOrderCount = (int) data_get($settlementFilter, 'matched_order_count', 0);
   $missingOrderCount = (int) data_get($settlementFilter, 'missing_order_count', 0);
+  $missingOrders = data_get($settlementFilter, 'missing_orders', []);
   $settlementCreatedStart = data_get($preview, 'source_totals.settlement.order_created_start');
   $settlementCreatedEnd = data_get($preview, 'source_totals.settlement.order_created_end');
 @endphp
@@ -120,6 +134,11 @@
         @endif
         File quyết toán gồm {{ number_format((float) data_get($preview, 'source_totals.settlement.positive_order_count', 0), 0, ',', '.') }} đơn dương tiền
         và {{ number_format((float) data_get($preview, 'source_totals.settlement.negative_order_count', 0), 0, ',', '.') }} đơn âm tiền.
+        @if($missingOrderCount > 0)
+          <button type="button" class="btn btn-sm btn-outline-danger ms-2" data-bs-toggle="modal" data-bs-target="#missingOrdersModal">
+            Xem đơn thiếu
+          </button>
+        @endif
       </div>
     @else
       File tất cả đơn hàng/SKU đã lọc theo mã đơn trong file quyết toán TikTok:
@@ -132,8 +151,56 @@
         @else
           Vui lòng xuất lại file tất cả đơn hàng/SKU bao phủ đủ ngày tạo đơn trong file quyết toán.
         @endif
+        <button type="button" class="btn btn-sm btn-outline-danger ms-2" data-bs-toggle="modal" data-bs-target="#missingOrdersModal">
+          Xem đơn thiếu
+        </button>
       @endif
     @endif
+  </div>
+@endif
+
+@if($missingOrderCount > 0)
+  <div class="modal fade" id="missingOrdersModal" tabindex="-1" aria-labelledby="missingOrdersModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title" id="missingOrdersModalLabel">Đơn có trong quyết toán nhưng thiếu trong file tất cả đơn hàng/SKU</h5>
+            <div class="text-muted small">{{ number_format($missingOrderCount, 0, ',', '.') }} đơn thiếu, doanh thu thiếu {{ number_format((float) data_get($settlementFilter, 'missing_revenue', 0), 0, ',', '.') }} ₫</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+        </div>
+        <div class="modal-body">
+          <div class="profit-missing-orders-scroll">
+            <table class="table table-sm profit-missing-orders-table mb-0">
+              <thead>
+                <tr>
+                  <th>Mã đơn</th>
+                  <th>Ngày tạo đơn</th>
+                  <th>Ngày quyết toán</th>
+                  <th class="text-end">Doanh thu quyết toán</th>
+                  <th class="text-end">Tiền thực nhận</th>
+                </tr>
+              </thead>
+              <tbody>
+                @foreach($missingOrders as $order)
+                  <tr>
+                    <td class="fw-semibold">{{ data_get($order, 'order_id') }}</td>
+                    <td>{{ data_get($order, 'created_at') ?: '-' }}</td>
+                    <td>{{ data_get($order, 'settled_at') ?: '-' }}</td>
+                    <td class="text-end profit-number {{ (float) data_get($order, 'revenue', 0) < 0 ? 'text-danger' : 'text-success' }}">{{ number_format((float) data_get($order, 'revenue', 0), 0, ',', '.') }} ₫</td>
+                    <td class="text-end profit-number">{{ number_format((float) data_get($order, 'settlement_amount', 0), 0, ',', '.') }} ₫</td>
+                  </tr>
+                @endforeach
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Đóng</button>
+        </div>
+      </div>
+    </div>
   </div>
 @endif
 
