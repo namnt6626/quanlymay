@@ -177,7 +177,7 @@
       return `${key}-${Date.now()}-${randomPart}`.replace(/[^A-Za-z0-9_-]/g, '');
     }
 
-    async function uploadFileInChunks(key, file) {
+    async function uploadFileInChunks(key, file, resetExisting = false) {
       const uploadId = uploadIdFor(key);
       const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize));
 
@@ -192,6 +192,9 @@
         body.append('chunk_index', String(index));
         body.append('total_chunks', String(totalChunks));
         body.append('original_name', file.name);
+        if (resetExisting && index === 0) {
+          body.append('reset_existing', '1');
+        }
         body.append('chunk', file.slice(start, end), `${file.name}.part`);
 
         const percent = Math.round(((index + 1) / totalChunks) * 100);
@@ -243,7 +246,7 @@
             if (allowMultiple) {
               renderStatus(key, `Đang tải file ${index + 1}/${selectedFiles.length}: ${file.name}`, '');
             }
-            lastData = await uploadFileInChunks(key, file);
+            lastData = await uploadFileInChunks(key, file, allowMultiple && index === 0);
           }
           uploaded.add(key);
           if (allowMultiple) {

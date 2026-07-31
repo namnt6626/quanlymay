@@ -81,7 +81,7 @@ class ProfitAnalysisController extends Controller
             return redirect()->route('phan-tich-lai-lo.index')->withErrors(['files' => 'Nền tảng nhập dữ liệu không hợp lệ.']);
         }
 
-        $importToken = $this->importToken();
+        $importToken = $this->importToken($request->old('import_token'));
 
         return view('content.san-xuat.phan-tich-lai-lo.create', [
             'months' => $this->monthOptions(),
@@ -102,6 +102,7 @@ class ProfitAnalysisController extends Controller
             'chunk_index' => ['required', 'integer', 'min:0'],
             'total_chunks' => ['required', 'integer', 'min:1', 'max:10000'],
             'original_name' => ['required', 'string', 'max:255'],
+            'reset_existing' => ['nullable', 'boolean'],
             'chunk' => ['required', 'file'],
         ], [
             'upload_id.regex' => 'Mã tải lên không hợp lệ.',
@@ -172,6 +173,16 @@ class ProfitAnalysisController extends Controller
         $sessionKey = $this->uploadSessionKey($token);
         $uploads = Session::get($sessionKey, []);
         $allowsMultiple = $marketplace === 'shopee' && $fileKey === 'order_file';
+        $resetExisting = $allowsMultiple && (bool) ($validated['reset_existing'] ?? false);
+
+        if ($resetExisting && isset($uploads[$fileKey]['files']) && is_array($uploads[$fileKey]['files'])) {
+            foreach ($uploads[$fileKey]['files'] as $existingFile) {
+                if (isset($existingFile['path']) && is_file($existingFile['path'])) {
+                    @unlink($existingFile['path']);
+                }
+            }
+            unset($uploads[$fileKey]);
+        }
 
         if (! $allowsMultiple && isset($uploads[$fileKey]['path']) && is_file($uploads[$fileKey]['path'])) {
             @unlink($uploads[$fileKey]['path']);
@@ -418,13 +429,22 @@ class ProfitAnalysisController extends Controller
         return array_reverse($months, true);
     }
 
-    private function importToken(): string
+    private function importToken(?string $reuseToken = null): string
     {
-        $token = Session::get('profit_analysis_import_token');
-        if (! is_string($token) || $token === '') {
-            $token = Str::uuid()->toString();
-            Session::put('profit_analysis_import_token', $token);
+        if (is_string($reuseToken) && $reuseToken !== '') {
+            Session::put('profit_analysis_import_token', $reuseToken);
+
+            return $reuseToken;
         }
+
+        $oldToken = Session::get('profit_analysis_import_token');
+        if (is_string($oldToken) && $oldToken !== '') {
+            File::deleteDirectory(storage_path('app/profit-analysis-imports/'.$oldToken));
+            Session::forget($this->uploadSessionKey($oldToken));
+        }
+
+        $token = Str::uuid()->toString();
+        Session::put('profit_analysis_import_token', $token);
 
         return $token;
     }
