@@ -96,6 +96,7 @@ class ProfitAnalysisController extends Controller
     {
         $validated = $request->validate([
             'import_token' => ['required', 'string', 'max:80'],
+            'marketplace' => ['nullable', 'string', 'in:tiktok,shopee'],
             'file_key' => ['required', 'string', 'in:fob_file,settlement_file,order_file'],
             'upload_id' => ['required', 'string', 'max:120', 'regex:/^[A-Za-z0-9_-]+$/'],
             'chunk_index' => ['required', 'integer', 'min:0'],
@@ -111,6 +112,7 @@ class ProfitAnalysisController extends Controller
         }
 
         $token = $validated['import_token'];
+        $marketplace = $this->normalizeMarketplace((string) ($validated['marketplace'] ?? 'tiktok'));
         $fileKey = $validated['file_key'];
         $uploadId = $validated['upload_id'];
         $chunkIndex = (int) $validated['chunk_index'];
@@ -169,22 +171,41 @@ class ProfitAnalysisController extends Controller
 
         $sessionKey = $this->uploadSessionKey($token);
         $uploads = Session::get($sessionKey, []);
-        if (isset($uploads[$fileKey]['path']) && is_file($uploads[$fileKey]['path'])) {
+        $allowsMultiple = $marketplace === 'shopee' && $fileKey === 'order_file';
+
+        if (! $allowsMultiple && isset($uploads[$fileKey]['path']) && is_file($uploads[$fileKey]['path'])) {
             @unlink($uploads[$fileKey]['path']);
         }
 
-        $uploads[$fileKey] = [
+        $filePayload = [
             'path' => $path,
             'name' => $validated['original_name'],
             'size' => filesize($path) ?: 0,
             'uploaded_at' => now()->toDateTimeString(),
         ];
+
+        if ($allowsMultiple) {
+            $existingFiles = $uploads[$fileKey]['files'] ?? [];
+            if (isset($uploads[$fileKey]['path'])) {
+                $existingFiles[] = $uploads[$fileKey];
+            }
+            $existingFiles[] = $filePayload;
+            $uploads[$fileKey] = [
+                'files' => array_values($existingFiles),
+                'name' => count($existingFiles).' file đơn hàng Shopee',
+                'size' => array_sum(array_map(fn (array $file): int => (int) ($file['size'] ?? 0), $existingFiles)),
+                'uploaded_at' => now()->toDateTimeString(),
+            ];
+        } else {
+            $uploads[$fileKey] = $filePayload;
+        }
         Session::put($sessionKey, $uploads);
 
         return response()->json([
             'complete' => true,
             'message' => 'Đã tải lên '.$uploads[$fileKey]['name'],
             'file' => $uploads[$fileKey],
+            'files' => $uploads[$fileKey]['files'] ?? null,
         ]);
     }
 
@@ -210,7 +231,7 @@ class ProfitAnalysisController extends Controller
         $uploads = Session::get($this->uploadSessionKey($validated['import_token']), []);
         $missing = [];
         foreach (['fob_file', 'settlement_file', 'order_file'] as $requiredKey) {
-            if (! isset($uploads[$requiredKey]['path']) || ! is_file($uploads[$requiredKey]['path'])) {
+            if (! $this->uploadedInputExists($uploads[$requiredKey] ?? null)) {
                 $missing[] = $requiredKey;
             }
         }
@@ -218,10 +239,21 @@ class ProfitAnalysisController extends Controller
             return back()->withInput()->withErrors(['files' => 'Vui lòng tải lên đủ 3 file bắt buộc trước khi kiểm tra dữ liệu.']);
         }
 
-        $files = collect($uploads)
-            ->filter(fn (array $file): bool => isset($file['path']) && is_file($file['path']))
-            ->map(fn (array $file): string => $file['path'])
-            ->all();
+        $files = [];
+        foreach ($uploads as $key => $file) {
+            if (isset($file['files']) && is_array($file['files'])) {
+                $paths = collect($file['files'])
+                    ->pluck('path')
+                    ->filter(fn ($path): bool => is_string($path) && is_file($path))
+                    ->values()
+                    ->all();
+                if ($paths !== []) {
+                    $files[$key] = $paths;
+                }
+            } elseif (isset($file['path']) && is_file($file['path'])) {
+                $files[$key] = $file['path'];
+            }
+        }
 
         try {
             $preview = $service->preview(
@@ -416,6 +448,20 @@ class ProfitAnalysisController extends Controller
     private function uploadedChunkCount(string $chunkDirectory): int
     {
         return count(glob($chunkDirectory.'/*.part') ?: []);
+    }
+
+    private function uploadedInputExists(mixed $file): bool
+    {
+        if (! is_array($file)) {
+            return false;
+        }
+
+        if (isset($file['files']) && is_array($file['files'])) {
+            return collect($file['files'])
+                ->contains(fn (array $item): bool => isset($item['path']) && is_file($item['path']));
+        }
+
+        return isset($file['path']) && is_file($file['path']);
     }
 
     private function number(mixed $value): float

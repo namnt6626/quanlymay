@@ -15,7 +15,7 @@ class ProfitAnalysisImportService
     public function __construct(private readonly SimpleXlsxReader $reader) {}
 
     /**
-     * @param array<string, string> $files
+     * @param array<string, string|array<int, string>> $files
      * @return array<string, mixed>
      */
     public function preview(array $files, Carbon $periodMonth, float $adCostPerOrder = 0, string $marketplace = 'tiktok'): array
@@ -28,7 +28,7 @@ class ProfitAnalysisImportService
             : $this->parseSettlement($files['settlement_file']);
         $orders = $marketplace === 'shopee'
             ? $this->parseShopeeOrderSkuList($files['order_file'], $settlement['orders_by_id'] ?? [])
-            : $this->parseOrderSkuList($files['order_file'], $settlement['orders_by_id'] ?? []);
+            : $this->parseOrderSkuList((string) $files['order_file'], $settlement['orders_by_id'] ?? []);
         $adCost = max(0, $adCostPerOrder) * (int) $orders['unique_orders'];
         $ads = $this->manualAds($adCostPerOrder, (int) $orders['unique_orders'], $adCost);
         $settlementSource = $settlement;
@@ -829,8 +829,9 @@ class ProfitAnalysisImportService
      * @param array<string, array<string, mixed>> $settlementOrders
      * @return array<string, mixed>
      */
-    private function parseShopeeOrderSkuList(string $path, array $settlementOrders = []): array
+    private function parseShopeeOrderSkuList(string|array $paths, array $settlementOrders = []): array
     {
+        $paths = is_array($paths) ? array_values($paths) : [$paths];
         $columns = [];
         $requiredColumns = ['Mã đơn hàng', 'Ngày đặt hàng', 'Trạng Thái Đơn Hàng', 'SKU phân loại hàng', 'Tên sản phẩm', 'Số lượng', 'Số lượng sản phẩm được hoàn trả', 'Giá ưu đãi'];
         $skuRows = [];
@@ -840,91 +841,103 @@ class ProfitAnalysisImportService
         $dates = [];
         $rowCount = 0;
         $matchedSettlementOrders = [];
+        $seenRows = [];
 
-        $this->reader->eachRow($path, function (array $row, int $rowNumber) use (&$columns, $requiredColumns, &$skuRows, &$uniqueOrders, &$fileUniqueOrders, &$statusCounts, &$dates, &$rowCount, &$matchedSettlementOrders, $settlementOrders): void {
-            if ($rowNumber === 1) {
-                $columns = $this->mapHeaderColumns($row);
-                foreach ($requiredColumns as $required) {
-                    if (! isset($columns[$required])) {
-                        throw new RuntimeException('File đơn hàng Shopee thiếu cột '.$required.'.');
+        foreach ($paths as $path) {
+            $columns = [];
+
+            $this->reader->eachRow($path, function (array $row, int $rowNumber) use (&$columns, $requiredColumns, &$skuRows, &$uniqueOrders, &$fileUniqueOrders, &$statusCounts, &$dates, &$rowCount, &$matchedSettlementOrders, &$seenRows, $settlementOrders): void {
+                if ($rowNumber === 1) {
+                    $columns = $this->mapHeaderColumns($row);
+                    foreach ($requiredColumns as $required) {
+                        if (! isset($columns[$required])) {
+                            throw new RuntimeException('File đơn hàng Shopee thiếu cột '.$required.'.');
+                        }
                     }
+
+                    return;
                 }
 
-                return;
-            }
+                if ($rowNumber <= 1) {
+                    return;
+                }
 
-            if ($rowNumber <= 1) {
-                return;
-            }
+                $orderId = trim((string) ($row[$columns['Mã đơn hàng']] ?? ''));
+                if ($orderId !== '') {
+                    $fileUniqueOrders[$orderId] = true;
+                }
 
-            $orderId = trim((string) ($row[$columns['Mã đơn hàng']] ?? ''));
-            if ($orderId !== '') {
-                $fileUniqueOrders[$orderId] = true;
-            }
+                $status = trim((string) ($row[$columns['Trạng Thái Đơn Hàng']] ?? ''));
+                $statusCounts[$status] = ($statusCounts[$status] ?? 0) + 1;
 
-            $status = trim((string) ($row[$columns['Trạng Thái Đơn Hàng']] ?? ''));
-            $statusCounts[$status] = ($statusCounts[$status] ?? 0) + 1;
+                if ($settlementOrders !== [] && ($orderId === '' || ! isset($settlementOrders[$orderId]))) {
+                    return;
+                }
 
-            if ($settlementOrders !== [] && ($orderId === '' || ! isset($settlementOrders[$orderId]))) {
-                return;
-            }
+                if ($orderId !== '') {
+                    $matchedSettlementOrders[$orderId] = true;
+                }
 
-            if ($orderId !== '') {
-                $matchedSettlementOrders[$orderId] = true;
-            }
+                if ($this->normalize($status) === 'da huy') {
+                    return;
+                }
 
-            if ($this->normalize($status) === 'da huy') {
-                return;
-            }
+                $sellerSku = trim((string) ($row[$columns['SKU phân loại hàng']] ?? ''));
+                if ($sellerSku === '') {
+                    $sellerSku = trim((string) ($row[$columns['SKU sản phẩm'] ?? 0] ?? ''));
+                }
+                if ($sellerSku === '') {
+                    $sellerSku = $this->extractShopeeSkuFromProductName((string) ($row[$columns['Tên sản phẩm']] ?? ''));
+                }
+                if ($sellerSku === '') {
+                    return;
+                }
 
-            $sellerSku = trim((string) ($row[$columns['SKU phân loại hàng']] ?? ''));
-            if ($sellerSku === '') {
-                $sellerSku = trim((string) ($row[$columns['SKU sản phẩm'] ?? 0] ?? ''));
-            }
-            if ($sellerSku === '') {
-                $sellerSku = $this->extractShopeeSkuFromProductName((string) ($row[$columns['Tên sản phẩm']] ?? ''));
-            }
-            if ($sellerSku === '') {
-                return;
-            }
+                $quantity = (float) $this->number($row[$columns['Số lượng']] ?? 0);
+                $returned = (float) $this->number($row[$columns['Số lượng sản phẩm được hoàn trả']] ?? 0);
+                $unitRevenue = (float) $this->number($row[$columns['Giá ưu đãi']] ?? 0);
+                $variation = trim((string) ($row[$columns['Tên phân loại hàng'] ?? 0] ?? ''));
+                $dedupeKey = implode('|', [$orderId, $sellerSku, $variation, $quantity, $returned, $unitRevenue]);
+                if (isset($seenRows[$dedupeKey])) {
+                    return;
+                }
+                $seenRows[$dedupeKey] = true;
 
-            $rowCount++;
-            if ($orderId !== '') {
-                $uniqueOrders[$orderId] = true;
-            }
+                $rowCount++;
+                if ($orderId !== '') {
+                    $uniqueOrders[$orderId] = true;
+                }
 
-            $created = $this->parseDate((string) ($row[$columns['Ngày đặt hàng']] ?? ''));
-            if ($created) {
-                $dates[] = $created->toDateString();
-            }
+                $created = $this->parseDate((string) ($row[$columns['Ngày đặt hàng']] ?? ''));
+                if ($created) {
+                    $dates[] = $created->toDateString();
+                }
 
-            $quantity = (float) $this->number($row[$columns['Số lượng']] ?? 0);
-            $returned = (float) $this->number($row[$columns['Số lượng sản phẩm được hoàn trả']] ?? 0);
-            $unitRevenue = (float) $this->number($row[$columns['Giá ưu đãi']] ?? 0);
-            $netQuantity = max(0, $quantity - $returned);
-            $grossRevenue = $unitRevenue * $quantity;
-            $revenue = $unitRevenue * $netQuantity;
-            $refund = max(0, $grossRevenue - $revenue);
+                $netQuantity = max(0, $quantity - $returned);
+                $grossRevenue = $unitRevenue * $quantity;
+                $revenue = $unitRevenue * $netQuantity;
+                $refund = max(0, $grossRevenue - $revenue);
 
-            if (! isset($skuRows[$sellerSku])) {
-                $skuRows[$sellerSku] = [
-                    'key' => md5($sellerSku),
-                    'seller_sku' => $sellerSku,
-                    'product_name' => trim((string) ($row[$columns['Tên sản phẩm']] ?? '')),
-                    'quantity_sold' => 0.0,
-                    'quantity_returned' => 0.0,
-                    'net_quantity' => 0.0,
-                    'revenue' => 0.0,
-                    'refund_amount' => 0.0,
-                ];
-            }
+                if (! isset($skuRows[$sellerSku])) {
+                    $skuRows[$sellerSku] = [
+                        'key' => md5($sellerSku),
+                        'seller_sku' => $sellerSku,
+                        'product_name' => trim((string) ($row[$columns['Tên sản phẩm']] ?? '')),
+                        'quantity_sold' => 0.0,
+                        'quantity_returned' => 0.0,
+                        'net_quantity' => 0.0,
+                        'revenue' => 0.0,
+                        'refund_amount' => 0.0,
+                    ];
+                }
 
-            $skuRows[$sellerSku]['quantity_sold'] += $quantity;
-            $skuRows[$sellerSku]['quantity_returned'] += $returned;
-            $skuRows[$sellerSku]['net_quantity'] += $netQuantity;
-            $skuRows[$sellerSku]['revenue'] += $revenue;
-            $skuRows[$sellerSku]['refund_amount'] += $refund;
-        }, 'orders');
+                $skuRows[$sellerSku]['quantity_sold'] += $quantity;
+                $skuRows[$sellerSku]['quantity_returned'] += $returned;
+                $skuRows[$sellerSku]['net_quantity'] += $netQuantity;
+                $skuRows[$sellerSku]['revenue'] += $revenue;
+                $skuRows[$sellerSku]['refund_amount'] += $refund;
+            }, 'orders');
+        }
 
         $missingSettlementOrders = array_diff_key($settlementOrders, $matchedSettlementOrders);
         $missingRevenue = (float) collect($missingSettlementOrders)->sum('revenue');

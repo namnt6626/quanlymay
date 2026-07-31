@@ -105,10 +105,14 @@
       <div class="profit-upload-box">
         <label class="form-label">3. File tất cả đơn hàng/SKU</label>
         <div class="profit-upload-note">Lấy Seller SKU, số lượng bán, hoàn/trả, doanh thu từng SKU.</div>
-        <input type="file" class="form-control js-profit-file" data-file-key="order_file" accept=".xlsx">
-        <div class="form-text">{{ $marketplace === 'shopee' ? 'Ví dụ: Order.all.20260601_20260630.xlsx' : 'Ví dụ: Tất cả đơn hàng-2026-07-30-08_33.xlsx' }}</div>
+        <input type="file" class="form-control js-profit-file" data-file-key="order_file" accept=".xlsx" @if($marketplace === 'shopee') multiple @endif>
+        <div class="form-text">{{ $marketplace === 'shopee' ? 'Có thể chọn nhiều file, ví dụ: Order.all.20260520_20260610.xlsx và Order.all.20260610_20260630.xlsx' : 'Ví dụ: Tất cả đơn hàng-2026-07-30-08_33.xlsx' }}</div>
         <div class="profit-upload-status js-profit-file-status" data-file-key="order_file">
-          @if(isset($uploadedFiles['order_file']))<span class="is-ready">Đã tải lên: {{ $uploadedFiles['order_file']['name'] }}</span>@endif
+          @if(isset($uploadedFiles['order_file']['files']))
+            <span class="is-ready">Đã tải lên {{ count($uploadedFiles['order_file']['files']) }} file: {{ collect($uploadedFiles['order_file']['files'])->pluck('name')->implode(', ') }}</span>
+          @elseif(isset($uploadedFiles['order_file']))
+            <span class="is-ready">Đã tải lên: {{ $uploadedFiles['order_file']['name'] }}</span>
+          @endif
         </div>
       </div>
     </div>
@@ -127,6 +131,7 @@
 <script>
   (() => {
     const token = @json($importToken);
+    const marketplace = @json($marketplace);
     const uploadUrl = @json(route('phan-tich-lai-lo.upload-file'));
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const requiredKeys = ['fob_file', 'settlement_file', 'order_file'];
@@ -181,6 +186,7 @@
         const end = Math.min(file.size, start + chunkSize);
         const body = new FormData();
         body.append('import_token', token);
+        body.append('marketplace', marketplace);
         body.append('file_key', key);
         body.append('upload_id', uploadId);
         body.append('chunk_index', String(index));
@@ -211,10 +217,12 @@
 
     document.querySelectorAll('.js-profit-file').forEach((input) => {
       input.addEventListener('change', async () => {
-        const file = input.files?.[0];
         const key = input.dataset.fileKey;
-        if (!file || !key) return;
-        if (!file.name.toLowerCase().endsWith('.xlsx')) {
+        const files = Array.from(input.files || []);
+        const allowMultiple = marketplace === 'shopee' && key === 'order_file';
+        const selectedFiles = allowMultiple ? files : files.slice(0, 1);
+        if (selectedFiles.length === 0 || !key) return;
+        if (selectedFiles.some((file) => !file.name.toLowerCase().endsWith('.xlsx'))) {
           uploaded.delete(key);
           renderStatus(key, 'Chỉ hỗ trợ file .xlsx.', 'is-error');
           input.value = '';
@@ -222,14 +230,28 @@
         }
 
         input.disabled = true;
-        uploaded.delete(key);
         uploading.add(key);
+        if (!allowMultiple) {
+          uploaded.delete(key);
+        }
         refreshPreviewButton();
 
         try {
-          const data = await uploadFileInChunks(key, file);
+          let lastData = null;
+          for (let index = 0; index < selectedFiles.length; index += 1) {
+            const file = selectedFiles[index];
+            if (allowMultiple) {
+              renderStatus(key, `Đang tải file ${index + 1}/${selectedFiles.length}: ${file.name}`, '');
+            }
+            lastData = await uploadFileInChunks(key, file);
+          }
           uploaded.add(key);
-          renderStatus(key, `Đã tải lên: ${data.file?.name || file.name}`, 'is-ready');
+          if (allowMultiple) {
+            const names = (lastData?.files || []).map((file) => file.name).join(', ');
+            renderStatus(key, `Đã tải lên ${lastData?.files?.length || selectedFiles.length} file: ${names}`, 'is-ready');
+          } else {
+            renderStatus(key, `Đã tải lên: ${lastData?.file?.name || selectedFiles[0].name}`, 'is-ready');
+          }
         } catch (error) {
           uploaded.delete(key);
           renderStatus(key, error.message || 'Không tải được file.', 'is-error');
