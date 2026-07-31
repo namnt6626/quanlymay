@@ -177,9 +177,12 @@ class Analytics extends Controller
             ->limit(10)
             ->get();
 
-        $onlineTopReturnReasons = (clone $onlineReturnBase)
-            ->selectRaw("COALESCE(NULLIF(hhct.return_reason, ''), 'Không rõ') as return_reason, COUNT(*) as so_dong, SUM(hhct.so_luong_hoan) as so_luong_hoan")
-            ->groupByRaw("COALESCE(NULLIF(hhct.return_reason, ''), 'Không rõ')")
+        $onlineReturnReasonsBase = (clone $onlineReturnBase)
+            ->selectRaw("COALESCE(NULLIF(hhct.return_reason, ''), 'Không rõ') as return_reason, hhct.so_luong_hoan");
+        $onlineTopReturnReasons = DB::query()
+            ->fromSub($onlineReturnReasonsBase, 'return_reasons')
+            ->selectRaw('return_reason, COUNT(*) as so_dong, SUM(so_luong_hoan) as so_luong_hoan')
+            ->groupBy('return_reason')
             ->orderByDesc('so_luong_hoan')
             ->limit(10)
             ->get();
