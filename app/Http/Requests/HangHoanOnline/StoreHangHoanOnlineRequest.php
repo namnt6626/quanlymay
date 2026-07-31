@@ -20,6 +20,9 @@ class StoreHangHoanOnlineRequest extends FormRequest
 
             $row['so_luong_hoan'] = $this->number($row['so_luong_hoan'] ?? null);
             $row['compensation_amount'] = $this->money($row['compensation_amount'] ?? null);
+            $row['ten_san_pham'] = trim((string) ($row['ten_san_pham'] ?? ''))
+                ?: (trim((string) ($row['seller_sku'] ?? '')) ?: trim((string) ($row['sku_name'] ?? '')));
+            $row['sku_name'] = trim((string) ($row['sku_name'] ?? ''));
 
             return $row;
         })->all();
@@ -48,7 +51,7 @@ class StoreHangHoanOnlineRequest extends FormRequest
             'chi_tiets.*.time_requested' => ['nullable', 'date'],
             'chi_tiets.*.refund_time' => ['nullable', 'date'],
             'chi_tiets.*.return_reason' => ['nullable', 'string', 'max:500'],
-            'chi_tiets.*.tracking_id' => ['nullable', 'string', 'max:100'],
+            'chi_tiets.*.tracking_id' => ['nullable', 'string', 'max:1000'],
             'chi_tiets.*.compensation_status' => ['nullable', 'string', 'max:100'],
             'chi_tiets.*.compensation_amount' => ['nullable', 'numeric', 'min:0'],
             'chi_tiets.*.buyer_note' => ['nullable', 'string', 'max:2000'],

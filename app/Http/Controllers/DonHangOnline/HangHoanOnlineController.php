@@ -37,8 +37,12 @@ class HangHoanOnlineController extends Controller
                     $keyword = '%'.$filters['q'].'%';
                     $query->where('order_id', 'like', $keyword)
                         ->orWhere('return_order_id', 'like', $keyword)
+                        ->orWhere('seller_sku', 'like', $keyword)
                         ->orWhere('ten_san_pham', 'like', $keyword)
                         ->orWhere('sku_name', 'like', $keyword)
+                        ->orWhere('mau', 'like', $keyword)
+                        ->orWhere('size', 'like', $keyword)
+                        ->orWhere('return_reason', 'like', $keyword)
                         ->orWhere('tracking_id', 'like', $keyword);
                 }))
                 ->when($filters['seller_sku'] !== '', fn (Builder $query) => $query->where('seller_sku', $filters['seller_sku']))

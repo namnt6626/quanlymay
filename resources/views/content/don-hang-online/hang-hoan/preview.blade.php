@@ -7,7 +7,7 @@
   .return-preview-metric .label { color: var(--bs-secondary-color); font-size: .78rem; font-weight: 800; text-transform: uppercase; }
   .return-preview-metric .value { margin-top: .4rem; font-size: 1.2rem; font-weight: 800; }
   .return-preview-wrap { max-height: 62vh; overflow: auto; scrollbar-gutter: stable; }
-  .return-preview-table { min-width: 1500px; }
+  .return-preview-table { min-width: 1180px; }
   .return-preview-table th { position: sticky; top: 0; background: var(--bs-gray-100); z-index: 1; white-space: nowrap; font-size: .76rem; text-transform: uppercase; }
 </style>
 @endsection
@@ -26,10 +26,6 @@
     'In Process' => 'bg-label-warning',
     'Refund rejected' => 'bg-label-danger',
   ][$value ?? ''] ?? 'bg-label-secondary';
-  $typeLabel = fn (?string $value): string => [
-    'Return and refund' => 'Hoàn hàng và hoàn tiền',
-    'Refund only' => 'Chỉ hoàn tiền',
-  ][$value ?? ''] ?? ($value ?: '-');
 @endphp
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
@@ -70,16 +66,14 @@
     <table class="table return-preview-table mb-0">
       <thead>
         <tr>
-          <th>Mã đơn gốc</th>
-          <th>Mã đơn hoàn</th>
           <th>Seller SKU</th>
-          <th>Sản phẩm</th>
+          <th>SKU Name</th>
           <th>Màu</th>
           <th>Size</th>
           <th class="text-end">SL</th>
           <th>Trạng thái</th>
-          <th>Loại hoàn</th>
           <th>Cộng tồn</th>
+          <th>Ngày yêu cầu</th>
           <th>Ngày hoàn tiền</th>
           <th>Lý do</th>
         </tr>
@@ -87,21 +81,19 @@
       <tbody>
         @forelse($displayRows as $row)
           <tr>
-            <td class="fw-semibold">{{ $row['order_id'] ?: '-' }}</td>
-            <td>{{ $row['return_order_id'] ?: '-' }}</td>
-            <td>{{ $row['seller_sku'] ?: '-' }}</td>
-            <td style="max-width:360px">{{ $row['ten_san_pham'] ?: '-' }}</td>
+            <td class="fw-semibold">{{ $row['seller_sku'] ?: '-' }}</td>
+            <td style="max-width:360px">{{ $row['sku_name'] ?: '-' }}</td>
             <td>{{ $row['mau'] ?: '-' }}</td>
             <td>{{ $row['size'] ?: '-' }}</td>
             <td class="text-end">{{ number_format((float) $row['so_luong_hoan'], 0, ',', '.') }}</td>
             <td><span class="badge {{ $statusClass($row['return_status'] ?? null) }}">{{ $statusLabel($row['return_status'] ?? null) }}</span></td>
-            <td>{{ $typeLabel($row['return_type'] ?? null) }}</td>
             <td><span class="badge {{ $row['cong_ton'] ? 'bg-label-success' : 'bg-label-secondary' }}">{{ $row['cong_ton'] ? 'Có' : 'Không' }}</span></td>
+            <td>{{ $row['time_requested'] ? \Carbon\Carbon::parse($row['time_requested'])->format('d/m/Y H:i') : '-' }}</td>
             <td>{{ $row['refund_time'] ? \Carbon\Carbon::parse($row['refund_time'])->format('d/m/Y H:i') : '-' }}</td>
             <td>{{ returnReasonVi($row['return_reason'] ?? null) }}</td>
           </tr>
         @empty
-          <tr><td colspan="12" class="text-center py-4">Không có dòng mới để hiển thị. Nếu xác nhận import, hệ thống chỉ cập nhật các dòng trùng đã có.</td></tr>
+          <tr><td colspan="10" class="text-center py-4">Không có dòng mới để hiển thị. Nếu xác nhận import, hệ thống chỉ cập nhật các dòng trùng đã có.</td></tr>
         @endforelse
       </tbody>
     </table>

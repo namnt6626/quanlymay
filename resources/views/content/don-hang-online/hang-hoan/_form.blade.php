@@ -54,18 +54,17 @@
     <button type="button" class="btn btn-outline-primary" id="add-return-row"><i class="icon-base bx bx-plus me-1"></i>Thêm dòng</button>
   </div>
   <div class="table-responsive">
-    <table class="table align-middle mb-0" id="return-detail-table" style="min-width: 1500px">
+    <table class="table align-middle mb-0" id="return-detail-table" style="min-width: 1180px">
       <thead>
         <tr>
-          <th>Mã đơn gốc</th>
-          <th>Mã đơn hoàn</th>
           <th>Seller SKU</th>
-          <th>Sản phẩm</th>
+          <th>SKU Name</th>
           <th>Màu</th>
           <th>Size</th>
           <th class="text-end">SL hoàn</th>
           <th>Trạng thái</th>
           <th>Tình trạng hàng</th>
+          <th>Ngày yêu cầu</th>
           <th>Ngày hoàn</th>
           <th>Lý do</th>
           <th></th>
@@ -75,15 +74,14 @@
         @foreach($details as $detail)
           <tr>
             @php $index = $loop->index; @endphp
-            <td><input class="form-control" name="chi_tiets[{{ $index }}][order_id]" value="{{ $detail['order_id'] ?? '' }}"></td>
-            <td><input class="form-control" name="chi_tiets[{{ $index }}][return_order_id]" value="{{ $detail['return_order_id'] ?? '' }}"><input type="hidden" name="chi_tiets[{{ $index }}][sku_id]" value="{{ $detail['sku_id'] ?? '' }}"><input type="hidden" name="chi_tiets[{{ $index }}][return_type]" value="{{ $detail['return_type'] ?? 'Return and refund' }}"><input type="hidden" name="chi_tiets[{{ $index }}][sku_name]" value="{{ $detail['sku_name'] ?? '' }}"><input type="hidden" name="chi_tiets[{{ $index }}][time_requested]" value="{{ $detail['time_requested'] ?? '' }}"><input type="hidden" name="chi_tiets[{{ $index }}][tracking_id]" value="{{ $detail['tracking_id'] ?? '' }}"><input type="hidden" name="chi_tiets[{{ $index }}][compensation_status]" value="{{ $detail['compensation_status'] ?? '' }}"><input type="hidden" name="chi_tiets[{{ $index }}][compensation_amount]" value="{{ $detail['compensation_amount'] ?? '' }}"><input type="hidden" name="chi_tiets[{{ $index }}][buyer_note]" value="{{ $detail['buyer_note'] ?? '' }}"></td>
-            <td><input class="form-control" name="chi_tiets[{{ $index }}][seller_sku]" value="{{ $detail['seller_sku'] ?? '' }}"></td>
-            <td><input class="form-control" name="chi_tiets[{{ $index }}][ten_san_pham]" required value="{{ $detail['ten_san_pham'] ?? '' }}"></td>
+            <td><input type="hidden" name="chi_tiets[{{ $index }}][order_id]" value="{{ $detail['order_id'] ?? '' }}"><input type="hidden" name="chi_tiets[{{ $index }}][return_order_id]" value="{{ $detail['return_order_id'] ?? '' }}"><input type="hidden" name="chi_tiets[{{ $index }}][sku_id]" value="{{ $detail['sku_id'] ?? '' }}"><input type="hidden" name="chi_tiets[{{ $index }}][return_type]" value="{{ $detail['return_type'] ?? 'Return and refund' }}"><input type="hidden" name="chi_tiets[{{ $index }}][tracking_id]" value="{{ $detail['tracking_id'] ?? '' }}"><input type="hidden" name="chi_tiets[{{ $index }}][compensation_status]" value="{{ $detail['compensation_status'] ?? '' }}"><input type="hidden" name="chi_tiets[{{ $index }}][compensation_amount]" value="{{ $detail['compensation_amount'] ?? '' }}"><input type="hidden" name="chi_tiets[{{ $index }}][buyer_note]" value="{{ $detail['buyer_note'] ?? '' }}"><input class="form-control" name="chi_tiets[{{ $index }}][seller_sku]" value="{{ $detail['seller_sku'] ?? '' }}"></td>
+            <td><input type="hidden" name="chi_tiets[{{ $index }}][ten_san_pham]" value="{{ $detail['ten_san_pham'] ?? ($detail['seller_sku'] ?? '') }}"><input class="form-control" name="chi_tiets[{{ $index }}][sku_name]" value="{{ $detail['sku_name'] ?? '' }}"></td>
             <td><input class="form-control" name="chi_tiets[{{ $index }}][mau]" value="{{ $detail['mau'] ?? '' }}"></td>
             <td><input class="form-control" name="chi_tiets[{{ $index }}][size]" value="{{ $detail['size'] ?? '' }}"></td>
             <td><input type="number" min="0.0001" step="0.0001" class="form-control text-end" name="chi_tiets[{{ $index }}][so_luong_hoan]" required value="{{ $detail['so_luong_hoan'] ?? 1 }}"></td>
             <td><select class="form-select" name="chi_tiets[{{ $index }}][return_status]" required>@foreach($statusOptions as $value => $label)<option value="{{ $value }}" @selected(($detail['return_status'] ?? 'Completed') === $value)>{{ $label }}</option>@endforeach</select></td>
             <td><select class="form-select" name="chi_tiets[{{ $index }}][tinh_trang_hang]" required>@foreach($conditionOptions as $value => $label)<option value="{{ $value }}" @selected(($detail['tinh_trang_hang'] ?? 'ban_lai_duoc') === $value)>{{ $label }}</option>@endforeach</select></td>
+            <td><input type="datetime-local" class="form-control" name="chi_tiets[{{ $index }}][time_requested]" value="{{ $detail['time_requested'] ?? '' }}"></td>
             <td><input type="datetime-local" class="form-control" name="chi_tiets[{{ $index }}][refund_time]" value="{{ $detail['refund_time'] ?? '' }}"></td>
             <td><input class="form-control" name="chi_tiets[{{ $index }}][return_reason]" value="{{ $detail['return_reason'] ?? '' }}"></td>
             <td><button type="button" class="btn btn-sm btn-icon btn-outline-danger js-remove-row"><i class="icon-base bx bx-trash"></i></button></td>
@@ -93,7 +91,7 @@
     </table>
   </div>
   <div class="card-footer d-flex justify-content-between">
-    <div class="text-muted">Chỉ dòng Completed + Return and refund + Bán lại được mới cộng tồn.</div>
+    <div class="text-muted">Chỉ dòng đã hoàn tất và hàng bán lại được mới cộng tồn.</div>
     <div class="d-flex gap-2">
       <a href="{{ route('hang-hoan-online.index') }}" class="btn btn-outline-secondary">Hủy</a>
       <button class="btn btn-primary">Lưu</button>
@@ -106,7 +104,7 @@
 <script>
 (() => {
   const body = document.querySelector('#return-detail-table tbody');
-  const template = index => `<tr><td><input class="form-control" name="chi_tiets[${index}][order_id]"></td><td><input class="form-control" name="chi_tiets[${index}][return_order_id]"><input type="hidden" name="chi_tiets[${index}][sku_id]"><input type="hidden" name="chi_tiets[${index}][return_type]" value="Return and refund"><input type="hidden" name="chi_tiets[${index}][sku_name]"><input type="hidden" name="chi_tiets[${index}][time_requested]"><input type="hidden" name="chi_tiets[${index}][tracking_id]"><input type="hidden" name="chi_tiets[${index}][compensation_status]"><input type="hidden" name="chi_tiets[${index}][compensation_amount]"><input type="hidden" name="chi_tiets[${index}][buyer_note]"></td><td><input class="form-control" name="chi_tiets[${index}][seller_sku]"></td><td><input class="form-control" name="chi_tiets[${index}][ten_san_pham]" required></td><td><input class="form-control" name="chi_tiets[${index}][mau]"></td><td><input class="form-control" name="chi_tiets[${index}][size]"></td><td><input type="number" min="0.0001" step="0.0001" class="form-control text-end" name="chi_tiets[${index}][so_luong_hoan]" required value="1"></td><td><select class="form-select" name="chi_tiets[${index}][return_status]" required><option value="Completed">Đã nhận hàng hoàn</option><option value="In Process">Đang xử lý</option><option value="To Process">Chờ xử lý</option><option value="Refund rejected">Hoàn bị từ chối</option></select></td><td><select class="form-select" name="chi_tiets[${index}][tinh_trang_hang]" required><option value="ban_lai_duoc">Bán lại được</option><option value="loi_hong">Lỗi/hỏng</option><option value="cho_kiem">Chờ kiểm</option></select></td><td><input type="datetime-local" class="form-control" name="chi_tiets[${index}][refund_time]"></td><td><input class="form-control" name="chi_tiets[${index}][return_reason]"></td><td><button type="button" class="btn btn-sm btn-icon btn-outline-danger js-remove-row"><i class="icon-base bx bx-trash"></i></button></td></tr>`;
+  const template = index => `<tr><td><input type="hidden" name="chi_tiets[${index}][order_id]"><input type="hidden" name="chi_tiets[${index}][return_order_id]"><input type="hidden" name="chi_tiets[${index}][sku_id]"><input type="hidden" name="chi_tiets[${index}][return_type]" value="Return and refund"><input type="hidden" name="chi_tiets[${index}][tracking_id]"><input type="hidden" name="chi_tiets[${index}][compensation_status]"><input type="hidden" name="chi_tiets[${index}][compensation_amount]"><input type="hidden" name="chi_tiets[${index}][buyer_note]"><input class="form-control" name="chi_tiets[${index}][seller_sku]"></td><td><input class="form-control" name="chi_tiets[${index}][sku_name]"><input type="hidden" name="chi_tiets[${index}][ten_san_pham]"></td><td><input class="form-control" name="chi_tiets[${index}][mau]"></td><td><input class="form-control" name="chi_tiets[${index}][size]"></td><td><input type="number" min="0.0001" step="0.0001" class="form-control text-end" name="chi_tiets[${index}][so_luong_hoan]" required value="1"></td><td><select class="form-select" name="chi_tiets[${index}][return_status]" required><option value="Completed">Đã nhận hàng hoàn</option><option value="In Process">Đang xử lý</option><option value="To Process">Chờ xử lý</option><option value="Refund rejected">Hoàn bị từ chối</option></select></td><td><select class="form-select" name="chi_tiets[${index}][tinh_trang_hang]" required><option value="ban_lai_duoc">Bán lại được</option><option value="loi_hong">Lỗi/hỏng</option><option value="cho_kiem">Chờ kiểm</option></select></td><td><input type="datetime-local" class="form-control" name="chi_tiets[${index}][time_requested]"></td><td><input type="datetime-local" class="form-control" name="chi_tiets[${index}][refund_time]"></td><td><input class="form-control" name="chi_tiets[${index}][return_reason]"></td><td><button type="button" class="btn btn-sm btn-icon btn-outline-danger js-remove-row"><i class="icon-base bx bx-trash"></i></button></td></tr>`;
   const bind = row => row.querySelector('.js-remove-row')?.addEventListener('click', () => {
     if (body.querySelectorAll('tr').length > 1) row.remove();
   });

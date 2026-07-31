@@ -19,7 +19,7 @@ class HangHoanOnlineImportService
     {
         $rows = [];
         $columns = [];
-        $required = ['Return Order ID', 'Order ID', 'Seller SKU', 'Product Name', 'SKU Name', 'Return Type', 'Time Requested', 'Return Quantity', 'Return Status'];
+        $required = ['Seller SKU', 'SKU Name', 'Time Requested', 'Return Quantity'];
 
         $this->reader->eachRow($path, function (array $row, int $rowNumber) use (&$rows, &$columns, $required): void {
             if ($rowNumber === 1) {
@@ -37,32 +37,39 @@ class HangHoanOnlineImportService
                 return;
             }
 
-            $quantity = $this->number($row[$columns['Return Quantity']] ?? 0);
+            $quantity = $this->number($this->cell($row, $columns, 'Return Quantity'));
             if ($quantity <= 0) {
                 return;
             }
 
-            [$color, $size] = $this->parseSkuName((string) ($row[$columns['SKU Name']] ?? ''));
+            $sellerSku = $this->text($this->cell($row, $columns, 'Seller SKU'));
+            $skuName = $this->text($this->cell($row, $columns, 'SKU Name'));
+            $productName = $this->text($this->cell($row, $columns, 'Product Name')) ?: $sellerSku;
+            $refundTime = $this->parseDate($this->cell($row, $columns, 'Refund Time'))?->toDateTimeString();
+            $buyerNote = $this->text($this->cell($row, $columns, 'Buyer Note'));
+            $returnReason = $this->text($this->cell($row, $columns, 'Return Reason')) ?: $buyerNote;
+            $returnStatus = $this->text($this->cell($row, $columns, 'Return Status')) ?: ($refundTime ? 'Completed' : 'To Process');
+            [$color, $size] = $this->parseSkuName((string) $skuName);
             $detail = [
-                'return_order_id' => $this->text($row[$columns['Return Order ID']] ?? null),
-                'order_id' => $this->text($row[$columns['Order ID']] ?? null),
-                'sku_id' => $this->text($row[$columns['SKU ID'] ?? 0] ?? null),
-                'seller_sku' => $this->text($row[$columns['Seller SKU']] ?? null),
-                'ten_san_pham' => $this->text($row[$columns['Product Name']] ?? null),
+                'return_order_id' => $this->text($this->cell($row, $columns, 'Return Order ID')),
+                'order_id' => $this->text($this->cell($row, $columns, 'Order ID')),
+                'sku_id' => $this->text($this->cell($row, $columns, 'SKU ID')),
+                'seller_sku' => $sellerSku,
+                'ten_san_pham' => $productName,
                 'mau' => $color,
                 'size' => $size,
-                'sku_name' => $this->text($row[$columns['SKU Name']] ?? null),
+                'sku_name' => $skuName,
                 'so_luong_hoan' => $quantity,
-                'return_type' => $this->text($row[$columns['Return Type']] ?? null),
-                'return_status' => $this->text($row[$columns['Return Status']] ?? null),
+                'return_type' => $this->text($this->cell($row, $columns, 'Return Type')) ?: 'Return and refund',
+                'return_status' => $returnStatus,
                 'tinh_trang_hang' => 'ban_lai_duoc',
-                'time_requested' => $this->parseDate($row[$columns['Time Requested']] ?? null)?->toDateTimeString(),
-                'refund_time' => $this->parseDate($row[$columns['Refund Time'] ?? 0] ?? null)?->toDateTimeString(),
-                'return_reason' => $this->text($row[$columns['Return Reason'] ?? 0] ?? null),
-                'tracking_id' => $this->text($row[$columns['Return Logistics Tracking ID'] ?? 0] ?? null),
-                'compensation_status' => $this->text($row[$columns['Compensation Status'] ?? 0] ?? null),
-                'compensation_amount' => $this->number($row[$columns['Compensation Amount'] ?? 0] ?? 0),
-                'buyer_note' => $this->text($row[$columns['Buyer Note'] ?? 0] ?? null),
+                'time_requested' => $this->parseDate($this->cell($row, $columns, 'Time Requested'))?->toDateTimeString(),
+                'refund_time' => $refundTime,
+                'return_reason' => $returnReason,
+                'tracking_id' => $this->text($this->cell($row, $columns, 'Return Logistics Tracking ID')),
+                'compensation_status' => $this->text($this->cell($row, $columns, 'Compensation Status')),
+                'compensation_amount' => $this->number($this->cell($row, $columns, 'Compensation Amount')),
+                'buyer_note' => $buyerNote,
             ];
             $detail['cong_ton'] = $this->shouldCountStock($detail);
             $detail['dedupe_key'] = $this->dedupeKey($detail);
@@ -138,12 +145,26 @@ class HangHoanOnlineImportService
 
     public function dedupeKey(array $row): string
     {
-        $parts = [
-            trim((string) ($row['return_order_id'] ?? '')),
-            trim((string) ($row['order_id'] ?? '')),
-            trim((string) ($row['sku_id'] ?? '')),
-            trim((string) ($row['seller_sku'] ?? '')),
-        ];
+        $returnOrderId = trim((string) ($row['return_order_id'] ?? ''));
+        $orderId = trim((string) ($row['order_id'] ?? ''));
+
+        $parts = $returnOrderId !== '' || $orderId !== ''
+            ? [
+                'full',
+                $returnOrderId,
+                $orderId,
+                trim((string) ($row['sku_id'] ?? '')),
+                trim((string) ($row['seller_sku'] ?? '')),
+            ]
+            : [
+                'compact',
+                trim((string) ($row['seller_sku'] ?? '')),
+                trim((string) ($row['sku_name'] ?? '')),
+                trim((string) ($row['time_requested'] ?? '')),
+                trim((string) ($row['refund_time'] ?? '')),
+                trim((string) ($row['buyer_note'] ?? '')),
+                trim((string) ($row['so_luong_hoan'] ?? '')),
+            ];
 
         return sha1(implode('|', $parts));
     }
@@ -170,6 +191,15 @@ class HangHoanOnlineImportService
         $text = trim((string) $value);
 
         return $text === '' ? null : $text;
+    }
+
+    /**
+     * @param array<int, string> $row
+     * @param array<string, int> $columns
+     */
+    private function cell(array $row, array $columns, string $column): mixed
+    {
+        return isset($columns[$column]) ? ($row[$columns[$column]] ?? null) : null;
     }
 
     /**

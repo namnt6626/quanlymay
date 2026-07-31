@@ -4,7 +4,7 @@
 @include('content.san-xuat._filter-style')
 <style>
   .return-table-wrap { overflow-x: auto; scrollbar-gutter: stable; }
-  .return-table { min-width: 1450px; }
+  .return-table { min-width: 1180px; }
   .return-table th { background: var(--bs-gray-100); font-size: .76rem; text-transform: uppercase; white-space: nowrap; }
   .return-number { white-space: nowrap; font-variant-numeric: tabular-nums; }
   .return-product { max-width: 320px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -44,7 +44,7 @@
   @endif
   <div class="card-body">
     <form method="GET" class="row g-3 align-items-end">
-      <div class="col-md-3"><label class="form-label">Tìm kiếm</label><input class="form-control" name="q" value="{{ $filters['q'] }}" placeholder="Mã đơn, sản phẩm, vận đơn"></div>
+      <div class="col-md-3"><label class="form-label">Tìm kiếm</label><input class="form-control" name="q" value="{{ $filters['q'] }}" placeholder="SKU, sản phẩm, màu, size, lý do"></div>
       <div class="col-md-2"><label class="form-label">Seller SKU</label><select class="form-select" name="seller_sku"><option value="">Tất cả</option>@foreach($filterOptions['sellerSkus'] as $sku)<option value="{{ $sku }}" @selected($filters['seller_sku'] === $sku)>{{ $sku }}</option>@endforeach</select></div>
       <div class="col-md-2"><label class="form-label">Trạng thái</label><select class="form-select" name="return_status"><option value="">Tất cả</option>@foreach($filterOptions['statuses'] as $status)<option value="{{ $status }}" @selected($filters['return_status'] === $status)>{{ $status }}</option>@endforeach</select></div>
       <div class="col-md-2"><label class="form-label">Từ ngày</label><input type="date" class="form-control" name="tu_ngay" value="{{ $filters['tu_ngay'] }}"></div>
@@ -60,16 +60,16 @@
           @if(hasPermission('DON_HANG_HOAN_THANH_DELETE'))<th class="bulk-select-cell js-bulk-column d-none"><input class="form-check-input js-bulk-check-all" type="checkbox" aria-label="Chọn tất cả"></th>@endif
           <th>Ngày</th>
           <th>Nguồn</th>
-          <th>Mã đơn gốc</th>
-          <th>Mã đơn hoàn</th>
           <th>Seller SKU</th>
-          <th>Sản phẩm</th>
+          <th>SKU Name</th>
           <th>Màu</th>
           <th>Size</th>
           <th class="text-end">SL hoàn</th>
           <th class="text-end">SL cộng tồn</th>
           <th>Trạng thái</th>
           <th>Tình trạng</th>
+          <th>Ngày yêu cầu</th>
+          <th>Ngày hoàn tiền</th>
           <th>Lý do</th>
           <th>Thao tác</th>
         </tr>
@@ -81,16 +81,16 @@
               @if(hasPermission('DON_HANG_HOAN_THANH_DELETE'))<td class="bulk-select-cell js-bulk-column d-none"><input class="form-check-input js-bulk-item" type="checkbox" value="{{ $batch->id }}" aria-label="Chọn phiếu hàng hoàn {{ $batch->id }}"></td>@endif
               <td class="return-number">{{ $batch->ngay_hoan->format('d/m/Y') }}</td>
               <td><span class="badge bg-label-{{ $batch->source === 'import' ? 'info' : 'secondary' }}">{{ $batch->source === 'import' ? 'Import' : 'Nhập tay' }}</span></td>
-              <td class="fw-semibold">{{ $detail->order_id ?: '-' }}</td>
-              <td>{{ $detail->return_order_id ?: '-' }}</td>
-              <td>{{ $detail->seller_sku ?: '-' }}</td>
-              <td><div class="return-product" title="{{ $detail->ten_san_pham }}">{{ $detail->ten_san_pham ?: '-' }}</div></td>
+              <td class="fw-semibold">{{ $detail->seller_sku ?: '-' }}</td>
+              <td><div class="return-product" title="{{ $detail->sku_name }}">{{ $detail->sku_name ?: '-' }}</div></td>
               <td>{{ $detail->mau ?: '-' }}</td>
               <td>{{ $detail->size ?: '-' }}</td>
               <td class="text-end return-number">{{ number_format((float) $detail->so_luong_hoan, 0, ',', '.') }}</td>
               <td class="text-end return-number {{ $detail->cong_ton ? 'text-success' : 'text-muted' }}">{{ $detail->cong_ton ? number_format((float) $detail->so_luong_hoan, 0, ',', '.') : '0' }}</td>
               <td><span class="badge {{ $statusClass($detail->return_status) }}">{{ $statusLabel($detail->return_status) }}</span></td>
               <td>{{ ['ban_lai_duoc' => 'Bán lại được', 'loi_hong' => 'Lỗi/hỏng', 'cho_kiem' => 'Chờ kiểm'][$detail->tinh_trang_hang] ?? $detail->tinh_trang_hang }}</td>
+              <td class="return-number">{{ $detail->time_requested ? $detail->time_requested->format('d/m/Y H:i') : '-' }}</td>
+              <td class="return-number">{{ $detail->refund_time ? $detail->refund_time->format('d/m/Y H:i') : '-' }}</td>
               <td>{{ returnReasonVi($detail->return_reason) }}</td>
               <td>
                 <div class="d-flex gap-2">
