@@ -33,6 +33,38 @@ if (! function_exists('paginationPerPage')) {
     }
 }
 
+if (! function_exists('returnReasonVi')) {
+    function returnReasonVi(?string $value): string
+    {
+        $reason = trim((string) $value);
+
+        if ($reason === '') {
+            return '-';
+        }
+
+        return [
+            'Change of mind' => 'Khách đổi ý',
+            'Damaged item' => 'Sản phẩm bị hư hỏng',
+            'Defective item' => 'Sản phẩm bị lỗi',
+            'Does not fit' => 'Sản phẩm không vừa',
+            "Don't want it anymore" => 'Khách không còn nhu cầu',
+            'Item not received' => 'Khách chưa nhận được hàng',
+            'Item too big or too small' => 'Sản phẩm quá rộng/quá chật',
+            'Late delivery' => 'Giao hàng muộn',
+            'Missing item or parts' => 'Thiếu sản phẩm/phụ kiện',
+            'No longer needed' => 'Khách không còn nhu cầu',
+            'Ordered by mistake' => 'Khách đặt nhầm',
+            'Poor quality' => 'Chất lượng sản phẩm kém',
+            "Product doesn't match description" => 'Sản phẩm không đúng mô tả',
+            'Package or product is damaged' => 'Kiện hàng hoặc sản phẩm bị hư hỏng',
+            'Received wrong item' => 'Nhận sai sản phẩm',
+            'Suspected counterfeit' => 'Nghi ngờ hàng giả/hàng nhái',
+            'Wrong item' => 'Gửi sai sản phẩm',
+            'Wrong product sent' => 'Gửi sai sản phẩm',
+        ][$reason] ?? $reason;
+    }
+}
+
 if (! function_exists('hasPermission')) {
     function hasPermission(string $permissionCode): bool
     {
@@ -64,6 +96,8 @@ if (! function_exists('menuPermissionCode')) {
             'don-hang-hoan-thanh.index', 'don-hang-hoan-thanh.create', 'don-hang-hoan-thanh.edit', 'don-hang-hoan-thanh.destroy',
             'don-hang-hoan-thanh.import', 'don-hang-hoan-thanh.preview', 'don-hang-hoan-thanh.commit' => 'DON_HANG_HOAN_THANH_VIEW',
             'nhap-hang-online.index', 'nhap-hang-online.create', 'nhap-hang-online.edit', 'nhap-hang-online.destroy',
+            'hang-hoan-online.index', 'hang-hoan-online.create', 'hang-hoan-online.edit', 'hang-hoan-online.destroy',
+            'hang-hoan-online.import', 'hang-hoan-online.preview', 'hang-hoan-online.commit',
             'ton-kho-online.index' => 'DON_HANG_HOAN_THANH_VIEW',
             'nhap-kho.index', 'nhap-kho.create', 'nhap-kho.edit', 'nhap-kho.destroy' => 'NHAP_KHO_VIEW',
             'xuat-kho.index', 'xuat-kho.create', 'xuat-kho.edit', 'xuat-kho.destroy' => 'XUAT_KHO_VIEW',

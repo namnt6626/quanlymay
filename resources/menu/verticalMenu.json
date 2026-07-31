@@ -63,6 +63,7 @@
       "slug": [
         "nhap-hang-online",
         "don-hang-hoan-thanh",
+        "hang-hoan-online",
         "ton-kho-online"
       ],
       "submenu": [
@@ -75,6 +76,11 @@
           "url": "don-hang-hoan-thanh",
           "name": "Xuất hàng",
           "slug": "don-hang-hoan-thanh.index"
+        },
+        {
+          "url": "hang-hoan-online",
+          "name": "Hàng hoàn",
+          "slug": "hang-hoan-online.index"
         },
         {
           "url": "ton-kho-online",

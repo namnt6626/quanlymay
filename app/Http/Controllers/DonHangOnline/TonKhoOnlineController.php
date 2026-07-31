@@ -4,6 +4,7 @@ namespace App\Http\Controllers\DonHangOnline;
 
 use App\Http\Controllers\Controller;
 use App\Models\DonHangHoanThanhChiTiet;
+use App\Models\HangHoanOnlineChiTiet;
 use App\Models\NhapHangOnlineChiTiet;
 use App\Models\OnlineColorAlias;
 use App\Models\OnlineProductAlias;
@@ -35,12 +36,22 @@ class TonKhoOnlineController extends Controller
             ->groupBy('don_hang_hoan_thanh.ten_san_pham', DB::raw("COALESCE(don_hang_hoan_thanh_chi_tiet.mau, '')"), DB::raw("COALESCE(don_hang_hoan_thanh_chi_tiet.size, '')"))
             ->get();
 
+        $returns = HangHoanOnlineChiTiet::query()
+            ->where('cong_ton', true)
+            ->selectRaw("ten_san_pham, COALESCE(mau, '') as mau_key, COALESCE(size, '') as size_key, SUM(so_luong_hoan) as so_luong_hoan")
+            ->groupBy('ten_san_pham', DB::raw("COALESCE(mau, '')"), DB::raw("COALESCE(size, '')"))
+            ->get();
+
         $productAliasRows = OnlineProductAlias::query()->get(['original_name', 'group_name']);
         $colorAliasRows = OnlineColorAlias::query()->get(['original_name', 'group_name']);
         $productAliases = $this->aliasLookup($productAliasRows);
         $colorAliases = $this->aliasLookup($colorAliasRows);
 
-        $rows = $this->mergeRows($this->normalizeStockRows($imports, 'import', $productAliases, $colorAliases), $this->normalizeStockRows($exports, 'export', $productAliases, $colorAliases))
+        $rows = $this->mergeRows(
+            $this->normalizeStockRows($imports, 'import', $productAliases, $colorAliases),
+            $this->normalizeStockRows($exports, 'export', $productAliases, $colorAliases),
+            $this->normalizeStockRows($returns, 'return', $productAliases, $colorAliases)
+        )
             ->filter(function (array $row) use ($filters): bool {
                 if ($filters['ten_san_pham'] !== '') {
                     $productName = (string) $row['ten_san_pham'];
@@ -66,6 +77,7 @@ class TonKhoOnlineController extends Controller
 
         $totals = [
             'so_luong_nhap' => $rows->sum('so_luong_nhap'),
+            'so_luong_hoan' => $rows->sum('so_luong_hoan'),
             'so_luong_xuat' => $rows->sum('so_luong_xuat'),
             'so_luong_ton' => $rows->sum('so_luong_ton'),
             'tien_nhap' => $rows->sum('tien_nhap'),
@@ -198,23 +210,26 @@ class TonKhoOnlineController extends Controller
             ->with('success', 'Đã bỏ gộp màu "'.$data['group_name'].'".');
     }
 
-    private function mergeRows(Collection $imports, Collection $exports): Collection
+    private function mergeRows(Collection $imports, Collection $exports, Collection $returns): Collection
     {
-        return $imports->keys()->merge($exports->keys())->unique()->map(function (string $key) use ($imports, $exports): array {
+        return $imports->keys()->merge($exports->keys())->merge($returns->keys())->unique()->map(function (string $key) use ($imports, $exports, $returns): array {
             $import = $imports->get($key);
             $export = $exports->get($key);
+            $return = $returns->get($key);
             $quantityIn = (float) ($import->so_luong_nhap ?? 0);
+            $quantityReturn = (float) ($return->so_luong_hoan ?? 0);
             $quantityOut = (float) ($export->so_luong_xuat ?? 0);
             $moneyIn = (float) ($import->tien_nhap ?? 0);
             $moneyOut = (float) ($export->tien_xuat ?? 0);
 
             return [
-                'ten_san_pham' => $import->ten_san_pham ?? $export->ten_san_pham,
-                'mau' => ($import->mau_key ?? $export->mau_key) ?: null,
-                'size' => ($import->size_key ?? $export->size_key) ?: null,
+                'ten_san_pham' => $import->ten_san_pham ?? $return->ten_san_pham ?? $export->ten_san_pham,
+                'mau' => ($import->mau_key ?? $return->mau_key ?? $export->mau_key) ?: null,
+                'size' => ($import->size_key ?? $return->size_key ?? $export->size_key) ?: null,
                 'so_luong_nhap' => $quantityIn,
+                'so_luong_hoan' => $quantityReturn,
                 'so_luong_xuat' => $quantityOut,
-                'so_luong_ton' => $quantityIn - $quantityOut,
+                'so_luong_ton' => $quantityIn + $quantityReturn - $quantityOut,
                 'tien_nhap' => $moneyIn,
                 'tien_xuat' => $moneyOut,
                 'chenh_lech_tien' => $moneyOut - $moneyIn,
@@ -239,15 +254,18 @@ class TonKhoOnlineController extends Controller
                     'tien_nhap' => 0,
                     'so_luong_xuat' => 0,
                     'tien_xuat' => 0,
+                    'so_luong_hoan' => 0,
                 ];
             }
 
             if ($type === 'import') {
                 $current->so_luong_nhap += (float) $row->so_luong_nhap;
                 $current->tien_nhap += (float) $row->tien_nhap;
-            } else {
+            } elseif ($type === 'export') {
                 $current->so_luong_xuat += (float) $row->so_luong_xuat;
                 $current->tien_xuat += (float) $row->tien_xuat;
+            } else {
+                $current->so_luong_hoan += (float) $row->so_luong_hoan;
             }
 
             $carry->put($key, $current);
@@ -331,12 +349,13 @@ class TonKhoOnlineController extends Controller
     private function filterOptions(): array
     {
         $importProducts = NhapHangOnlineChiTiet::query()->whereNotNull('ten_san_pham')->pluck('ten_san_pham');
+        $returnProducts = HangHoanOnlineChiTiet::query()->whereNotNull('ten_san_pham')->pluck('ten_san_pham');
         $exportProducts = DonHangHoanThanhChiTiet::query()
             ->join('don_hang_hoan_thanh', 'don_hang_hoan_thanh.id', '=', 'don_hang_hoan_thanh_chi_tiet.don_hang_hoan_thanh_id')
             ->whereNull('don_hang_hoan_thanh.deleted_at')
             ->pluck('don_hang_hoan_thanh.ten_san_pham');
 
-        $sourceProducts = $importProducts->merge($exportProducts)->unique()->sort()->values();
+        $sourceProducts = $importProducts->merge($returnProducts)->merge($exportProducts)->unique()->sort()->values();
         $productAliases = $this->aliasLookup(OnlineProductAlias::query()->get(['original_name', 'group_name']));
         $displayProducts = $sourceProducts
             ->reject(fn (string $product): bool => $this->hasAlias($productAliases, $product))
@@ -346,9 +365,10 @@ class TonKhoOnlineController extends Controller
             ->values();
 
         $importColors = NhapHangOnlineChiTiet::query()->whereNotNull('mau')->where('mau', '<>', '')->pluck('mau');
+        $returnColors = HangHoanOnlineChiTiet::query()->whereNotNull('mau')->where('mau', '<>', '')->pluck('mau');
         $exportColors = DonHangHoanThanhChiTiet::query()->whereNotNull('mau')->where('mau', '<>', '')->pluck('mau');
         $colorAliases = $this->aliasLookup(OnlineColorAlias::query()->get(['original_name', 'group_name']));
-        $sourceColors = $importColors->merge($exportColors)->unique()->sort()->values();
+        $sourceColors = $importColors->merge($returnColors)->merge($exportColors)->unique()->sort()->values();
         $displayColors = $sourceColors
             ->reject(fn (string $color): bool => $this->hasAlias($colorAliases, $color))
             ->merge($colorAliases->values())
@@ -357,6 +377,7 @@ class TonKhoOnlineController extends Controller
             ->values();
 
         $importSizes = NhapHangOnlineChiTiet::query()->whereNotNull('size')->where('size', '<>', '')->pluck('size');
+        $returnSizes = HangHoanOnlineChiTiet::query()->whereNotNull('size')->where('size', '<>', '')->pluck('size');
         $exportSizes = DonHangHoanThanhChiTiet::query()->whereNotNull('size')->where('size', '<>', '')->pluck('size');
 
         return [
@@ -364,7 +385,7 @@ class TonKhoOnlineController extends Controller
             'sourceProducts' => $sourceProducts,
             'colors' => $displayColors,
             'sourceColors' => $sourceColors,
-            'sizes' => $importSizes->merge($exportSizes)->unique()->sort()->values(),
+            'sizes' => $importSizes->merge($returnSizes)->merge($exportSizes)->unique()->sort()->values(),
         ];
     }
 }

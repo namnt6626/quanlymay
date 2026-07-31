@@ -468,6 +468,9 @@
   $onlineQuantity = (float) ($onlineTotals->tong_so_luong ?? 0);
   $onlineRevenue = (float) ($onlineTotals->tong_tien_ban_hang ?? 0);
   $onlineSalesDays = (int) ($onlineTotals->so_ngay_ban ?? 0);
+  $onlineReturnQuantity = (float) ($onlineReturnTotals->so_luong_hoan ?? 0);
+  $onlineReturnOrders = (int) ($onlineReturnTotals->so_don_hoan ?? 0);
+  $onlineReturnRate = $onlineQuantity > 0 ? ($onlineReturnQuantity / $onlineQuantity) * 100 : 0;
   $onlineAverage = $onlineQuantity > 0 ? $onlineRevenue / $onlineQuantity : 0;
   $onlineDailyAverage = $onlineSalesDays > 0 ? $onlineRevenue / $onlineSalesDays : 0;
 @endphp
@@ -937,6 +940,22 @@
             </div>
           </div>
         </div>
+        <div class="col-sm-6 col-xl-3">
+          <div class="card h-100 shadow-none dashboard-report-kpi">
+            <div class="card-body d-flex gap-3">
+              <div class="kpi-icon bg-label-danger"><i class="icon-base bx bx-undo fs-4"></i></div>
+              <div><div class="text-muted small">SL hàng hoàn đã nhận</div><h4 class="mb-0">{{ number_format($onlineReturnQuantity, 0, ',', '.') }}</h4><small class="text-muted">{{ number_format($onlineReturnOrders, 0, ',', '.') }} đơn hoàn</small></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-xl-3">
+          <div class="card h-100 shadow-none dashboard-report-kpi">
+            <div class="card-body d-flex gap-3">
+              <div class="kpi-icon bg-label-secondary"><i class="icon-base bx bx-pie-chart-alt-2 fs-4"></i></div>
+              <div><div class="text-muted small">Tỷ lệ hoàn theo SL</div><h4 class="mb-0">{{ number_format($onlineReturnRate, 1, ',', '.') }}%</h4></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="row g-4 mt-1">
@@ -995,6 +1014,42 @@
             {{ $onlineDailyRows->links() }}
           </div>
         @endif
+      </div>
+      <div class="row g-4 mt-1">
+        <div class="col-xl-6">
+          <div class="card shadow-none border h-100">
+            <div class="card-header"><h6 class="mb-0">Top sản phẩm hoàn nhiều</h6></div>
+            <div class="dashboard-report-scroll">
+              <table class="table align-middle mb-0">
+                <thead><tr><th>Sản phẩm</th><th class="text-end">SL hoàn</th></tr></thead>
+                <tbody>
+                  @forelse($onlineTopReturnProducts as $row)
+                    <tr><td><div class="dashboard-product-name fw-semibold" title="{{ $row->ten_san_pham }}">{{ $row->ten_san_pham }}</div></td><td class="text-end">{{ number_format((float) $row->so_luong_hoan, 0, ',', '.') }}</td></tr>
+                  @empty
+                    <tr><td colspan="2" class="text-center py-4">Chưa có hàng hoàn trong kỳ.</td></tr>
+                  @endforelse
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="col-xl-6">
+          <div class="card shadow-none border h-100">
+            <div class="card-header"><h6 class="mb-0">Top lý do hoàn</h6></div>
+            <div class="dashboard-report-scroll">
+              <table class="table align-middle mb-0">
+                <thead><tr><th>Lý do</th><th class="text-end">Dòng</th><th class="text-end">SL hoàn</th></tr></thead>
+                <tbody>
+                  @forelse($onlineTopReturnReasons as $row)
+                    <tr><td>{{ returnReasonVi($row->return_reason) }}</td><td class="text-end">{{ number_format((float) $row->so_dong, 0, ',', '.') }}</td><td class="text-end">{{ number_format((float) $row->so_luong_hoan, 0, ',', '.') }}</td></tr>
+                  @empty
+                    <tr><td colspan="3" class="text-center py-4">Chưa có lý do hoàn trong kỳ.</td></tr>
+                  @endforelse
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 

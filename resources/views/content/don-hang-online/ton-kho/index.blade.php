@@ -100,8 +100,8 @@
   <div class="online-stock-scroll">
     <table class="table online-stock-table">
       <thead>
-        <tr><th>Tên sản phẩm</th><th>Màu</th><th>Size</th><th class="text-end">SL nhập</th><th class="text-end">SL xuất</th><th class="text-end">Tồn</th><th class="text-end">Tiền nhập</th><th class="text-end">Tiền xuất</th><th class="text-end">Tiền xuất - nhập</th></tr>
-        <tr class="stock-total-row"><th colspan="3" class="text-end">Tổng</th><th class="text-end">{{ number_format($totals['so_luong_nhap'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['so_luong_xuat'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['so_luong_ton'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['tien_nhap'], 0, ',', '.') }} ₫</th><th class="text-end">{{ number_format($totals['tien_xuat'], 0, ',', '.') }} ₫</th><th class="text-end">{{ number_format($totals['chenh_lech_tien'], 0, ',', '.') }} ₫</th></tr>
+        <tr><th>Tên sản phẩm</th><th>Màu</th><th>Size</th><th class="text-end">SL nhập mới</th><th class="text-end">SL hàng hoàn</th><th class="text-end">SL xuất</th><th class="text-end">Tồn</th><th class="text-end">Tiền nhập</th><th class="text-end">Tiền xuất</th><th class="text-end">Tiền xuất - nhập</th></tr>
+        <tr class="stock-total-row"><th colspan="3" class="text-end">Tổng</th><th class="text-end">{{ number_format($totals['so_luong_nhap'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['so_luong_hoan'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['so_luong_xuat'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['so_luong_ton'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['tien_nhap'], 0, ',', '.') }} ₫</th><th class="text-end">{{ number_format($totals['tien_xuat'], 0, ',', '.') }} ₫</th><th class="text-end">{{ number_format($totals['chenh_lech_tien'], 0, ',', '.') }} ₫</th></tr>
       </thead>
       <tbody>
       @forelse($rows as $row)
@@ -110,6 +110,7 @@
           <td>{{ $row['mau'] ?: '-' }}</td>
           <td>{{ $row['size'] ?: '-' }}</td>
           <td class="text-end">{{ number_format($row['so_luong_nhap'], 0, ',', '.') }}</td>
+          <td class="text-end text-success">{{ number_format($row['so_luong_hoan'], 0, ',', '.') }}</td>
           <td class="text-end">{{ number_format($row['so_luong_xuat'], 0, ',', '.') }}</td>
           <td class="text-end fw-semibold {{ $row['so_luong_ton'] < 0 ? 'text-danger' : '' }}">{{ number_format($row['so_luong_ton'], 0, ',', '.') }}</td>
           <td class="text-end">{{ number_format($row['tien_nhap'], 0, ',', '.') }} ₫</td>
@@ -117,7 +118,7 @@
           <td class="text-end fw-semibold {{ $row['chenh_lech_tien'] < 0 ? 'text-danger' : 'text-success' }}">{{ number_format($row['chenh_lech_tien'], 0, ',', '.') }} ₫</td>
         </tr>
       @empty
-        <tr><td colspan="9" class="text-center py-4">Chưa có dữ liệu.</td></tr>
+        <tr><td colspan="10" class="text-center py-4">Chưa có dữ liệu.</td></tr>
       @endforelse
       </tbody>
     </table>

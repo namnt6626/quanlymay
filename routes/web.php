@@ -17,6 +17,7 @@ use App\Http\Controllers\authentications\RegisterBasic;
 use App\Http\Controllers\authentications\ForgotPasswordBasic;
 use App\Http\Controllers\BaoCao\BaoCaoTongHopDonHangController;
 use App\Http\Controllers\BaoCao\BaoCaoBanHangOnlineController;
+use App\Http\Controllers\DonHangOnline\HangHoanOnlineController;
 use App\Http\Controllers\DanhMuc\KenhBanController;
 use App\Http\Controllers\DanhMuc\MatHangController;
 use App\Http\Controllers\DanhMuc\MauController;
@@ -140,6 +141,18 @@ Route::delete('don-hang-hoan-thanh/bulk', [DonHangHoanThanhController::class, 'b
 Route::delete('nhap-hang-online/bulk', [NhapHangOnlineController::class, 'bulkDestroy'])
   ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_DELETE'])
   ->name('nhap-hang-online.bulk-destroy');
+Route::delete('hang-hoan-online/bulk', [HangHoanOnlineController::class, 'bulkDestroy'])
+  ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_DELETE'])
+  ->name('hang-hoan-online.bulk-destroy');
+Route::get('hang-hoan-online/import', [HangHoanOnlineController::class, 'importForm'])
+  ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_CREATE'])
+  ->name('hang-hoan-online.import');
+Route::post('hang-hoan-online/import/preview', [HangHoanOnlineController::class, 'preview'])
+  ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_CREATE'])
+  ->name('hang-hoan-online.preview');
+Route::post('hang-hoan-online/import/commit', [HangHoanOnlineController::class, 'commit'])
+  ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_CREATE'])
+  ->name('hang-hoan-online.commit');
 Route::delete('xuat-kho/bulk', [PhieuXuatKhoController::class, 'bulkDestroy'])
   ->middleware(['auth', 'permission:XUAT_KHO_DELETE'])
   ->name('xuat-kho.bulk-destroy');
@@ -199,6 +212,12 @@ $registerCrudRoutes('don-hang-hoan-thanh', DonHangHoanThanhController::class, 'd
   'delete' => 'DON_HANG_HOAN_THANH_DELETE',
 ]);
 $registerCrudRoutes('nhap-hang-online', NhapHangOnlineController::class, 'nhap_hang_online', [
+  'view' => 'DON_HANG_HOAN_THANH_VIEW',
+  'create' => 'DON_HANG_HOAN_THANH_CREATE',
+  'edit' => 'DON_HANG_HOAN_THANH_EDIT',
+  'delete' => 'DON_HANG_HOAN_THANH_DELETE',
+]);
+$registerCrudRoutes('hang-hoan-online', HangHoanOnlineController::class, 'hang_hoan_online', [
   'view' => 'DON_HANG_HOAN_THANH_VIEW',
   'create' => 'DON_HANG_HOAN_THANH_CREATE',
   'edit' => 'DON_HANG_HOAN_THANH_EDIT',

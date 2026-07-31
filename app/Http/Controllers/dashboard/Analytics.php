@@ -124,6 +124,11 @@ class Analytics extends Controller
             COUNT(DISTINCT dhht.ngay_hoan_thanh) as so_ngay_ban
         ')->first();
         $onlineTotals->tong_so_luong = $this->onlineSoldQuantity($onlineFilters);
+        $onlineReturnBase = $this->onlineReturnsBaseQuery($onlineFilters);
+        $onlineReturnTotals = (clone $onlineReturnBase)->selectRaw('
+            COUNT(DISTINCT hhct.order_id) as so_don_hoan,
+            COALESCE(SUM(hhct.so_luong_hoan), 0) as so_luong_hoan
+        ')->first();
 
         $from = Carbon::parse($onlineFilters['tu_ngay']);
         $to = Carbon::parse($onlineFilters['den_ngay']);
@@ -165,6 +170,20 @@ class Analytics extends Controller
             ->limit(10)
             ->get();
 
+        $onlineTopReturnProducts = (clone $onlineReturnBase)
+            ->selectRaw('COALESCE(opa.group_name, hhct.ten_san_pham) as ten_san_pham, SUM(hhct.so_luong_hoan) as so_luong_hoan')
+            ->groupByRaw('COALESCE(opa.group_name, hhct.ten_san_pham)')
+            ->orderByDesc('so_luong_hoan')
+            ->limit(10)
+            ->get();
+
+        $onlineTopReturnReasons = (clone $onlineReturnBase)
+            ->selectRaw("COALESCE(NULLIF(hhct.return_reason, ''), 'Không rõ') as return_reason, COUNT(*) as so_dong, SUM(hhct.so_luong_hoan) as so_luong_hoan")
+            ->groupByRaw("COALESCE(NULLIF(hhct.return_reason, ''), 'Không rõ')")
+            ->orderByDesc('so_luong_hoan')
+            ->limit(10)
+            ->get();
+
         $onlineRows = (clone $base)
             ->selectRaw($onlineProductName.' as ten_san_pham, '.$onlineColorName.' as mau, ct.size, SUM(ct.so_luong) as so_luong, SUM(ct.thanh_tien) as tong_tien')
             ->groupByRaw($onlineProductName.', '.$onlineColorName.', ct.size')
@@ -175,10 +194,13 @@ class Analytics extends Controller
         return [
             'onlineFilters' => $onlineFilters,
             'onlineTotals' => $onlineTotals,
+            'onlineReturnTotals' => $onlineReturnTotals,
             'onlineRevenueChange' => $onlineRevenueChange,
             'onlineTrend' => $onlineTrend,
             'onlineDailyRows' => $onlineDailyRows,
             'onlineTopProducts' => $onlineTopProducts,
+            'onlineTopReturnProducts' => $onlineTopReturnProducts,
+            'onlineTopReturnReasons' => $onlineTopReturnReasons,
             'onlineRows' => $onlineRows,
             'onlineProducts' => DB::table('don_hang_hoan_thanh as dhht')
                 ->leftJoin('online_product_aliases as opa', 'opa.original_name', '=', 'dhht.ten_san_pham')
@@ -186,9 +208,18 @@ class Analytics extends Controller
                 ->whereNotNull('dhht.ten_san_pham')
                 ->where('dhht.ten_san_pham', '<>', '')
                 ->selectRaw($onlineProductName.' as ten_san_pham')
-                ->distinct()
+                ->union(
+                    DB::table('hang_hoan_online_chi_tiet as hhct')
+                        ->leftJoin('online_product_aliases as opa', 'opa.original_name', '=', 'hhct.ten_san_pham')
+                        ->whereNull('hhct.deleted_at')
+                        ->whereNotNull('hhct.ten_san_pham')
+                        ->where('hhct.ten_san_pham', '<>', '')
+                        ->selectRaw('COALESCE(opa.group_name, hhct.ten_san_pham) as ten_san_pham')
+                )
                 ->orderBy('ten_san_pham')
-                ->pluck('ten_san_pham'),
+                ->pluck('ten_san_pham')
+                ->unique()
+                ->values(),
             'onlineMaus' => DB::table('don_hang_hoan_thanh_chi_tiet as ct')
                 ->join('don_hang_hoan_thanh as dhht', 'dhht.id', '=', 'ct.don_hang_hoan_thanh_id')
                 ->leftJoin('online_color_aliases as oca', 'oca.original_name', '=', 'ct.mau')
@@ -197,18 +228,36 @@ class Analytics extends Controller
                 ->whereNotNull('ct.mau')
                 ->where('ct.mau', '<>', '')
                 ->selectRaw($onlineColorName.' as mau')
-                ->distinct()
+                ->union(
+                    DB::table('hang_hoan_online_chi_tiet as hhct')
+                        ->leftJoin('online_color_aliases as oca', 'oca.original_name', '=', 'hhct.mau')
+                        ->whereNull('hhct.deleted_at')
+                        ->whereNotNull('hhct.mau')
+                        ->where('hhct.mau', '<>', '')
+                        ->selectRaw('COALESCE(oca.group_name, hhct.mau) as mau')
+                )
                 ->orderBy('mau')
-                ->pluck('mau'),
+                ->pluck('mau')
+                ->unique()
+                ->values(),
             'onlineSizes' => DB::table('don_hang_hoan_thanh_chi_tiet as ct')
                 ->join('don_hang_hoan_thanh as dhht', 'dhht.id', '=', 'ct.don_hang_hoan_thanh_id')
                 ->whereNull('ct.deleted_at')
                 ->whereNull('dhht.deleted_at')
                 ->whereNotNull('ct.size')
                 ->where('ct.size', '<>', '')
-                ->distinct()
-                ->orderBy('ct.size')
-                ->pluck('ct.size'),
+                ->select('ct.size')
+                ->union(
+                    DB::table('hang_hoan_online_chi_tiet as hhct')
+                        ->whereNull('hhct.deleted_at')
+                        ->whereNotNull('hhct.size')
+                        ->where('hhct.size', '<>', '')
+                        ->select('hhct.size')
+                )
+                ->orderBy('size')
+                ->pluck('size')
+                ->unique()
+                ->values(),
         ];
     }
 
@@ -229,6 +278,24 @@ class Analytics extends Controller
             ->when($filters['mau'] !== '', fn (Builder $query) => $query->whereRaw($onlineColorName.' = ?', [$filters['mau']]))
             ->when($filters['size'] !== '', fn (Builder $query) => $query->where('ct.size', $filters['size']))
             ->when($filters['kenh_ban'] !== '', fn (Builder $query) => $query->where('dhht.kenh_ban', $filters['kenh_ban']));
+    }
+
+    private function onlineReturnsBaseQuery(array $filters): Builder
+    {
+        $returnDate = 'DATE(COALESCE(hhct.refund_time, hho.ngay_hoan))';
+
+        return DB::table('hang_hoan_online_chi_tiet as hhct')
+            ->join('hang_hoan_online as hho', 'hho.id', '=', 'hhct.hang_hoan_online_id')
+            ->leftJoin('online_product_aliases as opa', 'opa.original_name', '=', 'hhct.ten_san_pham')
+            ->leftJoin('online_color_aliases as oca', 'oca.original_name', '=', 'hhct.mau')
+            ->whereNull('hhct.deleted_at')
+            ->whereNull('hho.deleted_at')
+            ->where('hhct.cong_ton', true)
+            ->whereDate(DB::raw($returnDate), '>=', $filters['tu_ngay'])
+            ->whereDate(DB::raw($returnDate), '<=', $filters['den_ngay'])
+            ->when($filters['ma_hang'] !== '', fn (Builder $query) => $query->whereRaw('COALESCE(opa.group_name, hhct.ten_san_pham) = ?', [$filters['ma_hang']]))
+            ->when($filters['mau'] !== '', fn (Builder $query) => $query->whereRaw('COALESCE(oca.group_name, hhct.mau) = ?', [$filters['mau']]))
+            ->when($filters['size'] !== '', fn (Builder $query) => $query->where('hhct.size', $filters['size']));
     }
 
     private function onlineProductNameExpression(): string
