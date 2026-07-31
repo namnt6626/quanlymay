@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ProfitAnalysisPeriod extends Model
 {
     protected $fillable = [
+        'marketplace',
         'period_month',
         'period_start',
         'period_end',
@@ -52,6 +53,14 @@ class ProfitAnalysisPeriod extends Model
     public function skuSummaries(): HasMany
     {
         return $this->hasMany(ProfitAnalysisSkuSummary::class);
+    }
+
+    public function getMarketplaceLabelAttribute(): string
+    {
+        return match ($this->marketplace) {
+            'shopee' => 'Shopee',
+            default => 'TikTok',
+        };
     }
 
     public function confirmedBy(): BelongsTo

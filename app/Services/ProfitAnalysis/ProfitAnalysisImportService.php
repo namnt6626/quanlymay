@@ -18,12 +18,17 @@ class ProfitAnalysisImportService
      * @param array<string, string> $files
      * @return array<string, mixed>
      */
-    public function preview(array $files, Carbon $periodMonth, float $adCostPerOrder = 0): array
+    public function preview(array $files, Carbon $periodMonth, float $adCostPerOrder = 0, string $marketplace = 'tiktok'): array
     {
+        $marketplace = $this->normalizeMarketplace($marketplace);
         $fob = $this->parseFob($files['fob_file']);
         $analytics = $this->emptyAnalytics();
-        $settlement = $this->parseSettlement($files['settlement_file']);
-        $orders = $this->parseOrderSkuList($files['order_file'], $settlement['orders_by_id'] ?? []);
+        $settlement = $marketplace === 'shopee'
+            ? $this->parseShopeeSettlement($files['settlement_file'])
+            : $this->parseSettlement($files['settlement_file']);
+        $orders = $marketplace === 'shopee'
+            ? $this->parseShopeeOrderSkuList($files['order_file'], $settlement['orders_by_id'] ?? [])
+            : $this->parseOrderSkuList($files['order_file'], $settlement['orders_by_id'] ?? []);
         $adCost = max(0, $adCostPerOrder) * (int) $orders['unique_orders'];
         $ads = $this->manualAds($adCostPerOrder, (int) $orders['unique_orders'], $adCost);
         $settlementSource = $settlement;
@@ -50,18 +55,22 @@ class ProfitAnalysisImportService
 
         return [
             'period' => [
+                'marketplace' => $marketplace,
+                'marketplace_label' => $this->marketplaceLabel($marketplace),
                 'month' => $periodMonth->copy()->startOfMonth()->toDateString(),
                 'label' => 'T'.$periodMonth->format('n/Y'),
                 'detected_start' => $periodStart,
                 'detected_end' => $periodEnd,
                 'existing_period_id' => ProfitAnalysisPeriod::query()
                     ->whereDate('period_month', $periodMonth->copy()->startOfMonth()->toDateString())
+                    ->where('marketplace', $marketplace)
                     ->value('id'),
             ],
             'source_totals' => [
                 'analytics' => $analytics,
                 'ads' => $ads,
                 'settlement' => $settlementSource,
+                'marketplace' => $marketplace,
                 'orders' => [
                     'row_count' => $orders['row_count'],
                     'unique_orders' => $orders['unique_orders'],
@@ -136,15 +145,21 @@ class ProfitAnalysisImportService
         return DB::transaction(function () use ($preview, $skuRows, $totals, $userId): ProfitAnalysisPeriod {
             $periodMonth = Carbon::parse($preview['period']['month'])->startOfMonth()->toDateString();
 
+            $marketplace = $this->normalizeMarketplace((string) data_get($preview, 'period.marketplace', 'tiktok'));
+
             ProfitAnalysisPeriod::query()
                 ->whereDate('period_month', $periodMonth)
+                ->where('marketplace', $marketplace)
                 ->each(function (ProfitAnalysisPeriod $period): void {
                     $period->delete();
                 });
 
             foreach ($skuRows as $row) {
                 ProfitAnalysisSkuMap::query()->updateOrCreate(
-                    ['seller_sku' => $row['seller_sku']],
+                    [
+                        'marketplace' => $marketplace,
+                        'seller_sku' => $row['seller_sku'],
+                    ],
                     [
                         'fob_sku' => $row['fob_sku'],
                         'fob_code' => $row['fob_code'],
@@ -158,6 +173,7 @@ class ProfitAnalysisImportService
             }
 
             $period = ProfitAnalysisPeriod::query()->create([
+                'marketplace' => $marketplace,
                 'period_month' => $periodMonth,
                 'period_start' => $preview['period']['detected_start'],
                 'period_end' => $preview['period']['detected_end'],
@@ -188,6 +204,7 @@ class ProfitAnalysisImportService
             ]);
 
             foreach ($totals['sku_summaries'] as $summary) {
+                $summary['marketplace'] = $marketplace;
                 $period->skuSummaries()->create($summary);
             }
 
@@ -468,6 +485,152 @@ class ProfitAnalysisImportService
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    private function parseShopeeSettlement(string $path): array
+    {
+        $summaryRows = $this->reader->rows($path, 'Summary');
+        $totals = [
+            'period_start' => null,
+            'period_end' => null,
+            'settlement_amount' => 0.0,
+            'total_revenue' => 0.0,
+            'total_fees' => 0.0,
+            'total_goods' => 0.0,
+            'refund_amount' => 0.0,
+            'adjustment_amount' => 0.0,
+        ];
+
+        foreach ($summaryRows as $row) {
+            $texts = array_values($row);
+            foreach ($texts as $index => $text) {
+                $normalized = $this->normalize((string) $text);
+                $nextValue = $this->firstNumericAfter($texts, $index + 1);
+
+                if ($normalized === 'tu') {
+                    $totals['period_start'] = $this->parseDate((string) ($texts[$index + 1] ?? ''))?->toDateString();
+                } elseif ($normalized === 'den') {
+                    $totals['period_end'] = $this->parseDate((string) ($texts[$index + 1] ?? ''))?->toDateString();
+                } elseif ($normalized === '1 tong doanh thu') {
+                    $totals['total_revenue'] = (float) $nextValue;
+                } elseif ($normalized === 'tong hang hoa') {
+                    $totals['total_goods'] = (float) $nextValue;
+                } elseif ($normalized === 'so tien hoan lai') {
+                    $totals['refund_amount'] = (float) $nextValue;
+                } elseif ($normalized === '2 tong chi phi') {
+                    $totals['total_fees'] = (float) $nextValue;
+                }
+            }
+        }
+
+        $adjustmentRows = $this->reader->rows($path, 'Adjustment');
+        foreach ($adjustmentRows as $row) {
+            $texts = array_values($row);
+            foreach ($texts as $index => $text) {
+                if ($this->normalize((string) $text) === 'tong so tien dieu chinh') {
+                    $totals['adjustment_amount'] = (float) $this->firstNumericAfter($texts, $index + 1);
+                    break 2;
+                }
+            }
+        }
+
+        if ($totals['total_revenue'] <= 0) {
+            throw new RuntimeException('File quyết toán Shopee chưa nhận diện được dòng Tổng doanh thu trong sheet Summary.');
+        }
+
+        $totals['orders_by_id'] = $this->parseShopeeSettlementOrderDetails($path);
+        $totals['order_count'] = count($totals['orders_by_id']);
+        $totals['order_revenue'] = (float) collect($totals['orders_by_id'])->sum('revenue');
+        $totals['order_subtotal_after_discount'] = (float) collect($totals['orders_by_id'])->sum('subtotal_after_discount');
+        $totals['order_refund_after_discount'] = (float) collect($totals['orders_by_id'])->sum('refund_after_discount');
+        $positiveOrders = collect($totals['orders_by_id'])->filter(fn (array $order): bool => (float) $order['revenue'] > 0);
+        $negativeOrders = collect($totals['orders_by_id'])->filter(fn (array $order): bool => (float) $order['revenue'] < 0);
+        $zeroOrders = collect($totals['orders_by_id'])->filter(fn (array $order): bool => abs((float) $order['revenue']) < 0.01);
+        $totals['positive_order_count'] = $positiveOrders->count();
+        $totals['positive_order_revenue'] = (float) $positiveOrders->sum('revenue');
+        $totals['negative_order_count'] = $negativeOrders->count();
+        $totals['negative_order_revenue'] = (float) $negativeOrders->sum('revenue');
+        $totals['zero_order_count'] = $zeroOrders->count();
+        $totals['sample_positive_order_ids'] = $positiveOrders->keys()->take(10)->values()->all();
+        $totals['sample_negative_order_ids'] = $negativeOrders->keys()->take(10)->values()->all();
+        $createdDates = collect($totals['orders_by_id'])
+            ->pluck('created_at')
+            ->map(fn (string $date): ?string => $this->parseDate($date)?->toDateString())
+            ->filter()
+            ->values();
+        $settledDates = collect($totals['orders_by_id'])
+            ->pluck('settled_at')
+            ->map(fn (string $date): ?string => $this->parseDate($date)?->toDateString())
+            ->filter()
+            ->values();
+        $totals['order_created_start'] = $createdDates->isNotEmpty() ? $createdDates->min() : null;
+        $totals['order_created_end'] = $createdDates->isNotEmpty() ? $createdDates->max() : null;
+        $totals['order_settled_start'] = $settledDates->isNotEmpty() ? $settledDates->min() : null;
+        $totals['order_settled_end'] = $settledDates->isNotEmpty() ? $settledDates->max() : null;
+
+        return $totals;
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private function parseShopeeSettlementOrderDetails(string $path): array
+    {
+        $orders = [];
+        $columns = [];
+        $requiredColumns = ['Đơn hàng / Sản phẩm', 'Mã đơn hàng', 'Tổng tiền đã thanh toán', 'Giá sản phẩm', 'Số tiền hoàn lại', 'Ngày đặt hàng', 'Ngày hoàn thành thanh toán'];
+
+        $this->reader->eachRow($path, function (array $row, int $rowNumber) use (&$orders, &$columns, $requiredColumns): void {
+            if ($rowNumber === 3) {
+                $columns = $this->mapHeaderColumns($row);
+                foreach ($requiredColumns as $required) {
+                    if (! isset($columns[$required])) {
+                        throw new RuntimeException('File quyết toán Shopee thiếu cột '.$required.' trong sheet Doanh thu.');
+                    }
+                }
+
+                return;
+            }
+
+            if ($rowNumber <= 3) {
+                return;
+            }
+
+            if (trim((string) ($row[$columns['Đơn hàng / Sản phẩm']] ?? '')) !== 'Order') {
+                return;
+            }
+
+            $orderId = trim((string) ($row[$columns['Mã đơn hàng']] ?? ''));
+            if ($orderId === '' || $orderId === '-') {
+                return;
+            }
+
+            $fees = 0.0;
+            foreach (['Phí cố định', 'Phí Dịch Vụ', 'Phí xử lý giao dịch', 'Phí hoa hồng Tiếp thị liên kết', 'Phí dịch vụ PiShip', 'Thuế GTGT', 'Thuế TNCN'] as $feeColumn) {
+                $fees += $this->number($row[$columns[$feeColumn] ?? 0] ?? 0);
+            }
+
+            $orders[$orderId] = [
+                'order_id' => $orderId,
+                'rows' => 1,
+                'revenue' => $this->number($row[$columns['Giá sản phẩm']] ?? 0) + $this->number($row[$columns['Số tiền hoàn lại']] ?? 0),
+                'subtotal_after_discount' => $this->number($row[$columns['Giá sản phẩm']] ?? 0),
+                'refund_after_discount' => $this->number($row[$columns['Số tiền hoàn lại']] ?? 0),
+                'settlement_amount' => $this->number($row[$columns['Tổng tiền đã thanh toán']] ?? 0),
+                'fees' => $fees,
+                'created_at' => trim((string) ($row[$columns['Ngày đặt hàng']] ?? '')),
+                'settled_at' => trim((string) ($row[$columns['Ngày hoàn thành thanh toán']] ?? '')),
+            ];
+        }, 'Doanh thu');
+
+        if ($orders === []) {
+            throw new RuntimeException('File quyết toán Shopee chưa có danh sách mã đơn trong sheet Doanh thu.');
+        }
+
+        return $orders;
+    }
+
+    /**
      * @return array<string, array<string, mixed>>
      */
     private function parseSettlementOrderDetails(string $path): array
@@ -623,6 +786,145 @@ class ProfitAnalysisImportService
             $skuRows[$sellerSku]['revenue'] += $revenue;
             $skuRows[$sellerSku]['refund_amount'] += $refund;
         }, 'OrderSKUList');
+
+        $missingSettlementOrders = array_diff_key($settlementOrders, $matchedSettlementOrders);
+        $missingRevenue = (float) collect($missingSettlementOrders)->sum('revenue');
+        $missingSubtotal = (float) collect($missingSettlementOrders)->sum('subtotal_after_discount');
+        $missingRefund = (float) collect($missingSettlementOrders)->sum('refund_after_discount');
+        $missingOrders = collect($missingSettlementOrders)
+            ->map(fn (array $order, string $orderId): array => [
+                'order_id' => $orderId,
+                'created_at' => $order['created_at'] ?? null,
+                'settled_at' => $order['settled_at'] ?? null,
+                'revenue' => (float) ($order['revenue'] ?? 0),
+                'settlement_amount' => (float) ($order['settlement_amount'] ?? 0),
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'row_count' => $rowCount,
+            'unique_orders' => count($uniqueOrders),
+            'file_unique_orders' => count($fileUniqueOrders),
+            'status_counts' => $statusCounts,
+            'settlement_filter' => [
+                'enabled' => $settlementOrders !== [],
+                'settlement_order_count' => count($settlementOrders),
+                'matched_order_count' => count($matchedSettlementOrders),
+                'missing_order_count' => count($missingSettlementOrders),
+                'missing_revenue' => $missingRevenue,
+                'missing_subtotal_after_discount' => $missingSubtotal,
+                'missing_refund_after_discount' => $missingRefund,
+                'missing_net_subtotal_after_discount' => $missingSubtotal + $missingRefund,
+                'sample_missing_order_ids' => array_slice(array_keys($missingSettlementOrders), 0, 10),
+                'missing_orders' => $missingOrders,
+            ],
+            'period_start' => $dates !== [] ? min($dates) : null,
+            'period_end' => $dates !== [] ? max($dates) : null,
+            'sku_rows' => $skuRows,
+        ];
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $settlementOrders
+     * @return array<string, mixed>
+     */
+    private function parseShopeeOrderSkuList(string $path, array $settlementOrders = []): array
+    {
+        $columns = [];
+        $requiredColumns = ['Mã đơn hàng', 'Ngày đặt hàng', 'Trạng Thái Đơn Hàng', 'SKU phân loại hàng', 'Tên sản phẩm', 'Số lượng', 'Số lượng sản phẩm được hoàn trả', 'Giá ưu đãi'];
+        $skuRows = [];
+        $uniqueOrders = [];
+        $fileUniqueOrders = [];
+        $statusCounts = [];
+        $dates = [];
+        $rowCount = 0;
+        $matchedSettlementOrders = [];
+
+        $this->reader->eachRow($path, function (array $row, int $rowNumber) use (&$columns, $requiredColumns, &$skuRows, &$uniqueOrders, &$fileUniqueOrders, &$statusCounts, &$dates, &$rowCount, &$matchedSettlementOrders, $settlementOrders): void {
+            if ($rowNumber === 1) {
+                $columns = $this->mapHeaderColumns($row);
+                foreach ($requiredColumns as $required) {
+                    if (! isset($columns[$required])) {
+                        throw new RuntimeException('File đơn hàng Shopee thiếu cột '.$required.'.');
+                    }
+                }
+
+                return;
+            }
+
+            if ($rowNumber <= 1) {
+                return;
+            }
+
+            $orderId = trim((string) ($row[$columns['Mã đơn hàng']] ?? ''));
+            if ($orderId !== '') {
+                $fileUniqueOrders[$orderId] = true;
+            }
+
+            $status = trim((string) ($row[$columns['Trạng Thái Đơn Hàng']] ?? ''));
+            $statusCounts[$status] = ($statusCounts[$status] ?? 0) + 1;
+
+            if ($settlementOrders !== [] && ($orderId === '' || ! isset($settlementOrders[$orderId]))) {
+                return;
+            }
+
+            if ($orderId !== '') {
+                $matchedSettlementOrders[$orderId] = true;
+            }
+
+            if ($this->normalize($status) === 'da huy') {
+                return;
+            }
+
+            $sellerSku = trim((string) ($row[$columns['SKU phân loại hàng']] ?? ''));
+            if ($sellerSku === '') {
+                $sellerSku = trim((string) ($row[$columns['SKU sản phẩm'] ?? 0] ?? ''));
+            }
+            if ($sellerSku === '') {
+                $sellerSku = $this->extractShopeeSkuFromProductName((string) ($row[$columns['Tên sản phẩm']] ?? ''));
+            }
+            if ($sellerSku === '') {
+                return;
+            }
+
+            $rowCount++;
+            if ($orderId !== '') {
+                $uniqueOrders[$orderId] = true;
+            }
+
+            $created = $this->parseDate((string) ($row[$columns['Ngày đặt hàng']] ?? ''));
+            if ($created) {
+                $dates[] = $created->toDateString();
+            }
+
+            $quantity = (float) $this->number($row[$columns['Số lượng']] ?? 0);
+            $returned = (float) $this->number($row[$columns['Số lượng sản phẩm được hoàn trả']] ?? 0);
+            $unitRevenue = (float) $this->number($row[$columns['Giá ưu đãi']] ?? 0);
+            $netQuantity = max(0, $quantity - $returned);
+            $grossRevenue = $unitRevenue * $quantity;
+            $revenue = $unitRevenue * $netQuantity;
+            $refund = max(0, $grossRevenue - $revenue);
+
+            if (! isset($skuRows[$sellerSku])) {
+                $skuRows[$sellerSku] = [
+                    'key' => md5($sellerSku),
+                    'seller_sku' => $sellerSku,
+                    'product_name' => trim((string) ($row[$columns['Tên sản phẩm']] ?? '')),
+                    'quantity_sold' => 0.0,
+                    'quantity_returned' => 0.0,
+                    'net_quantity' => 0.0,
+                    'revenue' => 0.0,
+                    'refund_amount' => 0.0,
+                ];
+            }
+
+            $skuRows[$sellerSku]['quantity_sold'] += $quantity;
+            $skuRows[$sellerSku]['quantity_returned'] += $returned;
+            $skuRows[$sellerSku]['net_quantity'] += $netQuantity;
+            $skuRows[$sellerSku]['revenue'] += $revenue;
+            $skuRows[$sellerSku]['refund_amount'] += $refund;
+        }, 'orders');
 
         $missingSettlementOrders = array_diff_key($settlementOrders, $matchedSettlementOrders);
         $missingRevenue = (float) collect($missingSettlementOrders)->sum('revenue');
@@ -887,7 +1189,7 @@ class ProfitAnalysisImportService
             return null;
         }
 
-        foreach (['d/m/Y H:i:s', 'Y/m/d H:i:s', 'd/m/Y', 'Y/m/d', 'Y-m-d H:i:s', 'Y-m-d'] as $format) {
+        foreach (['d/m/Y H:i:s', 'Y/m/d H:i:s', 'Y-m-d H:i:s', 'd/m/Y H:i', 'Y/m/d H:i', 'Y-m-d H:i', 'd/m/Y', 'Y/m/d', 'Y-m-d'] as $format) {
             try {
                 return Carbon::createFromFormat($format, $value);
             } catch (\Throwable) {
@@ -896,5 +1198,24 @@ class ProfitAnalysisImportService
         }
 
         return null;
+    }
+
+    private function extractShopeeSkuFromProductName(string $productName): string
+    {
+        if (preg_match('/\(([A-ZĐa-zđ0-9\s\-_]+)\)/u', $productName, $matches)) {
+            return trim((string) $matches[1]);
+        }
+
+        return '';
+    }
+
+    private function normalizeMarketplace(string $marketplace): string
+    {
+        return $marketplace === 'shopee' ? 'shopee' : 'tiktok';
+    }
+
+    private function marketplaceLabel(string $marketplace): string
+    {
+        return $marketplace === 'shopee' ? 'Shopee' : 'TikTok';
     }
 }

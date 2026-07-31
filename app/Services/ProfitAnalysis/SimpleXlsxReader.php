@@ -65,6 +65,7 @@ class SimpleXlsxReader
                 $callback($currentRow, $currentRowIndex);
             }
         } finally {
+            $this->closeTemporaryStreams();
             $zip->close();
         }
     }
@@ -177,23 +178,44 @@ class SimpleXlsxReader
      */
     private function sharedStrings(ZipArchive $zip): array
     {
-        $xml = $zip->getFromName('xl/sharedStrings.xml');
-        if ($xml === false) {
+        $source = $zip->getStream('xl/sharedStrings.xml');
+        if ($source === false) {
             return [];
         }
 
-        $document = simplexml_load_string($xml);
-        if (! $document) {
-            return [];
+        $temporary = tmpfile();
+        if ($temporary === false) {
+            fclose($source);
+
+            throw new RuntimeException('Không tạo được file tạm để đọc shared strings.');
+        }
+
+        stream_copy_to_stream($source, $temporary);
+        fclose($source);
+
+        $metadata = stream_get_meta_data($temporary);
+        $reader = new XMLReader();
+        if (! $reader->open($metadata['uri'])) {
+            fclose($temporary);
+
+            throw new RuntimeException('Không thể đọc shared strings trong file Excel.');
         }
 
         $strings = [];
-        foreach ($document->xpath('//*[local-name()="si"]') ?: [] as $item) {
-            $strings[] = implode('', array_map(
-                fn (SimpleXMLElement $text): string => (string) $text,
-                $item->xpath('.//*[local-name()="t"]') ?: []
-            ));
+        $current = null;
+        while ($reader->read()) {
+            if ($reader->nodeType === XMLReader::ELEMENT && $reader->localName === 'si') {
+                $current = '';
+            } elseif ($current !== null && $reader->nodeType === XMLReader::ELEMENT && $reader->localName === 't') {
+                $current .= $reader->readString();
+            } elseif ($reader->nodeType === XMLReader::END_ELEMENT && $reader->localName === 'si') {
+                $strings[] = $current ?? '';
+                $current = null;
+            }
         }
+
+        $reader->close();
+        fclose($temporary);
 
         return $strings;
     }
@@ -247,6 +269,17 @@ class SimpleXlsxReader
         }
 
         return $value;
+    }
+
+    private function closeTemporaryStreams(): void
+    {
+        foreach ($this->temporaryStreams as $stream) {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
+
+        $this->temporaryStreams = [];
     }
 
     /**

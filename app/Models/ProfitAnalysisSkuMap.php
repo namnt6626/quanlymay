@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class ProfitAnalysisSkuMap extends Model
 {
     protected $fillable = [
+        'marketplace',
         'seller_sku',
         'fob_sku',
         'fob_code',

@@ -111,6 +111,7 @@
 @endif
 
 @php
+  $marketplaceLabel = data_get($preview, 'period.marketplace_label', 'TikTok');
   $settlementFilter = data_get($preview, 'source_totals.orders.settlement_filter', []);
   $missingSettlementRevenue = abs((float) data_get($settlementFilter, 'missing_revenue', 0));
   $settlementOrderCount = (int) data_get($settlementFilter, 'settlement_order_count', 0);
@@ -123,7 +124,7 @@
 @if(data_get($settlementFilter, 'enabled'))
   <div class="alert {{ $missingSettlementRevenue > 0.5 ? 'alert-danger' : (data_get($settlementFilter, 'missing_order_count', 0) > 0 ? 'alert-warning' : 'alert-success') }}">
     @if($settlementOrderCount > 0 && $matchedOrderCount === 0)
-      <div class="fw-semibold mb-1">Không lấy được số liệu bán hàng vì file tất cả đơn hàng/SKU không có mã đơn nào trùng với file quyết toán TikTok.</div>
+      <div class="fw-semibold mb-1">Không lấy được số liệu bán hàng vì file tất cả đơn hàng/SKU không có mã đơn nào trùng với file quyết toán {{ $marketplaceLabel }}.</div>
       <div>
         File quyết toán có {{ number_format($settlementOrderCount, 0, ',', '.') }} đơn.
         @if($settlementCreatedStart && $settlementCreatedEnd)
@@ -141,7 +142,7 @@
         @endif
       </div>
     @else
-      File tất cả đơn hàng/SKU đã lọc theo mã đơn trong file quyết toán TikTok:
+      File tất cả đơn hàng/SKU đã lọc theo mã đơn trong file quyết toán {{ $marketplaceLabel }}:
       tìm thấy {{ number_format($matchedOrderCount, 0, ',', '.') }}/{{ number_format($settlementOrderCount, 0, ',', '.') }} đơn.
       @if($missingOrderCount > 0)
         Còn thiếu {{ number_format($missingOrderCount, 0, ',', '.') }} đơn,
@@ -215,7 +216,7 @@
         </div>
       @endif
       <div class="profit-preview-metric">
-        <div class="label">Doanh thu từ file quyết toán TikTok</div>
+        <div class="label">Doanh thu từ file quyết toán {{ $marketplaceLabel }}</div>
         <div class="value">{{ number_format((float) $preview['summary']['settlement_revenue'], 0, ',', '.') }} ₫</div>
       </div>
       <div class="profit-preview-metric">
@@ -223,7 +224,7 @@
         <div class="value">{{ number_format((float) $preview['summary']['sku_revenue_total'], 0, ',', '.') }} ₫</div>
       </div>
       <div class="profit-preview-metric">
-        <div class="label">Đơn trong file quyết toán TikTok</div>
+        <div class="label">Đơn trong file quyết toán {{ $marketplaceLabel }}</div>
         <div class="value">{{ number_format((float) data_get($settlementFilter, 'settlement_order_count', 0), 0, ',', '.') }}</div>
       </div>
       <div class="profit-preview-metric">

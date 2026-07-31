@@ -100,37 +100,74 @@
 <div class="d-flex flex-column flex-md-row gap-3 justify-content-between align-items-md-center mb-4">
   <div>
     <h4 class="mb-1">Phân tích lãi lỗ</h4>
-    <div class="text-muted">Mỗi tháng giữ một bộ dữ liệu chốt. Nhập lại cùng tháng sẽ thay thế dữ liệu tháng đó.</div>
+    <div class="text-muted">Mỗi tháng giữ riêng dữ liệu TikTok và Shopee; tab Tổng quan cộng gộp theo mã FOB.</div>
   </div>
   @if (hasPermission('PHAN_TICH_LAI_LO_CREATE'))
-    <a href="{{ route('phan-tich-lai-lo.create') }}" class="btn btn-primary">
-      <i class="icon-base bx bx-upload me-1"></i>Nhập dữ liệu tháng
-    </a>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{{ route('phan-tich-lai-lo.create-marketplace', 'tiktok') }}" class="btn btn-outline-primary">
+        <i class="icon-base bx bx-upload me-1"></i>Nhập dữ liệu TikTok
+      </a>
+      <a href="{{ route('phan-tich-lai-lo.create-marketplace', 'shopee') }}" class="btn btn-outline-primary">
+        <i class="icon-base bx bx-upload me-1"></i>Nhập dữ liệu Shopee
+      </a>
+    </div>
   @endif
 </div>
 
 @if($selectedPeriod)
+  @php
+    $tabPeriods = [
+      'total' => $selectedPeriod,
+      'shopee' => $shopeePeriod,
+      'tiktok' => $tiktokPeriod,
+    ];
+    $selectedPeriod = $tabPeriods[$activeTab];
+    $selectedMarketplaceLabel = $activeTab === 'total' ? 'Tổng quan' : ($activeTab === 'shopee' ? 'Shopee' : 'TikTok');
+    $revenueLabel = $activeTab === 'total' ? 'Doanh thu tổng hợp' : 'Doanh thu từ file quyết toán '.$selectedMarketplaceLabel;
+    $skuRevenueLabel = $activeTab === 'total' ? 'Doanh thu SKU đã cộng gộp' : 'Doanh thu từ file tất cả đơn hàng/SKU';
+    $grossRevenueLabel = $activeTab === 'total' ? 'DT SKU trước khi trừ hoàn/trả' : 'DT đơn hàng trước khi trừ hoàn/trả';
+    $adjustmentLabel = $activeTab === 'total' ? 'Chênh lệch tổng đã phân bổ' : 'Chênh lệch đã chia về từng mã';
+    $listedPeriods = $activeTab === 'total' ? $periods : $periods->getCollection()->where('marketplace', $activeTab);
+  @endphp
   <div class="card mb-4">
     <div class="card-body d-flex flex-column flex-lg-row gap-3 justify-content-between align-items-lg-end">
       <form method="GET" action="{{ route('phan-tich-lai-lo.index') }}" class="d-flex flex-column flex-sm-row gap-2 align-items-sm-end">
         <div>
           <label class="form-label">Chọn tháng xem</label>
-          <select class="form-select profit-period-select" name="period" onchange="this.form.submit()">
-            <option value="all" @selected($isTotalView)>Tổng tất cả tháng</option>
-            @foreach($periods as $periodOption)
-              <option value="{{ $periodOption->id }}" @selected(!$isTotalView && $selectedPeriod->id === $periodOption->id)>
-                {{ $periodOption->label }}
-                @if($periodOption->period_start && $periodOption->period_end)
-                  ({{ $periodOption->period_start->format('d/m/Y') }} - {{ $periodOption->period_end->format('d/m/Y') }})
-                @endif
-              </option>
+          <select class="form-select profit-period-select" name="month" onchange="this.form.submit()">
+            @foreach($monthOptions as $value => $label)
+              <option value="{{ $value }}" @selected($selectedMonth === $value)>{{ $label }}</option>
             @endforeach
           </select>
+          <input type="hidden" name="tab" value="{{ $activeTab }}">
         </div>
       </form>
-      <div class="text-muted">Đang xem {{ $selectedPeriod->label }}</div>
+      <div class="text-muted">Đang xem {{ $selectedPeriod?->label ?? $selectedMarketplaceLabel }}</div>
     </div>
   </div>
+
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+      <a class="nav-link {{ $activeTab === 'total' ? 'active' : '' }}" href="{{ route('phan-tich-lai-lo.index', ['month' => $selectedMonth, 'tab' => 'total']) }}">Tổng quan</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {{ $activeTab === 'shopee' ? 'active' : '' }}" href="{{ route('phan-tich-lai-lo.index', ['month' => $selectedMonth, 'tab' => 'shopee']) }}">Shopee</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {{ $activeTab === 'tiktok' ? 'active' : '' }}" href="{{ route('phan-tich-lai-lo.index', ['month' => $selectedMonth, 'tab' => 'tiktok']) }}">TikTok</a>
+    </li>
+  </ul>
+
+  @if(!$selectedPeriod)
+    <div class="card mb-4">
+      <div class="card-body text-center py-5">
+        <h5 class="mb-2">Chưa có dữ liệu {{ $activeTab === 'shopee' ? 'Shopee' : 'TikTok' }} tháng này</h5>
+        @if (hasPermission('PHAN_TICH_LAI_LO_CREATE'))
+          <a href="{{ route('phan-tich-lai-lo.create-marketplace', $activeTab) }}" class="btn btn-primary">Nhập dữ liệu {{ $activeTab === 'shopee' ? 'Shopee' : 'TikTok' }}</a>
+        @endif
+      </div>
+    </div>
+  @else
 
   <div class="card mb-4">
     <div class="card-header d-flex flex-column flex-md-row gap-2 justify-content-between align-items-md-center">
@@ -145,7 +182,7 @@
         </div>
       </div>
       <div class="d-flex gap-2 align-items-center">
-        @if(!$isTotalView && hasPermission('PHAN_TICH_LAI_LO_EDIT'))
+        @if($selectedPeriod->id !== 'all' && hasPermission('PHAN_TICH_LAI_LO_EDIT'))
           <a class="btn btn-sm btn-outline-primary" href="{{ route('phan-tich-lai-lo.edit', $selectedPeriod->id) }}">
             <i class="icon-base bx bx-edit me-1"></i>Sửa dữ liệu
           </a>
@@ -156,15 +193,15 @@
     <div class="card-body">
       <div class="profit-kpi-grid">
         <div class="profit-kpi">
-          <div class="profit-kpi-label">Doanh thu từ file quyết toán TikTok</div>
+          <div class="profit-kpi-label">{{ $revenueLabel }}</div>
           <div class="profit-kpi-value">{{ number_format((float) $selectedPeriod->total_revenue, 0, ',', '.') }} ₫</div>
         </div>
         <div class="profit-kpi">
-          <div class="profit-kpi-label">Doanh thu từ file tất cả đơn hàng/SKU</div>
+          <div class="profit-kpi-label">{{ $skuRevenueLabel }}</div>
           <div class="profit-kpi-value">{{ number_format((float) ($selectedPeriod->sku_revenue_total ?? 0), 0, ',', '.') }} ₫</div>
         </div>
         <div class="profit-kpi">
-          <div class="profit-kpi-label">DT đơn hàng trước khi trừ hoàn/trả</div>
+          <div class="profit-kpi-label">{{ $grossRevenueLabel }}</div>
           <div class="profit-kpi-value">{{ number_format((float) ($selectedPeriod->sku_gross_revenue_total ?? 0), 0, ',', '.') }} ₫</div>
         </div>
         <div class="profit-kpi">
@@ -172,7 +209,7 @@
           <div class="profit-kpi-value text-danger">{{ number_format((float) ($selectedPeriod->sku_refund_total ?? 0), 0, ',', '.') }} ₫</div>
         </div>
         <div class="profit-kpi">
-          <div class="profit-kpi-label">Chênh lệch đã chia về từng mã</div>
+          <div class="profit-kpi-label">{{ $adjustmentLabel }}</div>
           <div class="profit-kpi-value {{ abs((float) ($selectedPeriod->revenue_adjustment ?? 0)) > 0 ? 'text-warning' : 'text-success' }}">{{ number_format((float) ($selectedPeriod->revenue_adjustment ?? 0), 0, ',', '.') }} ₫</div>
         </div>
         <div class="profit-kpi">
@@ -218,6 +255,42 @@
       </div>
     </div>
   </div>
+
+  @if($activeTab === 'total' && !empty($selectedPeriod->marketplaceBreakdown))
+    <div class="card mb-4">
+      <div class="card-header"><h5 class="mb-0">So sánh nền tảng</h5></div>
+      <div class="table-responsive">
+        <table class="table mb-0">
+          <thead>
+            <tr>
+              <th>Nền tảng</th>
+              <th class="text-end">Doanh thu</th>
+              <th class="text-end">Đơn</th>
+              <th class="text-end">SL bán ròng</th>
+              <th class="text-end">Giá vốn</th>
+              <th class="text-end">Phí</th>
+              <th class="text-end">QC</th>
+              <th class="text-end">Lãi/lỗ</th>
+            </tr>
+          </thead>
+          <tbody>
+            @foreach($selectedPeriod->marketplaceBreakdown as $periodBreakdown)
+              <tr>
+                <td><span class="badge bg-label-{{ $periodBreakdown->marketplace === 'shopee' ? 'warning' : 'info' }}">{{ $periodBreakdown->marketplace_label }}</span></td>
+                <td class="text-end profit-number">{{ number_format((float) $periodBreakdown->total_revenue, 0, ',', '.') }} ₫</td>
+                <td class="text-end profit-number">{{ number_format((float) ($periodBreakdown->completed_order_count ?: $periodBreakdown->order_count), 0, ',', '.') }}</td>
+                <td class="text-end profit-number">{{ number_format((float) $periodBreakdown->item_count, 0, ',', '.') }}</td>
+                <td class="text-end profit-number">{{ number_format((float) $periodBreakdown->cogs, 0, ',', '.') }} ₫</td>
+                <td class="text-end profit-number">{{ number_format((float) $periodBreakdown->marketplace_fees, 0, ',', '.') }} ₫</td>
+                <td class="text-end profit-number">{{ number_format((float) $periodBreakdown->ad_cost, 0, ',', '.') }} ₫</td>
+                <td class="text-end profit-number fw-semibold {{ $periodBreakdown->profit >= 0 ? 'text-success' : 'text-danger' }}">{{ number_format((float) $periodBreakdown->profit, 0, ',', '.') }} ₫</td>
+              </tr>
+            @endforeach
+          </tbody>
+        </table>
+      </div>
+    </div>
+  @endif
 
   @php
     $profitableSkus = $selectedPeriod->skuSummaries
@@ -298,8 +371,8 @@
             <th>Seller SKU</th>
             <th>Sản phẩm</th>
             <th class="text-end">SL bán ròng</th>
-            <th class="text-end">DT từ file tất cả đơn hàng/SKU</th>
-            <th class="text-end">Chênh lệch chia về từng mã</th>
+            <th class="text-end">{{ $activeTab === 'total' ? 'DT SKU đã cộng gộp' : 'DT từ file tất cả đơn hàng/SKU' }}</th>
+            <th class="text-end">{{ $activeTab === 'total' ? 'Chênh lệch tổng phân bổ' : 'Chênh lệch chia về từng mã' }}</th>
             <th class="text-end">DT sau khi chia chênh lệch</th>
             <th class="text-end">Giá vốn/sp</th>
             <th class="text-end">Tổng giá vốn</th>
@@ -335,25 +408,28 @@
       </table>
     </div>
   </div>
+  @endif
 @else
   <div class="card mb-4">
     <div class="card-body text-center py-5">
       <h5 class="mb-2">Chưa có kỳ phân tích nào</h5>
       <div class="text-muted mb-3">Upload 3 file và nhập chi phí QC mỗi đơn hàng để tạo bộ thống kê đầu tiên.</div>
       @if (hasPermission('PHAN_TICH_LAI_LO_CREATE'))
-        <a href="{{ route('phan-tich-lai-lo.create') }}" class="btn btn-primary">Nhập dữ liệu tháng</a>
+        <a href="{{ route('phan-tich-lai-lo.create-marketplace', 'tiktok') }}" class="btn btn-outline-primary me-2">Nhập dữ liệu TikTok</a>
+        <a href="{{ route('phan-tich-lai-lo.create-marketplace', 'shopee') }}" class="btn btn-outline-primary">Nhập dữ liệu Shopee</a>
       @endif
     </div>
   </div>
 @endif
 
 <div class="card">
-  <div class="card-header"><h5 class="mb-0">Các tháng đã chốt</h5></div>
+  <div class="card-header"><h5 class="mb-0">Các tháng đã chốt{{ $activeTab !== 'total' ? ' - '.$selectedMarketplaceLabel : '' }}</h5></div>
   <div class="table-responsive">
     <table class="table mb-0">
       <thead>
         <tr>
           <th>Tháng</th>
+          <th>Nền tảng</th>
           <th>Khoảng ngày</th>
           <th class="text-end">Doanh thu</th>
           <th class="text-end">Chi phí</th>
@@ -364,9 +440,10 @@
         </tr>
       </thead>
       <tbody>
-        @forelse($periods as $period)
+        @forelse($listedPeriods as $period)
           <tr>
             <td class="fw-semibold">{{ $period->label }}</td>
+            <td><span class="badge bg-label-{{ $period->marketplace === 'shopee' ? 'warning' : 'info' }}">{{ $period->marketplace_label }}</span></td>
             <td>
               @if($period->period_start && $period->period_end)
                 {{ $period->period_start->format('d/m/Y') }} - {{ $period->period_end->format('d/m/Y') }}
@@ -399,12 +476,12 @@
             </td>
           </tr>
         @empty
-          <tr><td colspan="8" class="text-center py-4">Chưa có dữ liệu.</td></tr>
+          <tr><td colspan="9" class="text-center py-4">Chưa có dữ liệu.</td></tr>
         @endforelse
       </tbody>
     </table>
   </div>
-  @if($periods->hasPages())<div class="card-footer">{{ $periods->links() }}</div>@endif
+  @if($activeTab === 'total' && $periods->hasPages())<div class="card-footer">{{ $periods->links() }}</div>@endif
 </div>
 
 @endsection

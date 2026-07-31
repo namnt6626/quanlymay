@@ -9,6 +9,7 @@ class ProfitAnalysisSkuSummary extends Model
 {
     protected $fillable = [
         'profit_analysis_period_id',
+        'marketplace',
         'seller_sku',
         'fob_sku',
         'product_name',

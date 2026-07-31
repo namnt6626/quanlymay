@@ -41,7 +41,7 @@
 @section('content')
 <div class="d-flex flex-column flex-md-row gap-3 justify-content-between align-items-md-center mb-4">
   <div>
-    <h4 class="mb-1">Nhập dữ liệu phân tích lãi lỗ</h4>
+    <h4 class="mb-1">Nhập dữ liệu {{ $marketplaceLabel }}</h4>
     <div class="text-muted">Chọn tháng, upload 3 file bắt buộc và nhập chi phí QC mỗi đơn hàng.</div>
   </div>
   <a href="{{ route('phan-tich-lai-lo.index') }}" class="btn btn-outline-secondary">
@@ -60,6 +60,7 @@
 <form method="POST" action="{{ route('phan-tich-lai-lo.preview') }}" class="card" id="profit-preview-form">
   @csrf
   <input type="hidden" name="import_token" value="{{ $importToken }}">
+  <input type="hidden" name="marketplace" value="{{ $marketplace }}">
   <div class="card-header">
     <div class="row g-3 align-items-end">
       <div class="col-12 col-md-4 col-xl-3">
@@ -76,7 +77,7 @@
       <div class="col-12 col-md-4 col-xl-3">
         <label class="form-label">Chi phí QC mỗi đơn hàng</label>
         <input type="text" class="form-control js-money-input" name="ad_cost_per_order" inputmode="numeric" value="{{ old('ad_cost_per_order') }}" required>
-        <div class="form-text">Hệ thống sẽ nhân số này với số đơn hoàn tất đã lọc theo file quyết toán.</div>
+        <div class="form-text">Hệ thống sẽ nhân số này với số đơn hoàn tất đã lọc theo file quyết toán {{ $marketplaceLabel }}.</div>
       </div>
     </div>
   </div>
@@ -93,10 +94,10 @@
         </div>
       </div>
       <div class="profit-upload-box">
-        <label class="form-label">2. File quyết toán TikTok</label>
+        <label class="form-label">2. File quyết toán {{ $marketplaceLabel }}</label>
         <div class="profit-upload-note">Lấy doanh thu quyết toán, phí sàn, phí giao dịch, tiền thực nhận.</div>
         <input type="file" class="form-control js-profit-file" data-file-key="settlement_file" accept=".xlsx">
-        <div class="form-text">Ví dụ: quyết toán 20-6-26.xlsx</div>
+        <div class="form-text">{{ $marketplace === 'shopee' ? 'Ví dụ: Quyết toán Vinh Thuý SP.xlsx' : 'Ví dụ: quyết toán 20-6-26.xlsx' }}</div>
         <div class="profit-upload-status js-profit-file-status" data-file-key="settlement_file">
           @if(isset($uploadedFiles['settlement_file']))<span class="is-ready">Đã tải lên: {{ $uploadedFiles['settlement_file']['name'] }}</span>@endif
         </div>
@@ -105,7 +106,7 @@
         <label class="form-label">3. File tất cả đơn hàng/SKU</label>
         <div class="profit-upload-note">Lấy Seller SKU, số lượng bán, hoàn/trả, doanh thu từng SKU.</div>
         <input type="file" class="form-control js-profit-file" data-file-key="order_file" accept=".xlsx">
-        <div class="form-text">Ví dụ: Tất cả đơn hàng-2026-07-30-08_33.xlsx</div>
+        <div class="form-text">{{ $marketplace === 'shopee' ? 'Ví dụ: Order.all.20260601_20260630.xlsx' : 'Ví dụ: Tất cả đơn hàng-2026-07-30-08_33.xlsx' }}</div>
         <div class="profit-upload-status js-profit-file-status" data-file-key="order_file">
           @if(isset($uploadedFiles['order_file']))<span class="is-ready">Đã tải lên: {{ $uploadedFiles['order_file']['name'] }}</span>@endif
         </div>
