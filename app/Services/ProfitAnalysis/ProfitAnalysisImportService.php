@@ -472,29 +472,33 @@ class ProfitAnalysisImportService
      */
     private function parseSettlementOrderDetails(string $path): array
     {
-        $rows = $this->reader->rows($path, 'Chi tiết đơn hàng');
-        $header = $rows[1] ?? [];
-        $columns = $this->mapHeaderColumns($header);
-
-        foreach (['Loại giao dịch', 'ID đơn hàng liên quan', 'Tổng doanh thu', 'Tổng phụ sau giảm giá của người bán', 'Tổng phụ của khoản hoàn tiền sau giảm giá của người bán'] as $required) {
-            if (! isset($columns[$required])) {
-                throw new RuntimeException('File quyết toán thiếu cột '.$required.' trong sheet Chi tiết đơn hàng.');
-            }
-        }
-
         $orders = [];
-        foreach ($rows as $rowNumber => $row) {
+        $columns = [];
+        $requiredColumns = ['Loại giao dịch', 'ID đơn hàng liên quan', 'Tổng doanh thu', 'Tổng phụ sau giảm giá của người bán', 'Tổng phụ của khoản hoàn tiền sau giảm giá của người bán'];
+
+        $this->reader->eachRow($path, function (array $row, int $rowNumber) use (&$orders, &$columns, $requiredColumns): void {
+            if ($rowNumber === 1) {
+                $columns = $this->mapHeaderColumns($row);
+                foreach ($requiredColumns as $required) {
+                    if (! isset($columns[$required])) {
+                        throw new RuntimeException('File quyết toán thiếu cột '.$required.' trong sheet Chi tiết đơn hàng.');
+                    }
+                }
+
+                return;
+            }
+
             if ($rowNumber <= 1) {
-                continue;
+                return;
             }
 
             if (trim((string) ($row[$columns['Loại giao dịch']] ?? '')) !== 'Đơn hàng') {
-                continue;
+                return;
             }
 
             $orderId = trim((string) ($row[$columns['ID đơn hàng liên quan']] ?? ''));
             if ($orderId === '' || $orderId === '/') {
-                continue;
+                return;
             }
 
             if (! isset($orders[$orderId])) {
@@ -517,7 +521,7 @@ class ProfitAnalysisImportService
             $orders[$orderId]['refund_after_discount'] += $this->number($row[$columns['Tổng phụ của khoản hoàn tiền sau giảm giá của người bán']] ?? 0);
             $orders[$orderId]['settlement_amount'] += $this->number($row[$columns['Tổng số tiền quyết toán'] ?? 0] ?? 0);
             $orders[$orderId]['fees'] += $this->number($row[$columns['Tổng phí'] ?? 0] ?? 0);
-        }
+        }, 'Chi tiết đơn hàng');
 
         if ($orders === []) {
             throw new RuntimeException('File quyết toán chưa có danh sách ID đơn hàng trong sheet Chi tiết đơn hàng.');
@@ -532,16 +536,8 @@ class ProfitAnalysisImportService
      */
     private function parseOrderSkuList(string $path, array $settlementOrders = []): array
     {
-        $rows = $this->reader->rows($path, 'OrderSKUList');
-        $header = $rows[1] ?? [];
-        $columns = $this->mapHeaderColumns($header);
-
-        foreach (['Order ID', 'Order Status', 'Seller SKU', 'Quantity', 'Sku Quantity of return', 'SKU Subtotal After Discount'] as $required) {
-            if (! isset($columns[$required])) {
-                throw new RuntimeException('File đơn hàng/SKU thiếu cột '.$required.'.');
-            }
-        }
-
+        $columns = [];
+        $requiredColumns = ['Order ID', 'Order Status', 'Seller SKU', 'Quantity', 'Sku Quantity of return', 'SKU Subtotal After Discount'];
         $skuRows = [];
         $uniqueOrders = [];
         $fileUniqueOrders = [];
@@ -550,14 +546,25 @@ class ProfitAnalysisImportService
         $rowCount = 0;
         $matchedSettlementOrders = [];
 
-        foreach ($rows as $rowNumber => $row) {
+        $this->reader->eachRow($path, function (array $row, int $rowNumber) use (&$columns, $requiredColumns, &$skuRows, &$uniqueOrders, &$fileUniqueOrders, &$statusCounts, &$dates, &$rowCount, &$matchedSettlementOrders, $settlementOrders): void {
+            if ($rowNumber === 1) {
+                $columns = $this->mapHeaderColumns($row);
+                foreach ($requiredColumns as $required) {
+                    if (! isset($columns[$required])) {
+                        throw new RuntimeException('File đơn hàng/SKU thiếu cột '.$required.'.');
+                    }
+                }
+
+                return;
+            }
+
             if ($rowNumber <= 2) {
-                continue;
+                return;
             }
 
             $sellerSku = trim((string) ($row[$columns['Seller SKU']] ?? ''));
             if ($sellerSku === '') {
-                continue;
+                return;
             }
 
             $orderId = trim((string) ($row[$columns['Order ID']] ?? ''));
@@ -569,7 +576,7 @@ class ProfitAnalysisImportService
             $statusCounts[$status] = ($statusCounts[$status] ?? 0) + 1;
 
             if ($settlementOrders !== [] && ($orderId === '' || ! isset($settlementOrders[$orderId]))) {
-                continue;
+                return;
             }
 
             if ($orderId !== '') {
@@ -577,7 +584,7 @@ class ProfitAnalysisImportService
             }
 
             if ($this->normalize($status) === 'da huy') {
-                continue;
+                return;
             }
 
             $rowCount++;
@@ -615,7 +622,7 @@ class ProfitAnalysisImportService
             $skuRows[$sellerSku]['net_quantity'] += $netQuantity;
             $skuRows[$sellerSku]['revenue'] += $revenue;
             $skuRows[$sellerSku]['refund_amount'] += $refund;
-        }
+        }, 'OrderSKUList');
 
         $missingSettlementOrders = array_diff_key($settlementOrders, $matchedSettlementOrders);
         $missingRevenue = (float) collect($missingSettlementOrders)->sum('revenue');

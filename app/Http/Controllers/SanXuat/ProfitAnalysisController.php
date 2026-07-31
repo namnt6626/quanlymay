@@ -159,6 +159,8 @@ class ProfitAnalysisController extends Controller
 
     public function preview(Request $request, ProfitAnalysisImportService $service): View|RedirectResponse
     {
+        @ini_set('memory_limit', '512M');
+
         $validated = $request->validate([
             'period_month' => ['required', 'date_format:Y-m'],
             'import_token' => ['required', 'string', 'max:80'],

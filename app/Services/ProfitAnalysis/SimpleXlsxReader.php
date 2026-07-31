@@ -19,6 +19,16 @@ class SimpleXlsxReader
      */
     public function rows(string $path, ?string $sheetName = null): array
     {
+        $grouped = [];
+        $this->eachRow($path, function (array $row, int $rowIndex) use (&$grouped): void {
+            $grouped[$rowIndex] = $row;
+        }, $sheetName);
+
+        return $grouped;
+    }
+
+    public function eachRow(string $path, callable $callback, ?string $sheetName = null): void
+    {
         $zip = new ZipArchive();
         if ($zip->open($path) !== true) {
             throw new RuntimeException('Không thể mở file Excel.');
@@ -27,8 +37,9 @@ class SimpleXlsxReader
         try {
             $sheetPath = $this->sheetPath($zip, $sheetName);
             $shared = $this->sharedStrings($zip);
-            $grouped = [];
             $reader = $this->sheetXmlReader($zip, $sheetPath);
+            $currentRowIndex = 0;
+            $currentRow = [];
 
             while ($reader->read()) {
                 if ($reader->nodeType !== XMLReader::ELEMENT || $reader->localName !== 'c') {
@@ -40,13 +51,19 @@ class SimpleXlsxReader
                     continue;
                 }
 
-                $grouped[$rowIndex][$columnIndex] = trim($this->streamCellValue($reader, (string) $reader->getAttribute('t'), $shared));
+                if ($currentRowIndex !== 0 && $rowIndex !== $currentRowIndex) {
+                    $callback($currentRow, $currentRowIndex);
+                    $currentRow = [];
+                }
+
+                $currentRowIndex = $rowIndex;
+                $currentRow[$columnIndex] = trim($this->streamCellValue($reader, (string) $reader->getAttribute('t'), $shared));
             }
             $reader->close();
 
-            ksort($grouped);
-
-            return $grouped;
+            if ($currentRowIndex !== 0) {
+                $callback($currentRow, $currentRowIndex);
+            }
         } finally {
             $zip->close();
         }
