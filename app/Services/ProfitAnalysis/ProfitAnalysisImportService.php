@@ -18,7 +18,7 @@ class ProfitAnalysisImportService
      * @param array<string, string|array<int, string>> $files
      * @return array<string, mixed>
      */
-    public function preview(array $files, Carbon $periodMonth, float $adCostPerOrder = 0, string $marketplace = 'tiktok'): array
+    public function preview(array $files, Carbon $periodMonth, float $adCostPerOrder = 0, string $marketplace = 'tiktok', ?int $shopId = null): array
     {
         $marketplace = $this->normalizeMarketplace($marketplace);
         $fob = $this->parseFob($files['fob_file']);
@@ -57,6 +57,7 @@ class ProfitAnalysisImportService
             'period' => [
                 'marketplace' => $marketplace,
                 'marketplace_label' => $this->marketplaceLabel($marketplace),
+                'shop_id' => $shopId,
                 'month' => $periodMonth->copy()->startOfMonth()->toDateString(),
                 'label' => 'T'.$periodMonth->format('n/Y'),
                 'detected_start' => $periodStart,
@@ -64,6 +65,7 @@ class ProfitAnalysisImportService
                 'existing_period_id' => ProfitAnalysisPeriod::query()
                     ->whereDate('period_month', $periodMonth->copy()->startOfMonth()->toDateString())
                     ->where('marketplace', $marketplace)
+                    ->when($shopId, fn ($query) => $query->where('shop_id', $shopId))
                     ->value('id'),
             ],
             'source_totals' => [
@@ -146,10 +148,12 @@ class ProfitAnalysisImportService
             $periodMonth = Carbon::parse($preview['period']['month'])->startOfMonth()->toDateString();
 
             $marketplace = $this->normalizeMarketplace((string) data_get($preview, 'period.marketplace', 'tiktok'));
+            $shopId = (int) data_get($preview, 'period.shop_id', 0);
 
             ProfitAnalysisPeriod::query()
                 ->whereDate('period_month', $periodMonth)
                 ->where('marketplace', $marketplace)
+                ->when($shopId > 0, fn ($query) => $query->where('shop_id', $shopId))
                 ->each(function (ProfitAnalysisPeriod $period): void {
                     $period->delete();
                 });
@@ -158,6 +162,7 @@ class ProfitAnalysisImportService
                 ProfitAnalysisSkuMap::query()->updateOrCreate(
                     [
                         'marketplace' => $marketplace,
+                        'shop_id' => $shopId ?: null,
                         'seller_sku' => $row['seller_sku'],
                     ],
                     [
@@ -174,6 +179,7 @@ class ProfitAnalysisImportService
 
             $period = ProfitAnalysisPeriod::query()->create([
                 'marketplace' => $marketplace,
+                'shop_id' => $shopId ?: null,
                 'period_month' => $periodMonth,
                 'period_start' => $preview['period']['detected_start'],
                 'period_end' => $preview['period']['detected_end'],
@@ -205,6 +211,7 @@ class ProfitAnalysisImportService
 
             foreach ($totals['sku_summaries'] as $summary) {
                 $summary['marketplace'] = $marketplace;
+                $summary['shop_id'] = $shopId ?: null;
                 $period->skuSummaries()->create($summary);
             }
 

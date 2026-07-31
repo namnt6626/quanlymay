@@ -10,6 +10,7 @@ class ProfitAnalysisSkuSummary extends Model
     protected $fillable = [
         'profit_analysis_period_id',
         'marketplace',
+        'shop_id',
         'seller_sku',
         'fob_sku',
         'product_name',
@@ -33,5 +34,10 @@ class ProfitAnalysisSkuSummary extends Model
     public function period(): BelongsTo
     {
         return $this->belongsTo(ProfitAnalysisPeriod::class, 'profit_analysis_period_id');
+    }
+
+    public function shop(): BelongsTo
+    {
+        return $this->belongsTo(ProfitAnalysisShop::class, 'shop_id');
     }
 }

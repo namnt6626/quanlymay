@@ -104,6 +104,9 @@
   </div>
   @if (hasPermission('PHAN_TICH_LAI_LO_CREATE'))
     <div class="d-flex flex-wrap gap-2">
+      <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#profitShopModal">
+        <i class="icon-base bx bx-store me-1"></i>Quản lý shop
+      </button>
       <a href="{{ route('phan-tich-lai-lo.create-marketplace', 'tiktok') }}" class="btn btn-outline-primary">
         <i class="icon-base bx bx-upload me-1"></i>Nhập dữ liệu TikTok
       </a>
@@ -114,6 +117,12 @@
   @endif
 </div>
 
+@php
+  $selectedMarketplaceLabel = $activeTab === 'total' ? 'Tổng quan' : ($activeTab === 'shopee' ? 'Shopee' : 'TikTok');
+  $shopOptions = $activeTab === 'total' ? $shops : $shops->where('marketplace', $activeTab);
+  $listedPeriods = $periods;
+@endphp
+
 @if($selectedPeriod)
   @php
     $tabPeriods = [
@@ -122,16 +131,15 @@
       'tiktok' => $tiktokPeriod,
     ];
     $selectedPeriod = $tabPeriods[$activeTab];
-    $selectedMarketplaceLabel = $activeTab === 'total' ? 'Tổng quan' : ($activeTab === 'shopee' ? 'Shopee' : 'TikTok');
     $revenueLabel = $activeTab === 'total' ? 'Doanh thu tổng hợp' : 'Doanh thu từ file quyết toán '.$selectedMarketplaceLabel;
     $skuRevenueLabel = $activeTab === 'total' ? 'Doanh thu SKU đã cộng gộp' : 'Doanh thu từ file tất cả đơn hàng/SKU';
     $grossRevenueLabel = $activeTab === 'total' ? 'DT SKU trước khi trừ hoàn/trả' : 'DT đơn hàng trước khi trừ hoàn/trả';
     $adjustmentLabel = $activeTab === 'total' ? 'Chênh lệch tổng đã phân bổ' : 'Chênh lệch đã chia về từng mã';
-    $listedPeriods = $activeTab === 'total' ? $periods : $periods->getCollection()->where('marketplace', $activeTab);
   @endphp
   <div class="card mb-4">
     <div class="card-body d-flex flex-column flex-lg-row gap-3 justify-content-between align-items-lg-end">
       <form method="GET" action="{{ route('phan-tich-lai-lo.index') }}" class="d-flex flex-column flex-sm-row gap-2 align-items-sm-end">
+        <input type="hidden" name="tab" value="{{ $activeTab }}">
         <div>
           <label class="form-label">Chọn tháng xem</label>
           <select class="form-select profit-period-select" name="month" onchange="this.form.submit()">
@@ -139,7 +147,17 @@
               <option value="{{ $value }}" @selected($selectedMonth === $value)>{{ $label }}</option>
             @endforeach
           </select>
-          <input type="hidden" name="tab" value="{{ $activeTab }}">
+        </div>
+        <div>
+          <label class="form-label">Shop</label>
+          <select class="form-select profit-period-select" name="shop_id" onchange="this.form.submit()">
+            <option value="">Tất cả shop{{ $activeTab !== 'total' ? ' '.$selectedMarketplaceLabel : '' }}</option>
+            @foreach($shopOptions as $shop)
+              <option value="{{ $shop->id }}" @selected((int) $selectedShopId === (int) $shop->id)>
+                {{ $activeTab === 'total' ? $shop->marketplace_label.' - ' : '' }}{{ $shop->name }}
+              </option>
+            @endforeach
+          </select>
         </div>
       </form>
       <div class="text-muted">Đang xem {{ $selectedPeriod?->label ?? $selectedMarketplaceLabel }}</div>
@@ -148,13 +166,13 @@
 
   <ul class="nav nav-tabs mb-4">
     <li class="nav-item">
-      <a class="nav-link {{ $activeTab === 'total' ? 'active' : '' }}" href="{{ route('phan-tich-lai-lo.index', ['month' => $selectedMonth, 'tab' => 'total']) }}">Tổng quan</a>
+      <a class="nav-link {{ $activeTab === 'total' ? 'active' : '' }}" href="{{ route('phan-tich-lai-lo.index', ['month' => $selectedMonth, 'tab' => 'total', 'shop_id' => $selectedShopId]) }}">Tổng quan</a>
     </li>
     <li class="nav-item">
-      <a class="nav-link {{ $activeTab === 'shopee' ? 'active' : '' }}" href="{{ route('phan-tich-lai-lo.index', ['month' => $selectedMonth, 'tab' => 'shopee']) }}">Shopee</a>
+      <a class="nav-link {{ $activeTab === 'shopee' ? 'active' : '' }}" href="{{ route('phan-tich-lai-lo.index', ['month' => $selectedMonth, 'tab' => 'shopee', 'shop_id' => $selectedShopId]) }}">Shopee</a>
     </li>
     <li class="nav-item">
-      <a class="nav-link {{ $activeTab === 'tiktok' ? 'active' : '' }}" href="{{ route('phan-tich-lai-lo.index', ['month' => $selectedMonth, 'tab' => 'tiktok']) }}">TikTok</a>
+      <a class="nav-link {{ $activeTab === 'tiktok' ? 'active' : '' }}" href="{{ route('phan-tich-lai-lo.index', ['month' => $selectedMonth, 'tab' => 'tiktok', 'shop_id' => $selectedShopId]) }}">TikTok</a>
     </li>
   </ul>
 
@@ -284,6 +302,44 @@
                 <td class="text-end profit-number">{{ number_format((float) $periodBreakdown->marketplace_fees, 0, ',', '.') }} ₫</td>
                 <td class="text-end profit-number">{{ number_format((float) $periodBreakdown->ad_cost, 0, ',', '.') }} ₫</td>
                 <td class="text-end profit-number fw-semibold {{ $periodBreakdown->profit >= 0 ? 'text-success' : 'text-danger' }}">{{ number_format((float) $periodBreakdown->profit, 0, ',', '.') }} ₫</td>
+              </tr>
+            @endforeach
+          </tbody>
+        </table>
+      </div>
+    </div>
+  @endif
+
+  @if($activeTab === 'total' && !$selectedShopId && !empty($selectedPeriod->shopBreakdown))
+    <div class="card mb-4">
+      <div class="card-header"><h5 class="mb-0">So sánh shop</h5></div>
+      <div class="table-responsive">
+        <table class="table mb-0">
+          <thead>
+            <tr>
+              <th>Nền tảng</th>
+              <th>Shop</th>
+              <th class="text-end">Doanh thu</th>
+              <th class="text-end">Đơn</th>
+              <th class="text-end">SL bán ròng</th>
+              <th class="text-end">Giá vốn</th>
+              <th class="text-end">Phí</th>
+              <th class="text-end">QC</th>
+              <th class="text-end">Lãi/lỗ</th>
+            </tr>
+          </thead>
+          <tbody>
+            @foreach($selectedPeriod->shopBreakdown as $shopBreakdown)
+              <tr>
+                <td><span class="badge bg-label-{{ $shopBreakdown->marketplace === 'shopee' ? 'warning' : 'info' }}">{{ $shopBreakdown->marketplace_label }}</span></td>
+                <td class="fw-semibold">{{ $shopBreakdown->shop?->name ?: 'Shop mặc định' }}</td>
+                <td class="text-end profit-number">{{ number_format((float) $shopBreakdown->total_revenue, 0, ',', '.') }} ₫</td>
+                <td class="text-end profit-number">{{ number_format((float) ($shopBreakdown->completed_order_count ?: $shopBreakdown->order_count), 0, ',', '.') }}</td>
+                <td class="text-end profit-number">{{ number_format((float) $shopBreakdown->item_count, 0, ',', '.') }}</td>
+                <td class="text-end profit-number">{{ number_format((float) $shopBreakdown->cogs, 0, ',', '.') }} ₫</td>
+                <td class="text-end profit-number">{{ number_format((float) $shopBreakdown->marketplace_fees, 0, ',', '.') }} ₫</td>
+                <td class="text-end profit-number">{{ number_format((float) $shopBreakdown->ad_cost, 0, ',', '.') }} ₫</td>
+                <td class="text-end profit-number fw-semibold {{ $shopBreakdown->profit >= 0 ? 'text-success' : 'text-danger' }}">{{ number_format((float) $shopBreakdown->profit, 0, ',', '.') }} ₫</td>
               </tr>
             @endforeach
           </tbody>
@@ -430,6 +486,7 @@
         <tr>
           <th>Tháng</th>
           <th>Nền tảng</th>
+          <th>Shop</th>
           <th>Khoảng ngày</th>
           <th class="text-end">Doanh thu</th>
           <th class="text-end">Chi phí</th>
@@ -444,6 +501,7 @@
           <tr>
             <td class="fw-semibold">{{ $period->label }}</td>
             <td><span class="badge bg-label-{{ $period->marketplace === 'shopee' ? 'warning' : 'info' }}">{{ $period->marketplace_label }}</span></td>
+            <td>{{ $period->shop?->name ?: '-' }}</td>
             <td>
               @if($period->period_start && $period->period_end)
                 {{ $period->period_start->format('d/m/Y') }} - {{ $period->period_end->format('d/m/Y') }}
@@ -476,12 +534,90 @@
             </td>
           </tr>
         @empty
-          <tr><td colspan="9" class="text-center py-4">Chưa có dữ liệu.</td></tr>
+          <tr><td colspan="10" class="text-center py-4">Chưa có dữ liệu.</td></tr>
         @endforelse
       </tbody>
     </table>
   </div>
   @if($activeTab === 'total' && $periods->hasPages())<div class="card-footer">{{ $periods->links() }}</div>@endif
 </div>
+
+@if (hasPermission('PHAN_TICH_LAI_LO_CREATE') || hasPermission('PHAN_TICH_LAI_LO_EDIT'))
+  <div class="modal fade" id="profitShopModal" tabindex="-1" aria-labelledby="profitShopModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="profitShopModalLabel">Quản lý shop</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+        </div>
+        <div class="modal-body">
+          @if (hasPermission('PHAN_TICH_LAI_LO_CREATE'))
+            <form method="POST" action="{{ route('phan-tich-lai-lo.shops.store') }}" class="row g-2 align-items-end mb-4">
+              @csrf
+              <div class="col-12 col-md-3">
+                <label class="form-label">Nền tảng</label>
+                <select class="form-select" name="marketplace" required>
+                  <option value="shopee">Shopee</option>
+                  <option value="tiktok">TikTok</option>
+                </select>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Tên shop mới</label>
+                <input type="text" class="form-control" name="name" maxlength="255" required>
+              </div>
+              <div class="col-12 col-md-3">
+                <button class="btn btn-primary w-100"><i class="icon-base bx bx-plus me-1"></i>Thêm shop</button>
+              </div>
+            </form>
+          @endif
+
+          <div class="table-responsive">
+            <table class="table mb-0">
+              <thead>
+                <tr>
+                  <th>Nền tảng</th>
+                  <th>Tên shop</th>
+                  <th>Trạng thái</th>
+                  <th class="text-end">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                @forelse($shops as $shop)
+                  <tr>
+                    <td><span class="badge bg-label-{{ $shop->marketplace === 'shopee' ? 'warning' : 'info' }}">{{ $shop->marketplace_label }}</span></td>
+                    <td>
+                      @if (hasPermission('PHAN_TICH_LAI_LO_EDIT'))
+                        <form method="POST" action="{{ route('phan-tich-lai-lo.shops.update', $shop) }}" class="d-flex gap-2">
+                          @csrf
+                          @method('PUT')
+                          <input type="text" class="form-control" name="name" value="{{ $shop->name }}" maxlength="255" required>
+                          <button class="btn btn-outline-primary">Đổi tên</button>
+                        </form>
+                      @else
+                        {{ $shop->name }}
+                      @endif
+                    </td>
+                    <td><span class="badge {{ $shop->is_active ? 'bg-label-success' : 'bg-label-secondary' }}">{{ $shop->is_active ? 'Đang dùng' : 'Đã ẩn' }}</span></td>
+                    <td class="text-end">
+                      @if (hasPermission('PHAN_TICH_LAI_LO_EDIT'))
+                        <form method="POST" action="{{ route('phan-tich-lai-lo.shops.toggle', $shop) }}">
+                          @csrf
+                          @method('PATCH')
+                          <button class="btn btn-sm btn-outline-secondary">{{ $shop->is_active ? 'Ẩn' : 'Hiện lại' }}</button>
+                        </form>
+                      @endif
+                    </td>
+                  </tr>
+                @empty
+                  <tr><td colspan="4" class="text-center py-4">Chưa có shop.</td></tr>
+                @endforelse
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+@endif
 
 @endsection

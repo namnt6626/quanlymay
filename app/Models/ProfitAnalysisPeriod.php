@@ -10,6 +10,7 @@ class ProfitAnalysisPeriod extends Model
 {
     protected $fillable = [
         'marketplace',
+        'shop_id',
         'period_month',
         'period_start',
         'period_end',
@@ -66,5 +67,10 @@ class ProfitAnalysisPeriod extends Model
     public function confirmedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'confirmed_by');
+    }
+
+    public function shop(): BelongsTo
+    {
+        return $this->belongsTo(ProfitAnalysisShop::class, 'shop_id');
     }
 }

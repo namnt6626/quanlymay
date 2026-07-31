@@ -8,6 +8,7 @@ class ProfitAnalysisSkuMap extends Model
 {
     protected $fillable = [
         'marketplace',
+        'shop_id',
         'seller_sku',
         'fob_sku',
         'fob_code',

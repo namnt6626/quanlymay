@@ -6,23 +6,44 @@
 <style>
   .profit-upload-grid {
     display: grid;
-    gap: 1rem;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: .875rem;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
   .profit-upload-box {
     border: 1px solid var(--bs-border-color);
     border-radius: .5rem;
     padding: 1rem;
-    min-height: 160px;
+    min-height: 176px;
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
   }
-  .profit-upload-box .form-label {
+  .profit-upload-title {
+    display: flex;
+    gap: .75rem;
+    align-items: flex-start;
+  }
+  .profit-upload-step {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    font-weight: 800;
+    color: var(--bs-primary);
+    background: rgba(var(--bs-primary-rgb), .1);
+  }
+  .profit-upload-box .form-label,
+  .profit-section-title {
     font-weight: 800;
     color: var(--bs-heading-color);
   }
   .profit-upload-note {
-    min-height: 44px;
     color: var(--bs-secondary-color);
     font-size: .88rem;
+    margin-top: .15rem;
   }
   .profit-upload-status {
     min-height: 24px;
@@ -35,14 +56,32 @@
   .profit-upload-status.is-error {
     color: var(--bs-danger);
   }
+  .profit-import-setup {
+    background: var(--bs-card-bg, #fff);
+    border-bottom: 1px solid var(--bs-border-color);
+  }
+  .profit-upload-section {
+    padding-top: 1.5rem;
+  }
+  .profit-upload-heading {
+    margin-top: .75rem;
+  }
+  .profit-market-badge {
+    font-size: .8rem;
+    font-weight: 800;
+    letter-spacing: 0;
+  }
 </style>
 @endsection
 
 @section('content')
 <div class="d-flex flex-column flex-md-row gap-3 justify-content-between align-items-md-center mb-4">
   <div>
-    <h4 class="mb-1">Nhập dữ liệu {{ $marketplaceLabel }}</h4>
-    <div class="text-muted">Chọn tháng, upload 3 file bắt buộc và nhập chi phí QC mỗi đơn hàng.</div>
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+      <h4 class="mb-0">Nhập dữ liệu lãi lỗ</h4>
+      <span class="badge bg-label-{{ $marketplace === 'shopee' ? 'warning' : 'info' }} profit-market-badge">{{ $marketplaceLabel }}</span>
+    </div>
+    <div class="text-muted">Chọn shop, tháng phân tích, chi phí QC rồi tải đủ bộ file Excel.</div>
   </div>
   <a href="{{ route('phan-tich-lai-lo.index') }}" class="btn btn-outline-secondary">
     <i class="icon-base bx bx-arrow-back me-1"></i>Quay lại
@@ -61,9 +100,15 @@
   @csrf
   <input type="hidden" name="import_token" value="{{ $importToken }}">
   <input type="hidden" name="marketplace" value="{{ $marketplace }}">
-  <div class="card-header">
-    <div class="row g-3 align-items-end">
-      <div class="col-12 col-md-4 col-xl-3">
+  <div class="card-header profit-import-setup">
+    <div class="d-flex flex-column flex-lg-row gap-3 justify-content-between mb-3">
+      <div>
+        <h5 class="mb-1">Thông tin nhập liệu</h5>
+        <div class="text-muted">Dữ liệu cùng tháng chỉ thay thế khi trùng cả nền tảng và shop.</div>
+      </div>
+    </div>
+    <div class="row g-3 align-items-start">
+      <div class="col-12 col-md-6 col-xl-3">
         <label class="form-label">Tháng phân tích</label>
         <select class="form-select" name="period_month" required>
           @foreach($months as $value => $label)
@@ -71,22 +116,43 @@
           @endforeach
         </select>
       </div>
-      <div class="col-12 col-md-8 col-xl-9 text-muted">
-        Lần upload mới sẽ cần xác nhận lại giá vốn; dữ liệu tháng cũ chỉ bị thay thế sau khi bấm xác nhận cập nhật.
+      <div class="col-12 col-md-6 col-xl-3">
+        <label class="form-label">Shop / Gian hàng</label>
+        <select class="form-select" name="shop_id" id="profit-shop-select" required>
+          @foreach($shops as $shop)
+            <option value="{{ $shop->id }}" @selected((string) old('shop_id') === (string) $shop->id)>{{ $shop->name }}</option>
+          @endforeach
+          <option value="__new__" @selected(old('shop_id') === '__new__')>+ Thêm shop mới</option>
+        </select>
       </div>
-      <div class="col-12 col-md-4 col-xl-3">
+      <div class="col-12 col-md-6 col-xl-3" id="profit-new-shop-wrap" style="display: none;">
+        <label class="form-label">Tên shop mới</label>
+        <input type="text" class="form-control" name="new_shop_name" id="profit-new-shop-name" value="{{ old('new_shop_name') }}" maxlength="255">
+      </div>
+      <div class="col-12 col-md-6 col-xl-3">
         <label class="form-label">Chi phí QC mỗi đơn hàng</label>
         <input type="text" class="form-control js-money-input" name="ad_cost_per_order" inputmode="numeric" value="{{ old('ad_cost_per_order') }}" required>
-        <div class="form-text">Hệ thống sẽ nhân số này với số đơn hoàn tất đã lọc theo file quyết toán {{ $marketplaceLabel }}.</div>
+        <div class="form-text">Nhân với số đơn hoàn tất đã lọc theo quyết toán.</div>
       </div>
     </div>
   </div>
 
-  <div class="card-body">
+  <div class="card-body profit-upload-section">
+    <div class="d-flex flex-column flex-md-row gap-2 justify-content-between align-items-md-center mb-4 profit-upload-heading">
+      <div>
+        <div class="profit-section-title">Bộ file Excel</div>
+        <div class="text-muted small">Tải từng file lên xong mới bấm kiểm tra dữ liệu.</div>
+      </div>
+    </div>
     <div class="profit-upload-grid">
       <div class="profit-upload-box">
-        <label class="form-label">1. File giá vốn FOB</label>
-        <div class="profit-upload-note">Dùng để tự gợi ý mã FOB và giá vốn cho SKU.</div>
+        <div class="profit-upload-title">
+          <span class="profit-upload-step">1</span>
+          <div>
+            <label class="form-label mb-0">File giá vốn FOB</label>
+            <div class="profit-upload-note">Gợi ý mã FOB và giá vốn cho SKU.</div>
+          </div>
+        </div>
         <input type="file" class="form-control js-profit-file" data-file-key="fob_file" accept=".xlsx">
         <div class="form-text">Ví dụ: Copy of FOB-MỚI NHẤT.xlsx</div>
         <div class="profit-upload-status js-profit-file-status" data-file-key="fob_file">
@@ -94,8 +160,13 @@
         </div>
       </div>
       <div class="profit-upload-box">
-        <label class="form-label">2. File quyết toán {{ $marketplaceLabel }}</label>
-        <div class="profit-upload-note">Lấy doanh thu quyết toán, phí sàn, phí giao dịch, tiền thực nhận.</div>
+        <div class="profit-upload-title">
+          <span class="profit-upload-step">2</span>
+          <div>
+            <label class="form-label mb-0">File quyết toán {{ $marketplaceLabel }}</label>
+            <div class="profit-upload-note">Lấy doanh thu, phí sàn và tiền thực nhận.</div>
+          </div>
+        </div>
         <input type="file" class="form-control js-profit-file" data-file-key="settlement_file" accept=".xlsx">
         <div class="form-text">{{ $marketplace === 'shopee' ? 'Ví dụ: Quyết toán Vinh Thuý SP.xlsx' : 'Ví dụ: quyết toán 20-6-26.xlsx' }}</div>
         <div class="profit-upload-status js-profit-file-status" data-file-key="settlement_file">
@@ -103,8 +174,13 @@
         </div>
       </div>
       <div class="profit-upload-box">
-        <label class="form-label">3. File tất cả đơn hàng/SKU</label>
-        <div class="profit-upload-note">Lấy Seller SKU, số lượng bán, hoàn/trả, doanh thu từng SKU.</div>
+        <div class="profit-upload-title">
+          <span class="profit-upload-step">3</span>
+          <div>
+            <label class="form-label mb-0">File tất cả đơn hàng/SKU</label>
+            <div class="profit-upload-note">Lấy SKU, số lượng, hoàn/trả và doanh thu từng mã.</div>
+          </div>
+        </div>
         <input type="file" class="form-control js-profit-file" data-file-key="order_file" accept=".xlsx" @if($marketplace === 'shopee') multiple @endif>
         <div class="form-text">{{ $marketplace === 'shopee' ? 'Có thể chọn nhiều file, ví dụ: Order.all.20260520_20260610.xlsx và Order.all.20260610_20260630.xlsx' : 'Ví dụ: Tất cả đơn hàng-2026-07-30-08_33.xlsx' }}</div>
         <div class="profit-upload-status js-profit-file-status" data-file-key="order_file">
@@ -140,6 +216,9 @@
     const chunkSize = 1024 * 1024;
     const previewForm = document.getElementById('profit-preview-form');
     const previewButton = document.getElementById('profit-preview-button');
+    const shopSelect = document.getElementById('profit-shop-select');
+    const newShopWrap = document.getElementById('profit-new-shop-wrap');
+    const newShopName = document.getElementById('profit-new-shop-name');
 
     function formatMoney(value) {
       const digits = String(value || '').replace(/\D/g, '');
@@ -152,6 +231,21 @@
         input.value = formatMoney(input.value);
       });
     });
+
+    function refreshShopInput() {
+      const isNew = shopSelect?.value === '__new__';
+      if (newShopWrap) {
+        newShopWrap.style.display = isNew ? '' : 'none';
+      }
+      if (newShopName) {
+        newShopName.required = !!isNew;
+        if (!isNew) {
+          newShopName.value = '';
+        }
+      }
+    }
+    shopSelect?.addEventListener('change', refreshShopInput);
+    refreshShopInput();
 
     function statusFor(key) {
       return document.querySelector(`.js-profit-file-status[data-file-key="${key}"]`);
@@ -274,6 +368,16 @@
       } else if (uploading.size > 0) {
         event.preventDefault();
         alert('File đang tải lên, vui lòng đợi hoàn tất.');
+      } else if (shopSelect?.value === '__new__') {
+        const name = newShopName?.value?.trim() || '';
+        if (!name) {
+          event.preventDefault();
+          alert('Vui lòng nhập tên shop mới.');
+          return;
+        }
+        if (!confirm(`Tạo shop mới "${name}" cho ${marketplace === 'shopee' ? 'Shopee' : 'TikTok'}?`)) {
+          event.preventDefault();
+        }
       }
     });
 

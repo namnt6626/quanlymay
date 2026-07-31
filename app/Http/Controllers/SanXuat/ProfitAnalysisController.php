@@ -4,6 +4,7 @@ namespace App\Http\Controllers\SanXuat;
 
 use App\Http\Controllers\Controller;
 use App\Models\ProfitAnalysisPeriod;
+use App\Models\ProfitAnalysisShop;
 use App\Services\ProfitAnalysis\ProfitAnalysisImportService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -20,8 +21,26 @@ class ProfitAnalysisController extends Controller
 {
     public function index(Request $request): View
     {
+        $activeTab = in_array($request->input('tab'), ['total', 'shopee', 'tiktok'], true)
+            ? (string) $request->input('tab')
+            : 'total';
+
+        $shops = ProfitAnalysisShop::query()
+            ->orderBy('marketplace')
+            ->orderBy('name')
+            ->get();
+        $availableShopIds = $activeTab === 'total'
+            ? $shops->pluck('id')->all()
+            : $shops->where('marketplace', $activeTab)->pluck('id')->all();
+        $selectedShopId = $request->filled('shop_id') ? $request->integer('shop_id') : null;
+        if ($selectedShopId && ! in_array($selectedShopId, $availableShopIds, true)) {
+            $selectedShopId = null;
+        }
+
         $periods = ProfitAnalysisPeriod::query()
-            ->with('confirmedBy')
+            ->with(['confirmedBy', 'shop'])
+            ->when($activeTab !== 'total', fn ($query) => $query->where('marketplace', $activeTab))
+            ->when($selectedShopId, fn ($query) => $query->where('shop_id', $selectedShopId))
             ->orderByDesc('period_month')
             ->orderBy('marketplace')
             ->paginate(paginationPerPage())
@@ -42,24 +61,12 @@ class ProfitAnalysisController extends Controller
             $selectedMonth = array_key_first($monthOptions);
         }
 
-        $marketplacePeriods = collect();
-        if ($selectedMonth) {
-            $marketplacePeriods = ProfitAnalysisPeriod::query()
-                ->with(['skuSummaries' => fn ($query) => $query->orderBy('profit')->orderByDesc('net_quantity')])
-                ->whereDate('period_month', $this->monthCarbon($selectedMonth)->toDateString())
-                ->get()
-                ->keyBy('marketplace');
-        }
-
-        $selectedPeriod = $selectedMonth ? $this->totalPeriod($selectedMonth) : null;
-        $shopeePeriod = $marketplacePeriods->get('shopee');
-        $tiktokPeriod = $marketplacePeriods->get('tiktok');
-        $activeTab = in_array($request->input('tab'), ['total', 'shopee', 'tiktok'], true)
-            ? (string) $request->input('tab')
-            : 'total';
+        $selectedPeriod = $selectedMonth ? $this->totalPeriod($selectedMonth, null, $selectedShopId) : null;
+        $shopeePeriod = $selectedMonth ? $this->totalPeriod($selectedMonth, 'shopee', $selectedShopId) : null;
+        $tiktokPeriod = $selectedMonth ? $this->totalPeriod($selectedMonth, 'tiktok', $selectedShopId) : null;
 
         $selectedPeriod ??= ProfitAnalysisPeriod::query()
-            ->with(['skuSummaries' => fn ($query) => $query->orderBy('profit')->orderByDesc('net_quantity')])
+            ->with(['shop', 'skuSummaries' => fn ($query) => $query->orderBy('profit')->orderByDesc('net_quantity')])
             ->orderByDesc('period_month')
             ->first();
 
@@ -71,6 +78,8 @@ class ProfitAnalysisController extends Controller
             'shopeePeriod' => $shopeePeriod,
             'tiktokPeriod' => $tiktokPeriod,
             'activeTab' => $activeTab,
+            'shops' => $shops,
+            'selectedShopId' => $selectedShopId,
         ]);
     }
 
@@ -82,6 +91,11 @@ class ProfitAnalysisController extends Controller
         }
 
         $importToken = $this->importToken($request->old('import_token'));
+        $shops = ProfitAnalysisShop::query()
+            ->where('marketplace', $marketplace)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
 
         return view('content.san-xuat.phan-tich-lai-lo.create', [
             'months' => $this->monthOptions(),
@@ -89,6 +103,7 @@ class ProfitAnalysisController extends Controller
             'uploadedFiles' => Session::get($this->uploadSessionKey($importToken), []),
             'marketplace' => $marketplace,
             'marketplaceLabel' => $this->marketplaceLabel($marketplace),
+            'shops' => $shops,
         ]);
     }
 
@@ -229,6 +244,8 @@ class ProfitAnalysisController extends Controller
             'import_token' => ['required', 'string', 'max:80'],
             'ad_cost_per_order' => ['required', 'string', 'max:50'],
             'marketplace' => ['required', 'string', 'in:tiktok,shopee'],
+            'shop_id' => ['nullable', 'string', 'max:50'],
+            'new_shop_name' => ['nullable', 'string', 'max:255'],
         ], [
             'period_month.required' => 'Vui lòng chọn tháng phân tích.',
             'ad_cost_per_order.required' => 'Vui lòng nhập chi phí QC mỗi đơn hàng.',
@@ -238,6 +255,8 @@ class ProfitAnalysisController extends Controller
         if ($adCostPerOrder < 0) {
             return back()->withInput()->withErrors(['ad_cost_per_order' => 'Chi phí QC mỗi đơn hàng không được âm.']);
         }
+
+        $shop = $this->resolveImportShop($validated['marketplace'], $validated['shop_id'] ?? null, $validated['new_shop_name'] ?? null);
 
         $uploads = Session::get($this->uploadSessionKey($validated['import_token']), []);
         $missing = [];
@@ -271,7 +290,8 @@ class ProfitAnalysisController extends Controller
                 $files,
                 $this->monthCarbon($validated['period_month']),
                 $adCostPerOrder,
-                $validated['marketplace']
+                $validated['marketplace'],
+                $shop->id
             );
         } catch (RuntimeException $exception) {
             return back()->withInput()->withErrors(['files' => $exception->getMessage()]);
@@ -285,6 +305,50 @@ class ProfitAnalysisController extends Controller
             'previewKey' => $previewKey,
             'preview' => $preview,
         ]);
+    }
+
+    public function storeShop(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'marketplace' => ['required', 'string', 'in:tiktok,shopee'],
+            'name' => ['required', 'string', 'max:255'],
+        ]);
+
+        $shop = $this->findOrCreateShop($validated['marketplace'], $validated['name']);
+
+        return back()->with('success', 'Đã tạo shop '.$shop->name.'.');
+    }
+
+    public function updateShop(Request $request, ProfitAnalysisShop $profitAnalysisShop): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+        ]);
+
+        $normalized = $this->normalizeShopName($validated['name']);
+        $exists = ProfitAnalysisShop::query()
+            ->where('marketplace', $profitAnalysisShop->marketplace)
+            ->where('normalized_name', $normalized)
+            ->whereKeyNot($profitAnalysisShop->id)
+            ->exists();
+
+        if ($exists) {
+            return back()->withErrors(['shop' => 'Shop này đã tồn tại trong '.$profitAnalysisShop->marketplace_label.'.']);
+        }
+
+        $profitAnalysisShop->update([
+            'name' => trim($validated['name']),
+            'normalized_name' => $normalized,
+        ]);
+
+        return back()->with('success', 'Đã đổi tên shop.');
+    }
+
+    public function toggleShop(ProfitAnalysisShop $profitAnalysisShop): RedirectResponse
+    {
+        $profitAnalysisShop->update(['is_active' => ! $profitAnalysisShop->is_active]);
+
+        return back()->with('success', 'Đã cập nhật trạng thái shop.');
     }
 
     public function commit(Request $request, ProfitAnalysisImportService $service): View|RedirectResponse
@@ -319,6 +383,7 @@ class ProfitAnalysisController extends Controller
             ->route('phan-tich-lai-lo.index', [
                 'month' => $period->period_month->format('Y-m'),
                 'tab' => $period->marketplace,
+                'shop_id' => $period->shop_id,
             ])
             ->with('success', 'Đã cập nhật dữ liệu '.$period->label.' thành công.');
     }
@@ -398,6 +463,7 @@ class ProfitAnalysisController extends Controller
             ->route('phan-tich-lai-lo.index', [
                 'month' => $profitAnalysisPeriod->period_month->format('Y-m'),
                 'tab' => $profitAnalysisPeriod->marketplace,
+                'shop_id' => $profitAnalysisPeriod->shop_id,
             ])
             ->with('success', 'Đã cập nhật dữ liệu '.$profitAnalysisPeriod->label.'.');
     }
@@ -540,11 +606,17 @@ class ProfitAnalysisController extends Controller
         return $separator === ',' ? str_replace(',', '.', $text) : $text;
     }
 
-    private function totalPeriod(?string $month = null): ?object
+    private function totalPeriod(?string $month = null, ?string $marketplace = null, ?int $shopId = null): ?object
     {
-        $query = ProfitAnalysisPeriod::query()->with('skuSummaries')->orderBy('period_month');
+        $query = ProfitAnalysisPeriod::query()->with(['shop', 'skuSummaries'])->orderBy('period_month');
         if ($month) {
             $query->whereDate('period_month', $this->monthCarbon($month)->toDateString());
+        }
+        if ($marketplace) {
+            $query->where('marketplace', $marketplace);
+        }
+        if ($shopId) {
+            $query->where('shop_id', $shopId);
         }
         $periods = $query->get();
         if ($periods->isEmpty()) {
@@ -557,8 +629,10 @@ class ProfitAnalysisController extends Controller
 
         return (object) [
             'id' => 'all',
-            'marketplace' => 'total',
-            'marketplace_label' => 'Tổng quan',
+            'marketplace' => $marketplace ?? 'total',
+            'marketplace_label' => $marketplace ? $this->marketplaceLabel($marketplace) : 'Tổng quan',
+            'shop_id' => $shopId,
+            'shop' => $shopId ? $periods->first()?->shop : null,
             'label' => $month ? 'T'.$this->monthCarbon($month)->format('n/Y') : 'Tổng tất cả tháng',
             'period_start' => $periods->min('period_start'),
             'period_end' => $periods->max('period_end'),
@@ -590,8 +664,42 @@ class ProfitAnalysisController extends Controller
             'confirmed_at' => $periods->max('confirmed_at'),
             'confirmedBy' => null,
             'skuSummaries' => $skuSummaries,
-            'marketplaceBreakdown' => $periods->sortBy('marketplace')->values(),
+            'marketplaceBreakdown' => $this->aggregatePeriods($periods, 'marketplace'),
+            'shopBreakdown' => $this->aggregatePeriods($periods, 'shop'),
         ];
+    }
+
+    private function aggregatePeriods(Collection $periods, string $groupBy): Collection
+    {
+        return $periods
+            ->groupBy(function (ProfitAnalysisPeriod $period) use ($groupBy): string {
+                return $groupBy === 'shop'
+                    ? ($period->shop_id ?: 0).':'.$period->marketplace
+                    : $period->marketplace;
+            })
+            ->map(function (Collection $rows) use ($groupBy): object {
+                $first = $rows->first();
+                $profit = (float) $rows->sum('profit');
+                $orderCount = max(1, (int) $rows->sum('order_count'));
+
+                return (object) [
+                    'marketplace' => $groupBy === 'shop' ? $first->marketplace : ($first->marketplace ?? 'total'),
+                    'marketplace_label' => $this->marketplaceLabel((string) ($first->marketplace ?? 'tiktok')),
+                    'shop_id' => $groupBy === 'shop' ? $first->shop_id : null,
+                    'shop' => $groupBy === 'shop' ? $first->shop : null,
+                    'total_revenue' => (float) $rows->sum('total_revenue'),
+                    'completed_order_count' => (int) $rows->sum('completed_order_count'),
+                    'order_count' => (int) $rows->sum('order_count'),
+                    'item_count' => (int) $rows->sum('item_count'),
+                    'cogs' => (float) $rows->sum('cogs'),
+                    'marketplace_fees' => (float) $rows->sum('marketplace_fees'),
+                    'ad_cost' => (float) $rows->sum('ad_cost'),
+                    'profit' => $profit,
+                    'profit_per_order' => $profit / $orderCount,
+                ];
+            })
+            ->sortBy(fn (object $row): string => ($row->marketplace ?? '').($row->shop?->name ?? ''))
+            ->values();
     }
 
     private function aggregateSkuSummaries(Collection $summaries): Collection
@@ -650,5 +758,52 @@ class ProfitAnalysisController extends Controller
     private function marketplaceLabel(string $marketplace): string
     {
         return $marketplace === 'shopee' ? 'Shopee' : 'TikTok';
+    }
+
+    private function resolveImportShop(string $marketplace, mixed $shopId, ?string $newShopName): ProfitAnalysisShop
+    {
+        $marketplace = $this->normalizeMarketplace($marketplace);
+        $newShopName = trim((string) $newShopName);
+
+        if ($newShopName !== '') {
+            return $this->findOrCreateShop($marketplace, $newShopName);
+        }
+
+        if ($shopId) {
+            $shop = ProfitAnalysisShop::query()
+                ->where('marketplace', $marketplace)
+                ->find((int) $shopId);
+
+            if ($shop) {
+                return $shop;
+            }
+        }
+
+        return $this->findOrCreateShop($marketplace, 'Shop mặc định');
+    }
+
+    private function findOrCreateShop(string $marketplace, string $name): ProfitAnalysisShop
+    {
+        $marketplace = $this->normalizeMarketplace($marketplace);
+        $name = trim($name) !== '' ? trim($name) : 'Shop mặc định';
+
+        return ProfitAnalysisShop::query()->firstOrCreate(
+            [
+                'marketplace' => $marketplace,
+                'normalized_name' => $this->normalizeShopName($name),
+            ],
+            [
+                'name' => $name,
+                'is_active' => true,
+            ]
+        );
+    }
+
+    private function normalizeShopName(string $name): string
+    {
+        $name = Str::ascii(mb_strtolower(trim($name)));
+        $name = preg_replace('/[^a-z0-9]+/', ' ', $name) ?? '';
+
+        return trim(preg_replace('/\s+/', ' ', $name) ?? '');
     }
 }

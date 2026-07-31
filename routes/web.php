@@ -194,6 +194,15 @@ Route::post('phan-tich-lai-lo/import/preview', [ProfitAnalysisController::class,
 Route::post('phan-tich-lai-lo/import/commit', [ProfitAnalysisController::class, 'commit'])
   ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_CREATE'])
   ->name('phan-tich-lai-lo.commit');
+Route::post('phan-tich-lai-lo/shops', [ProfitAnalysisController::class, 'storeShop'])
+  ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_CREATE'])
+  ->name('phan-tich-lai-lo.shops.store');
+Route::put('phan-tich-lai-lo/shops/{profitAnalysisShop}', [ProfitAnalysisController::class, 'updateShop'])
+  ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_EDIT'])
+  ->name('phan-tich-lai-lo.shops.update');
+Route::patch('phan-tich-lai-lo/shops/{profitAnalysisShop}/toggle', [ProfitAnalysisController::class, 'toggleShop'])
+  ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_EDIT'])
+  ->name('phan-tich-lai-lo.shops.toggle');
 Route::get('phan-tich-lai-lo/{profitAnalysisPeriod}/edit', [ProfitAnalysisController::class, 'edit'])
   ->middleware(['auth', 'permission:PHAN_TICH_LAI_LO_EDIT'])
   ->name('phan-tich-lai-lo.edit');
