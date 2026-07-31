@@ -262,6 +262,12 @@ Route::post('ton-kho-online/color-groups', [TonKhoOnlineController::class, 'stor
 Route::delete('ton-kho-online/color-groups', [TonKhoOnlineController::class, 'destroyColorGroup'])
   ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_VIEW'])
   ->name('ton-kho-online.color-groups.destroy');
+Route::post('ton-kho-online/size-groups', [TonKhoOnlineController::class, 'storeSizeGroup'])
+  ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_VIEW'])
+  ->name('ton-kho-online.size-groups.store');
+Route::delete('ton-kho-online/size-groups', [TonKhoOnlineController::class, 'destroySizeGroup'])
+  ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_VIEW'])
+  ->name('ton-kho-online.size-groups.destroy');
 Route::get('bao-cao/tong-hop-don-hang', BaoCaoTongHopDonHangController::class)
   ->middleware(['auth', 'permission:BAO_CAO_TONG_HOP_DON_HANG_VIEW'])
   ->name('bao-cao.tong-hop-don-hang');

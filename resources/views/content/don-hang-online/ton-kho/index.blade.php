@@ -78,6 +78,9 @@
       <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#colorGroupModal">
         <i class="icon-base bx bx-palette me-1"></i>Gộp màu
       </button>
+      <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#sizeGroupModal">
+        <i class="icon-base bx bx-ruler me-1"></i>Gộp size
+      </button>
     </div>
   </div>
   <div class="card-body">
@@ -284,6 +287,86 @@
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="sizeGroupModal" tabindex="-1" aria-labelledby="sizeGroupModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="sizeGroupModalLabel">Gộp size trong thống kê</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+      </div>
+      <div class="modal-body">
+        <form id="store-size-group-form" method="POST" action="{{ route('ton-kho-online.size-groups.store', request()->query()) }}">
+          @csrf
+          <input type="hidden" id="online_size_editing_group_name" name="editing_group_name" value="">
+          <div class="online-product-group-editing align-items-center justify-content-between gap-2 mb-3" id="online_size_group_editing_banner">
+            <div>
+              <div class="fw-semibold">Đang sửa nhóm size</div>
+              <div class="text-muted small" id="online_size_group_editing_text"></div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="online_size_group_cancel_edit">Hủy sửa</button>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="online_size_group_name">Tên size chung <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="online_size_group_name" name="group_name" value="{{ old('group_name') }}" required placeholder="Ví dụ: M">
+          </div>
+          <div>
+            <label class="form-label">Chọn size cần gộp <span class="text-danger">*</span></label>
+            <div class="online-product-group-list d-flex flex-column gap-2">
+              @forelse ($filterOptions['sourceSizes'] as $size)
+                @php
+                  $checkedSizes = collect(old('sizes', []));
+                  $currentGroupName = $sizeAliasGroupNames->get($size, '');
+                @endphp
+                <label class="online-product-group-item mb-0 {{ $currentGroupName !== '' ? 'd-none' : '' }}" data-alias-item data-current-group="{{ $currentGroupName }}">
+                  <input class="form-check-input" type="checkbox" name="sizes[]" value="{{ $size }}" data-alias-checkbox @checked($checkedSizes->contains($size))>
+                  <span class="online-product-group-item-name">
+                    <span class="fw-semibold">{{ $size }}</span>
+                    @if ($currentGroupName !== '')
+                      <span class="text-muted small d-block">Đang thuộc nhóm: {{ $currentGroupName }}</span>
+                    @endif
+                  </span>
+                </label>
+              @empty
+                <div class="text-center text-muted py-4">Chưa có size để gộp.</div>
+              @endforelse
+            </div>
+          </div>
+        </form>
+
+        @if ($sizeGroups->isNotEmpty())
+          <hr>
+          <div class="form-label">Nhóm size đang có</div>
+          <div class="d-flex flex-column gap-2">
+            @foreach ($sizeGroups as $groupName => $aliases)
+              <form method="POST" action="{{ route('ton-kho-online.size-groups.destroy', request()->query()) }}" class="d-flex flex-wrap gap-2 align-items-start justify-content-between border rounded p-2">
+                @csrf
+                @method('DELETE')
+                <input type="hidden" name="group_name" value="{{ $groupName }}">
+                <div>
+                  <div class="fw-semibold">{{ $groupName }}</div>
+                  <div class="text-muted small">{{ $aliases->pluck('original_name')->implode(', ') }}</div>
+                </div>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-sm btn-outline-primary" data-edit-alias-group data-group-name="{{ $groupName }}" data-items='@json($aliases->pluck('original_name')->values())'>
+                    <i class="icon-base bx bx-edit me-1"></i>Sửa
+                  </button>
+                  <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="icon-base bx bx-trash me-1"></i>Bỏ gộp
+                  </button>
+                </div>
+              </form>
+            @endforeach
+          </div>
+        @endif
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Đóng</button>
+        <button type="submit" class="btn btn-primary" form="store-size-group-form"><i class="icon-base bx bx-save me-1"></i>Lưu nhóm</button>
+      </div>
+    </div>
+  </div>
+</div>
 @endsection
 @section('page-script')
 <script>
@@ -367,6 +450,15 @@
       editingBannerId: 'online_color_group_editing_banner',
       editingTextId: 'online_color_group_editing_text',
       cancelEditId: 'online_color_group_cancel_edit',
+    });
+
+    bindAliasModal({
+      modalId: 'sizeGroupModal',
+      groupNameId: 'online_size_group_name',
+      editingInputId: 'online_size_editing_group_name',
+      editingBannerId: 'online_size_group_editing_banner',
+      editingTextId: 'online_size_group_editing_text',
+      cancelEditId: 'online_size_group_cancel_edit',
     });
   });
 </script>

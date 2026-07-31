@@ -8,6 +8,7 @@ use App\Models\HangHoanOnlineChiTiet;
 use App\Models\NhapHangOnlineChiTiet;
 use App\Models\OnlineColorAlias;
 use App\Models\OnlineProductAlias;
+use App\Models\OnlineSizeAlias;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -44,13 +45,15 @@ class TonKhoOnlineController extends Controller
 
         $productAliasRows = OnlineProductAlias::query()->get(['original_name', 'group_name']);
         $colorAliasRows = OnlineColorAlias::query()->get(['original_name', 'group_name']);
+        $sizeAliasRows = OnlineSizeAlias::query()->get(['original_name', 'group_name']);
         $productAliases = $this->aliasLookup($productAliasRows);
         $colorAliases = $this->aliasLookup($colorAliasRows);
+        $sizeAliases = $this->aliasLookup($sizeAliasRows);
 
         $rows = $this->mergeRows(
-            $this->normalizeStockRows($imports, 'import', $productAliases, $colorAliases),
-            $this->normalizeStockRows($exports, 'export', $productAliases, $colorAliases),
-            $this->normalizeStockRows($returns, 'return', $productAliases, $colorAliases)
+            $this->normalizeStockRows($imports, 'import', $productAliases, $colorAliases, $sizeAliases),
+            $this->normalizeStockRows($exports, 'export', $productAliases, $colorAliases, $sizeAliases),
+            $this->normalizeStockRows($returns, 'return', $productAliases, $colorAliases, $sizeAliases)
         )
             ->filter(function (array $row) use ($filters): bool {
                 if ($filters['ten_san_pham'] !== '') {
@@ -88,6 +91,7 @@ class TonKhoOnlineController extends Controller
         $filterOptions = $this->filterOptions();
         $productAliasGroupNames = $this->matchedAliasGroupNames($filterOptions['sourceProducts'], $productAliases);
         $colorAliasGroupNames = $this->matchedAliasGroupNames($filterOptions['sourceColors'], $colorAliases);
+        $sizeAliasGroupNames = $this->matchedAliasGroupNames($filterOptions['sourceSizes'], $sizeAliases);
 
         $productGroups = OnlineProductAlias::query()
             ->orderBy('group_name')
@@ -100,8 +104,13 @@ class TonKhoOnlineController extends Controller
             ->orderBy('original_name')
             ->get()
             ->groupBy('group_name');
+        $sizeGroups = OnlineSizeAlias::query()
+            ->orderBy('group_name')
+            ->orderBy('original_name')
+            ->get()
+            ->groupBy('group_name');
 
-        return view('content.don-hang-online.ton-kho.index', compact('rows', 'filters', 'totals', 'filterOptions', 'productGroups', 'colorGroups', 'productAliasGroupNames', 'colorAliasGroupNames'));
+        return view('content.don-hang-online.ton-kho.index', compact('rows', 'filters', 'totals', 'filterOptions', 'productGroups', 'colorGroups', 'sizeGroups', 'productAliasGroupNames', 'colorAliasGroupNames', 'sizeAliasGroupNames'));
     }
 
     public function storeProductGroup(Request $request): RedirectResponse
@@ -210,6 +219,59 @@ class TonKhoOnlineController extends Controller
             ->with('success', 'Đã bỏ gộp màu "'.$data['group_name'].'".');
     }
 
+    public function storeSizeGroup(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'editing_group_name' => ['nullable', 'string', 'max:255'],
+            'group_name' => ['required', 'string', 'max:255'],
+            'sizes' => ['required', 'array', 'min:1'],
+            'sizes.*' => ['required', 'string', 'max:255'],
+        ], [
+            'group_name.required' => 'Vui lòng nhập tên size chung.',
+            'sizes.required' => 'Vui lòng chọn ít nhất một size.',
+            'sizes.min' => 'Vui lòng chọn ít nhất một size.',
+        ]);
+
+        $groupName = trim((string) $data['group_name']);
+        $editingGroupName = trim((string) ($data['editing_group_name'] ?? ''));
+        $sizes = collect($data['sizes'])
+            ->map(fn (string $size) => trim($size))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($editingGroupName !== '') {
+            OnlineSizeAlias::query()
+                ->where('group_name', $editingGroupName)
+                ->whereNotIn('original_name', $sizes)
+                ->delete();
+        }
+
+        foreach ($sizes as $size) {
+            OnlineSizeAlias::query()->updateOrCreate(
+                ['original_name' => $size],
+                ['original_name' => $size, 'group_name' => $groupName]
+            );
+        }
+
+        return redirect()
+            ->route('ton-kho-online.index', $request->query())
+            ->with('success', 'Đã gộp size vào nhóm "'.$groupName.'".');
+    }
+
+    public function destroySizeGroup(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'group_name' => ['required', 'string', 'max:255'],
+        ]);
+
+        OnlineSizeAlias::query()->where('group_name', $data['group_name'])->delete();
+
+        return redirect()
+            ->route('ton-kho-online.index', $request->query())
+            ->with('success', 'Đã bỏ gộp size "'.$data['group_name'].'".');
+    }
+
     private function mergeRows(Collection $imports, Collection $exports, Collection $returns): Collection
     {
         return $imports->keys()->merge($exports->keys())->merge($returns->keys())->unique()->map(function (string $key) use ($imports, $exports, $returns): array {
@@ -237,19 +299,20 @@ class TonKhoOnlineController extends Controller
         });
     }
 
-    private function normalizeStockRows(Collection $rows, string $type, Collection $productAliases, Collection $colorAliases): Collection
+    private function normalizeStockRows(Collection $rows, string $type, Collection $productAliases, Collection $colorAliases, Collection $sizeAliases): Collection
     {
-        return $rows->reduce(function (Collection $carry, object $row) use ($type, $productAliases, $colorAliases): Collection {
+        return $rows->reduce(function (Collection $carry, object $row) use ($type, $productAliases, $colorAliases, $sizeAliases): Collection {
             $productName = $this->aliasName($productAliases, (string) $row->ten_san_pham);
             $colorName = $this->aliasName($colorAliases, (string) $row->mau_key);
-            $key = $this->key($productName, $colorName, $row->size_key);
+            $sizeName = $this->aliasName($sizeAliases, (string) $row->size_key);
+            $key = $this->key($productName, $colorName, $sizeName);
             $current = $carry->get($key);
 
             if (! $current) {
                 $current = (object) [
                     'ten_san_pham' => $productName,
                     'mau_key' => $colorName,
-                    'size_key' => $row->size_key,
+                    'size_key' => $sizeName,
                     'so_luong_nhap' => 0,
                     'tien_nhap' => 0,
                     'so_luong_xuat' => 0,
@@ -379,13 +442,22 @@ class TonKhoOnlineController extends Controller
         $importSizes = NhapHangOnlineChiTiet::query()->whereNotNull('size')->where('size', '<>', '')->pluck('size');
         $returnSizes = HangHoanOnlineChiTiet::query()->whereNotNull('size')->where('size', '<>', '')->pluck('size');
         $exportSizes = DonHangHoanThanhChiTiet::query()->whereNotNull('size')->where('size', '<>', '')->pluck('size');
+        $sizeAliases = $this->aliasLookup(OnlineSizeAlias::query()->get(['original_name', 'group_name']));
+        $sourceSizes = $importSizes->merge($returnSizes)->merge($exportSizes)->unique()->sort()->values();
+        $displaySizes = $sourceSizes
+            ->reject(fn (string $size): bool => $this->hasAlias($sizeAliases, $size))
+            ->merge($sizeAliases->values())
+            ->unique()
+            ->sort()
+            ->values();
 
         return [
             'products' => $displayProducts,
             'sourceProducts' => $sourceProducts,
             'colors' => $displayColors,
             'sourceColors' => $sourceColors,
-            'sizes' => $importSizes->merge($returnSizes)->merge($exportSizes)->unique()->sort()->values(),
+            'sizes' => $displaySizes,
+            'sourceSizes' => $sourceSizes,
         ];
     }
 }
