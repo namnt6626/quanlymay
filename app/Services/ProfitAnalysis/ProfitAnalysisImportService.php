@@ -733,6 +733,7 @@ class ProfitAnalysisImportService
             }
 
             $sellerSku = trim((string) ($row[$columns['Seller SKU']] ?? ''));
+            $sellerSku = $this->normalizeSellerSku($sellerSku);
             if ($sellerSku === '') {
                 return;
             }
@@ -896,6 +897,7 @@ class ProfitAnalysisImportService
                 if ($sellerSku === '') {
                     $sellerSku = $this->extractShopeeSkuFromProductName((string) ($row[$columns['Tên sản phẩm']] ?? ''));
                 }
+                $sellerSku = $this->normalizeSellerSku($sellerSku);
                 if ($sellerSku === '') {
                     return;
                 }
@@ -1110,6 +1112,19 @@ class ProfitAnalysisImportService
     private function compact(string $value): string
     {
         return preg_replace('/[^A-Z0-9]+/', '', Str::ascii(mb_strtoupper($value))) ?? '';
+    }
+
+    private function normalizeSellerSku(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        $value = Str::ascii(mb_strtoupper($value));
+        $value = preg_replace('/\s+/', ' ', $value) ?? '';
+
+        return trim($value);
     }
 
     private function normalize(string $value): string
