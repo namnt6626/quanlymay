@@ -113,11 +113,13 @@
 @php
   $marketplaceLabel = data_get($preview, 'period.marketplace_label', 'TikTok');
   $settlementFilter = data_get($preview, 'source_totals.orders.settlement_filter', []);
-  $missingSettlementRevenue = abs((float) data_get($settlementFilter, 'missing_revenue', 0));
+  $missingSettlementRevenue = abs((float) data_get($settlementFilter, 'issue_revenue', data_get($settlementFilter, 'missing_revenue', 0)));
   $settlementOrderCount = (int) data_get($settlementFilter, 'settlement_order_count', 0);
   $matchedOrderCount = (int) data_get($settlementFilter, 'matched_order_count', 0);
   $missingOrderCount = (int) data_get($settlementFilter, 'missing_order_count', 0);
-  $missingOrders = data_get($settlementFilter, 'missing_orders', []);
+  $blankSkuOrderCount = (int) data_get($settlementFilter, 'blank_sku_order_count', 0);
+  $issueOrderCount = (int) data_get($settlementFilter, 'issue_order_count', $missingOrderCount);
+  $issueOrders = data_get($settlementFilter, 'issue_orders', data_get($settlementFilter, 'missing_orders', []));
   $settlementCreatedStart = data_get($preview, 'source_totals.settlement.order_created_start');
   $settlementCreatedEnd = data_get($preview, 'source_totals.settlement.order_created_end');
 @endphp
@@ -135,39 +137,46 @@
         @endif
         File quyết toán gồm {{ number_format((float) data_get($preview, 'source_totals.settlement.positive_order_count', 0), 0, ',', '.') }} đơn dương tiền
         và {{ number_format((float) data_get($preview, 'source_totals.settlement.negative_order_count', 0), 0, ',', '.') }} đơn âm tiền.
-        @if($missingOrderCount > 0)
+        @if($issueOrderCount > 0)
           <button type="button" class="btn btn-sm btn-outline-danger ms-2" data-bs-toggle="modal" data-bs-target="#missingOrdersModal">
-            Xem đơn thiếu
+            Xem lỗi đối soát
           </button>
         @endif
       </div>
     @else
       File tất cả đơn hàng/SKU đã lọc theo mã đơn trong file quyết toán {{ $marketplaceLabel }}:
       tìm thấy {{ number_format($matchedOrderCount, 0, ',', '.') }}/{{ number_format($settlementOrderCount, 0, ',', '.') }} đơn.
-      @if($missingOrderCount > 0)
-        Còn thiếu {{ number_format($missingOrderCount, 0, ',', '.') }} đơn,
-        doanh thu thiếu {{ number_format((float) data_get($settlementFilter, 'missing_revenue', 0), 0, ',', '.') }} ₫.
+      @if($issueOrderCount > 0)
+        Còn {{ number_format($issueOrderCount, 0, ',', '.') }} đơn chưa map được SKU/giá vốn:
+        {{ number_format($missingOrderCount, 0, ',', '.') }} đơn thiếu trong file,
+        {{ number_format($blankSkuOrderCount, 0, ',', '.') }} đơn có trong file nhưng thiếu SKU.
+        Doanh thu cần xử lý {{ number_format((float) data_get($settlementFilter, 'issue_revenue', data_get($settlementFilter, 'missing_revenue', 0)), 0, ',', '.') }} ₫.
         @if($settlementCreatedStart && $settlementCreatedEnd)
-          Vui lòng xuất lại file tất cả đơn hàng/SKU theo cột Thời gian tạo đơn hàng từ {{ \Carbon\Carbon::parse($settlementCreatedStart)->format('d/m/Y') }} đến {{ \Carbon\Carbon::parse($settlementCreatedEnd)->format('d/m/Y') }}.
+          Nếu thiếu đơn, xuất lại file tất cả đơn hàng/SKU theo cột Thời gian tạo đơn hàng từ {{ \Carbon\Carbon::parse($settlementCreatedStart)->format('d/m/Y') }} đến {{ \Carbon\Carbon::parse($settlementCreatedEnd)->format('d/m/Y') }}.
         @else
-          Vui lòng xuất lại file tất cả đơn hàng/SKU bao phủ đủ ngày tạo đơn trong file quyết toán.
+          Nếu thiếu đơn, xuất lại file tất cả đơn hàng/SKU bao phủ đủ ngày tạo đơn trong file quyết toán.
         @endif
         <button type="button" class="btn btn-sm btn-outline-danger ms-2" data-bs-toggle="modal" data-bs-target="#missingOrdersModal">
-          Xem đơn thiếu
+          Xem lỗi đối soát
         </button>
       @endif
     @endif
   </div>
 @endif
 
-@if($missingOrderCount > 0)
+@if($issueOrderCount > 0)
   <div class="modal fade" id="missingOrdersModal" tabindex="-1" aria-labelledby="missingOrdersModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
           <div>
-            <h5 class="modal-title" id="missingOrdersModalLabel">Đơn có trong quyết toán nhưng thiếu trong file tất cả đơn hàng/SKU</h5>
-            <div class="text-muted small">{{ number_format($missingOrderCount, 0, ',', '.') }} đơn thiếu, doanh thu thiếu {{ number_format((float) data_get($settlementFilter, 'missing_revenue', 0), 0, ',', '.') }} ₫</div>
+            <h5 class="modal-title" id="missingOrdersModalLabel">Đơn quyết toán chưa map được SKU/giá vốn</h5>
+            <div class="text-muted small">
+              {{ number_format($issueOrderCount, 0, ',', '.') }} đơn cần xử lý,
+              doanh thu {{ number_format((float) data_get($settlementFilter, 'issue_revenue', data_get($settlementFilter, 'missing_revenue', 0)), 0, ',', '.') }} ₫.
+              Thiếu đơn: {{ number_format($missingOrderCount, 0, ',', '.') }},
+              thiếu SKU: {{ number_format($blankSkuOrderCount, 0, ',', '.') }}.
+            </div>
           </div>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
         </div>
@@ -177,18 +186,32 @@
               <thead>
                 <tr>
                   <th>Mã đơn</th>
+                  <th>Tình trạng</th>
+                  <th>Cần xử lý</th>
+                  <th>Dòng file SKU</th>
                   <th>Ngày tạo đơn</th>
                   <th>Ngày quyết toán</th>
+                  <th>Sản phẩm</th>
+                  <th>Phân loại</th>
                   <th class="text-end">Doanh thu quyết toán</th>
                   <th class="text-end">Tiền thực nhận</th>
                 </tr>
               </thead>
               <tbody>
-                @foreach($missingOrders as $order)
+                @foreach($issueOrders as $order)
                   <tr>
                     <td class="fw-semibold">{{ data_get($order, 'order_id') }}</td>
+                    <td>
+                      <span class="badge {{ data_get($order, 'issue_type') === 'missing_seller_sku' ? 'bg-label-warning' : 'bg-label-danger' }}">
+                        {{ data_get($order, 'issue_label', 'Thiếu dữ liệu') }}
+                      </span>
+                    </td>
+                    <td class="small">{{ data_get($order, 'fix_hint') ?: '-' }}</td>
+                    <td>{{ data_get($order, 'row_number') ?: '-' }}</td>
                     <td>{{ data_get($order, 'created_at') ?: '-' }}</td>
                     <td>{{ data_get($order, 'settled_at') ?: '-' }}</td>
+                    <td><div class="profit-product" title="{{ data_get($order, 'product_name') }}">{{ data_get($order, 'product_name') ?: '-' }}</div></td>
+                    <td>{{ data_get($order, 'variation') ?: '-' }}</td>
                     <td class="text-end profit-number {{ (float) data_get($order, 'revenue', 0) < 0 ? 'text-danger' : 'text-success' }}">{{ number_format((float) data_get($order, 'revenue', 0), 0, ',', '.') }} ₫</td>
                     <td class="text-end profit-number">{{ number_format((float) data_get($order, 'settlement_amount', 0), 0, ',', '.') }} ₫</td>
                   </tr>
@@ -248,12 +271,16 @@
         <div class="value">{{ number_format((float) data_get($settlementFilter, 'matched_order_count', 0), 0, ',', '.') }}</div>
       </div>
       <div class="profit-preview-metric">
-        <div class="label">Đơn quyết toán còn thiếu trong file SKU</div>
+        <div class="label">Đơn thiếu hẳn trong file SKU</div>
         <div class="value {{ data_get($settlementFilter, 'missing_order_count', 0) > 0 ? 'text-warning' : 'text-success' }}">{{ number_format((float) data_get($settlementFilter, 'missing_order_count', 0), 0, ',', '.') }}</div>
       </div>
       <div class="profit-preview-metric">
-        <div class="label">Doanh thu của đơn còn thiếu</div>
-        <div class="value {{ $missingSettlementRevenue > 0.5 ? 'text-danger' : 'text-success' }}">{{ number_format((float) data_get($settlementFilter, 'missing_revenue', 0), 0, ',', '.') }} ₫</div>
+        <div class="label">Đơn có nhưng thiếu Seller SKU</div>
+        <div class="value {{ data_get($settlementFilter, 'blank_sku_order_count', 0) > 0 ? 'text-warning' : 'text-success' }}">{{ number_format((float) data_get($settlementFilter, 'blank_sku_order_count', 0), 0, ',', '.') }}</div>
+      </div>
+      <div class="profit-preview-metric">
+        <div class="label">Doanh thu chưa map SKU/giá vốn</div>
+        <div class="value {{ $missingSettlementRevenue > 0.5 ? 'text-danger' : 'text-success' }}">{{ number_format((float) data_get($settlementFilter, 'issue_revenue', data_get($settlementFilter, 'missing_revenue', 0)), 0, ',', '.') }} ₫</div>
       </div>
       <div class="profit-preview-metric">
         <div class="label">DT đơn hàng trước khi trừ hoàn/trả</div>

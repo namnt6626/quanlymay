@@ -115,10 +115,10 @@ class ProfitAnalysisImportService
     {
         $skuRows = [];
         $missing = [];
-        $missingSettlementRevenue = abs((float) data_get($preview, 'source_totals.orders.settlement_filter.missing_revenue', 0));
+        $missingSettlementRevenue = abs((float) data_get($preview, 'source_totals.orders.settlement_filter.issue_revenue', data_get($preview, 'source_totals.orders.settlement_filter.missing_revenue', 0)));
 
         if ($missingSettlementRevenue > 0.5) {
-            throw new RuntimeException('File tất cả đơn hàng/SKU đang thiếu đơn có doanh thu trong file quyết toán. Vui lòng upload file đơn hàng bao phủ đủ các mã đơn quyết toán.');
+            throw new RuntimeException('Còn đơn quyết toán chưa map được vào SKU/giá vốn. Vui lòng mở danh sách lỗi đối soát, bổ sung đúng file/cột được gợi ý rồi import lại.');
         }
 
         foreach ($preview['sku_rows'] as $row) {
@@ -715,8 +715,9 @@ class ProfitAnalysisImportService
         $dates = [];
         $rowCount = 0;
         $matchedSettlementOrders = [];
+        $blankSkuSettlementOrders = [];
 
-        $this->reader->eachRow($path, function (array $row, int $rowNumber) use (&$columns, $requiredColumns, &$skuRows, &$uniqueOrders, &$fileUniqueOrders, &$statusCounts, &$dates, &$rowCount, &$matchedSettlementOrders, $settlementOrders): void {
+        $this->reader->eachRow($path, function (array $row, int $rowNumber) use (&$columns, $requiredColumns, &$skuRows, &$uniqueOrders, &$fileUniqueOrders, &$statusCounts, &$dates, &$rowCount, &$matchedSettlementOrders, &$blankSkuSettlementOrders, $settlementOrders): void {
             if ($rowNumber === 1) {
                 $columns = $this->mapHeaderColumns($row);
                 foreach ($requiredColumns as $required) {
@@ -729,12 +730,6 @@ class ProfitAnalysisImportService
             }
 
             if ($rowNumber <= 2) {
-                return;
-            }
-
-            $sellerSku = trim((string) ($row[$columns['Seller SKU']] ?? ''));
-            $sellerSku = $this->normalizeSellerSku($sellerSku);
-            if ($sellerSku === '') {
                 return;
             }
 
@@ -755,6 +750,22 @@ class ProfitAnalysisImportService
             }
 
             if ($this->normalize($status) === 'da huy') {
+                return;
+            }
+
+            $sellerSku = trim((string) ($row[$columns['Seller SKU']] ?? ''));
+            $sellerSku = $this->normalizeSellerSku($sellerSku);
+            if ($sellerSku === '') {
+                if ($settlementOrders !== [] && $orderId !== '' && ! isset($blankSkuSettlementOrders[$orderId])) {
+                    $blankSkuSettlementOrders[$orderId] = [
+                        ...($settlementOrders[$orderId] ?? []),
+                        'row_number' => $rowNumber,
+                        'product_name' => trim((string) ($row[$columns['Product Name'] ?? 0] ?? '')),
+                        'variation' => trim((string) ($row[$columns['Variation'] ?? 0] ?? '')),
+                        'sku_id' => trim((string) ($row[$columns['SKU ID'] ?? 0] ?? '')),
+                    ];
+                }
+
                 return;
             }
 
@@ -797,6 +808,7 @@ class ProfitAnalysisImportService
 
         $missingSettlementOrders = array_diff_key($settlementOrders, $matchedSettlementOrders);
         $missingRevenue = (float) collect($missingSettlementOrders)->sum('revenue');
+        $blankSkuRevenue = (float) collect($blankSkuSettlementOrders)->sum('revenue');
         $missingSubtotal = (float) collect($missingSettlementOrders)->sum('subtotal_after_discount');
         $missingRefund = (float) collect($missingSettlementOrders)->sum('refund_after_discount');
         $missingOrders = collect($missingSettlementOrders)
@@ -809,6 +821,34 @@ class ProfitAnalysisImportService
             ])
             ->values()
             ->all();
+        $blankSkuOrders = collect($blankSkuSettlementOrders)
+            ->map(fn (array $order, string $orderId): array => [
+                'order_id' => $orderId,
+                'created_at' => $order['created_at'] ?? null,
+                'settled_at' => $order['settled_at'] ?? null,
+                'revenue' => (float) ($order['revenue'] ?? 0),
+                'settlement_amount' => (float) ($order['settlement_amount'] ?? 0),
+                'row_number' => $order['row_number'] ?? null,
+                'product_name' => $order['product_name'] ?? null,
+                'variation' => $order['variation'] ?? null,
+                'sku_id' => $order['sku_id'] ?? null,
+            ])
+            ->values()
+            ->all();
+        $issueOrders = [
+            ...collect($missingOrders)->map(fn (array $order): array => [
+                ...$order,
+                'issue_type' => 'missing_order',
+                'issue_label' => 'Thiếu Order ID trong file tất cả đơn hàng/SKU',
+                'fix_hint' => 'Xuất lại file tất cả đơn hàng/SKU bao phủ ngày tạo đơn này.',
+            ])->all(),
+            ...collect($blankSkuOrders)->map(fn (array $order): array => [
+                ...$order,
+                'issue_type' => 'missing_seller_sku',
+                'issue_label' => 'Có đơn nhưng cột Seller SKU trống',
+                'fix_hint' => 'Bổ sung Seller SKU tại dòng này trong file tất cả đơn hàng/SKU.',
+            ])->all(),
+        ];
 
         return [
             'row_count' => $rowCount,
@@ -821,11 +861,17 @@ class ProfitAnalysisImportService
                 'matched_order_count' => count($matchedSettlementOrders),
                 'missing_order_count' => count($missingSettlementOrders),
                 'missing_revenue' => $missingRevenue,
+                'blank_sku_order_count' => count($blankSkuSettlementOrders),
+                'blank_sku_revenue' => $blankSkuRevenue,
+                'issue_order_count' => count($issueOrders),
+                'issue_revenue' => $missingRevenue + $blankSkuRevenue,
                 'missing_subtotal_after_discount' => $missingSubtotal,
                 'missing_refund_after_discount' => $missingRefund,
                 'missing_net_subtotal_after_discount' => $missingSubtotal + $missingRefund,
                 'sample_missing_order_ids' => array_slice(array_keys($missingSettlementOrders), 0, 10),
                 'missing_orders' => $missingOrders,
+                'blank_sku_orders' => $blankSkuOrders,
+                'issue_orders' => $issueOrders,
             ],
             'period_start' => $dates !== [] ? min($dates) : null,
             'period_end' => $dates !== [] ? max($dates) : null,
@@ -849,12 +895,13 @@ class ProfitAnalysisImportService
         $dates = [];
         $rowCount = 0;
         $matchedSettlementOrders = [];
+        $blankSkuSettlementOrders = [];
         $seenRows = [];
 
         foreach ($paths as $path) {
             $columns = [];
 
-            $this->reader->eachRow($path, function (array $row, int $rowNumber) use (&$columns, $requiredColumns, &$skuRows, &$uniqueOrders, &$fileUniqueOrders, &$statusCounts, &$dates, &$rowCount, &$matchedSettlementOrders, &$seenRows, $settlementOrders): void {
+            $this->reader->eachRow($path, function (array $row, int $rowNumber) use (&$columns, $requiredColumns, &$skuRows, &$uniqueOrders, &$fileUniqueOrders, &$statusCounts, &$dates, &$rowCount, &$matchedSettlementOrders, &$blankSkuSettlementOrders, &$seenRows, $settlementOrders): void {
                 if ($rowNumber === 1) {
                     $columns = $this->mapHeaderColumns($row);
                     foreach ($requiredColumns as $required) {
@@ -899,6 +946,16 @@ class ProfitAnalysisImportService
                 }
                 $sellerSku = $this->normalizeSellerSku($sellerSku);
                 if ($sellerSku === '') {
+                    if ($settlementOrders !== [] && $orderId !== '' && ! isset($blankSkuSettlementOrders[$orderId])) {
+                        $blankSkuSettlementOrders[$orderId] = [
+                            ...($settlementOrders[$orderId] ?? []),
+                            'row_number' => $rowNumber,
+                            'product_name' => trim((string) ($row[$columns['Tên sản phẩm'] ?? 0] ?? '')),
+                            'variation' => trim((string) ($row[$columns['Tên phân loại hàng'] ?? 0] ?? '')),
+                            'sku_id' => '',
+                        ];
+                    }
+
                     return;
                 }
 
@@ -950,6 +1007,7 @@ class ProfitAnalysisImportService
 
         $missingSettlementOrders = array_diff_key($settlementOrders, $matchedSettlementOrders);
         $missingRevenue = (float) collect($missingSettlementOrders)->sum('revenue');
+        $blankSkuRevenue = (float) collect($blankSkuSettlementOrders)->sum('revenue');
         $missingSubtotal = (float) collect($missingSettlementOrders)->sum('subtotal_after_discount');
         $missingRefund = (float) collect($missingSettlementOrders)->sum('refund_after_discount');
         $missingOrders = collect($missingSettlementOrders)
@@ -962,6 +1020,34 @@ class ProfitAnalysisImportService
             ])
             ->values()
             ->all();
+        $blankSkuOrders = collect($blankSkuSettlementOrders)
+            ->map(fn (array $order, string $orderId): array => [
+                'order_id' => $orderId,
+                'created_at' => $order['created_at'] ?? null,
+                'settled_at' => $order['settled_at'] ?? null,
+                'revenue' => (float) ($order['revenue'] ?? 0),
+                'settlement_amount' => (float) ($order['settlement_amount'] ?? 0),
+                'row_number' => $order['row_number'] ?? null,
+                'product_name' => $order['product_name'] ?? null,
+                'variation' => $order['variation'] ?? null,
+                'sku_id' => $order['sku_id'] ?? null,
+            ])
+            ->values()
+            ->all();
+        $issueOrders = [
+            ...collect($missingOrders)->map(fn (array $order): array => [
+                ...$order,
+                'issue_type' => 'missing_order',
+                'issue_label' => 'Thiếu mã đơn trong file đơn hàng/SKU',
+                'fix_hint' => 'Xuất lại file đơn hàng/SKU bao phủ ngày tạo đơn này.',
+            ])->all(),
+            ...collect($blankSkuOrders)->map(fn (array $order): array => [
+                ...$order,
+                'issue_type' => 'missing_seller_sku',
+                'issue_label' => 'Có đơn nhưng thiếu SKU phân loại hàng',
+                'fix_hint' => 'Bổ sung SKU phân loại hàng hoặc SKU sản phẩm tại dòng này trong file đơn hàng/SKU.',
+            ])->all(),
+        ];
 
         return [
             'row_count' => $rowCount,
@@ -974,11 +1060,17 @@ class ProfitAnalysisImportService
                 'matched_order_count' => count($matchedSettlementOrders),
                 'missing_order_count' => count($missingSettlementOrders),
                 'missing_revenue' => $missingRevenue,
+                'blank_sku_order_count' => count($blankSkuSettlementOrders),
+                'blank_sku_revenue' => $blankSkuRevenue,
+                'issue_order_count' => count($issueOrders),
+                'issue_revenue' => $missingRevenue + $blankSkuRevenue,
                 'missing_subtotal_after_discount' => $missingSubtotal,
                 'missing_refund_after_discount' => $missingRefund,
                 'missing_net_subtotal_after_discount' => $missingSubtotal + $missingRefund,
                 'sample_missing_order_ids' => array_slice(array_keys($missingSettlementOrders), 0, 10),
                 'missing_orders' => $missingOrders,
+                'blank_sku_orders' => $blankSkuOrders,
+                'issue_orders' => $issueOrders,
             ],
             'period_start' => $dates !== [] ? min($dates) : null,
             'period_end' => $dates !== [] ? max($dates) : null,
