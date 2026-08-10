@@ -301,6 +301,7 @@ class PhanBoMayController extends Controller
                 (int) $allocation['mat_hang_id'],
                 (int) $allocation['mau_id'],
                 (int) $allocation['size_id'],
+                (int) $allocation['don_vi_may_id'],
             ]))
             ->map(fn ($group): array => [
                 'group_key' => $group->first()['group_key'] ?? null,
@@ -308,6 +309,7 @@ class PhanBoMayController extends Controller
                 'mat_hang_id' => (int) $group->first()['mat_hang_id'],
                 'mau_id' => (int) $group->first()['mau_id'],
                 'size_id' => (int) $group->first()['size_id'],
+                'don_vi_may_id' => (int) $group->first()['don_vi_may_id'],
                 'so_luong_giao' => $group->sum(fn (array $allocation): float => (float) ($allocation['so_luong_giao'] ?? 0)),
             ])
             ->values();
@@ -327,7 +329,7 @@ class PhanBoMayController extends Controller
                     quantity: $quantity,
                     commonData: [
                         'ngay_phan_bo' => $data['ngay_phan_bo'],
-                        'don_vi_may_id' => $data['don_vi_may_id'],
+                        'don_vi_may_id' => $allocation['don_vi_may_id'],
                         'ghi_chu' => $data['ghi_chu'] ?? null,
                     ]
                 );

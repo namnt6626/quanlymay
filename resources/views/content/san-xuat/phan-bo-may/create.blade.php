@@ -33,6 +33,28 @@
       text-align: right;
     }
 
+    .allocation-draft-table {
+      min-width: 920px;
+    }
+
+    .allocation-draft-table th,
+    .allocation-draft-table td {
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+
+    .allocation-draft-table .allocation-draft-action-cell {
+      width: 74px;
+    }
+
+    .allocation-draft-empty {
+      border: 1px dashed var(--bs-border-color);
+      border-radius: 0.5rem;
+      color: var(--bs-secondary-color);
+      padding: 1rem;
+      text-align: center;
+    }
+
     .cut-search-combobox {
       position: relative;
     }
@@ -172,6 +194,7 @@
       'don_hang_id' => old('don_hang_id'),
       'mat_hang_id' => old('mat_hang_id'),
       'size_ids' => old('size_ids', []),
+      'allocations' => old('allocations', []),
   ];
   $phanBoMaySubmitToken = old('phan_bo_may_submit_token', (string) \Illuminate\Support\Str::uuid());
 @endphp
@@ -182,6 +205,10 @@
     document.addEventListener('DOMContentLoaded', function() {
       const form = document.getElementById('phan-bo-may-form');
       const options = @json($allocationOptions);
+      const sewingUnits = @json($donViMays->map(fn ($donViMay) => [
+          'id' => $donViMay->id,
+          'label' => $donViMay->ma_don_vi.' - '.$donViMay->ten_don_vi,
+      ])->values());
       const modeInputs = Array.from(document.querySelectorAll('input[name="allocation_mode"]'));
       const donHangSearchInput = document.getElementById('don_hang_search');
       const donHangInput = document.getElementById('don_hang_id');
@@ -189,11 +216,21 @@
       const productSearchInput = document.getElementById('product_search');
       const matHangInput = document.getElementById('mat_hang_id');
       const productMenu = document.getElementById('product_search_menu');
+      const donViMayInput = document.getElementById('don_vi_may_id');
       const sizeBox = document.getElementById('size-box');
       const sizeList = document.getElementById('size-list');
       const tableWrapper = document.getElementById('allocation-table-wrapper');
       const allocationBody = document.getElementById('allocation-body');
+      const addAllocationsButton = document.getElementById('add-allocations-button');
+      const allocationDraftWrapper = document.getElementById('allocation-draft-wrapper');
+      const allocationDraftEmpty = document.getElementById('allocation-draft-empty');
+      const allocationDraftBody = document.getElementById('allocation-draft-body');
+      const allocationDraftInputs = document.getElementById('allocation-draft-inputs');
+      const allocationDraftCount = document.getElementById('allocation-draft-count');
+      const allocationDraftTotal = document.getElementById('allocation-draft-total');
+      const allocationAlert = document.getElementById('allocation-alert');
       const initialState = @json($initialState);
+      const draftAllocations = [];
 
       function normalizeNumber(value) {
         let text = String(value || '').trim();
@@ -330,6 +367,55 @@
 
       function productLabel(item) {
         return `${item.ma_hang || '-'} - ${item.ten_hang || '-'}`;
+      }
+
+      function allocationKey(item) {
+        return [
+          item.don_hang_chi_tiet_id || 'plain',
+          item.mat_hang_id || '',
+          item.mau_id || '',
+          item.size_id || '',
+        ].join(':');
+      }
+
+      function draftKey(item, unitId) {
+        return `${allocationKey(item)}:${unitId || ''}`;
+      }
+
+      function findOptionByKey(key) {
+        const sourceKey = String(key).split(':').slice(0, 4).join(':');
+
+        return options.find(item => allocationKey(item) === sourceKey);
+      }
+
+      function currentDraftQuantity(sourceKey) {
+        return draftAllocations
+          .filter(item => item.source_key === sourceKey)
+          .reduce((total, item) => total + Number(item.so_luong_giao || 0), 0);
+      }
+
+      function remainingAfterDraft(item) {
+        return Math.max(0, Number(item.remaining || 0) - currentDraftQuantity(allocationKey(item)));
+      }
+
+      function unitLabelById(unitId) {
+        const unit = sewingUnits.find(item => String(item.id) === String(unitId));
+
+        return unit ? unit.label : '';
+      }
+
+      function selectedUnitId() {
+        return donViMayInput.value || '';
+      }
+
+      function setAllocationAlert(message, type = 'danger') {
+        if (!allocationAlert) {
+          return;
+        }
+
+        allocationAlert.className = `alert alert-${type} py-2 mb-3`;
+        allocationAlert.textContent = message;
+        allocationAlert.classList.toggle('d-none', !message);
       }
 
       function normalizeSearchText(value) {
@@ -509,31 +595,169 @@
 
         rows.forEach(function(item, index) {
           const row = document.createElement('tr');
+          const key = allocationKey(item);
+          const availableAfterDraft = remainingAfterDraft(item);
 
           row.innerHTML = `
             <td data-label="Màu">${item.ten_mau || '-'}</td>
             <td data-label="Size">
               ${item.ten_size || '-'}
-              <input type="hidden" name="allocations[${index}][group_key]" value="${item.key || ''}">
-              <input type="hidden" name="allocations[${index}][don_hang_chi_tiet_id]" value="${item.don_hang_chi_tiet_id || ''}">
-              <input type="hidden" name="allocations[${index}][mat_hang_id]" value="${item.mat_hang_id || ''}">
-              <input type="hidden" name="allocations[${index}][mau_id]" value="${item.mau_id || ''}">
-              <input type="hidden" name="allocations[${index}][size_id]" value="${item.size_id || ''}">
             </td>
             <td data-label="SL cắt">${formatDisplayNumber(item.sl_cat)}</td>
             <td data-label="Đã phân bổ">${formatDisplayNumber(item.allocated)}</td>
-            <td data-label="Còn lại">${formatDisplayNumber(item.remaining)}</td>
+            <td data-label="Còn lại">${formatDisplayNumber(availableAfterDraft)}</td>
             <td class="allocation-quantity-cell" data-label="SL giao">
               <input type="text" inputmode="decimal" autocomplete="off"
                 class="form-control js-number-format allocation-quantity-input"
-                name="allocations[${index}][so_luong_giao]"
-                value="${formatDisplayNumber(item.remaining)}">
+                data-allocation-key="${key}"
+                placeholder="Còn ${formatDisplayNumber(availableAfterDraft)}">
             </td>
           `;
 
           allocationBody.appendChild(row);
           wireNumberInput(row.querySelector('.js-number-format'));
         });
+      }
+
+      function addOrUpdateDraft(item, unitId, quantity) {
+        const key = draftKey(item, unitId);
+        const existing = draftAllocations.find(draft => draft.key === key);
+
+        if (existing) {
+          existing.so_luong_giao = Number(existing.so_luong_giao || 0) + quantity;
+          return;
+        }
+
+        draftAllocations.push({
+          key,
+          source_key: allocationKey(item),
+          group_key: item.key || '',
+          don_hang_chi_tiet_id: item.don_hang_chi_tiet_id || '',
+          order_label: orderLabel(item),
+          mat_hang_id: item.mat_hang_id || '',
+          product_label: productLabel(item),
+          mau_id: item.mau_id || '',
+          ten_mau: item.ten_mau || '-',
+          size_id: item.size_id || '',
+          ten_size: item.ten_size || '-',
+          don_vi_may_id: unitId,
+          unit_label: unitLabelById(unitId),
+          remaining: Number(item.remaining || 0),
+          so_luong_giao: quantity,
+        });
+      }
+
+      function rebuildDraftInputs() {
+        allocationDraftInputs.innerHTML = '';
+
+        draftAllocations.forEach(function(item, index) {
+          const fields = {
+            group_key: item.group_key,
+            don_hang_chi_tiet_id: item.don_hang_chi_tiet_id,
+            mat_hang_id: item.mat_hang_id,
+            mau_id: item.mau_id,
+            size_id: item.size_id,
+            don_vi_may_id: item.don_vi_may_id,
+            so_luong_giao: item.so_luong_giao,
+          };
+
+          Object.entries(fields).forEach(function([name, value]) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = `allocations[${index}][${name}]`;
+            input.value = value ?? '';
+            allocationDraftInputs.appendChild(input);
+          });
+        });
+      }
+
+      function renderDraftList() {
+        allocationDraftBody.innerHTML = '';
+
+        const hasDrafts = draftAllocations.length > 0;
+        allocationDraftWrapper.classList.toggle('d-none', !hasDrafts);
+        allocationDraftEmpty.classList.toggle('d-none', hasDrafts);
+
+        let total = 0;
+
+        draftAllocations.forEach(function(item, index) {
+          total += Number(item.so_luong_giao || 0);
+
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${item.order_label || '-'}</td>
+            <td>${item.product_label || '-'}</td>
+            <td>${item.ten_mau || '-'}</td>
+            <td>${item.ten_size || '-'}</td>
+            <td>${item.unit_label || '-'}</td>
+            <td class="text-end">${formatDisplayNumber(item.remaining)}</td>
+            <td class="text-end fw-medium">${formatDisplayNumber(item.so_luong_giao)}</td>
+            <td class="text-end allocation-draft-action-cell">
+              <button type="button" class="btn btn-sm btn-icon btn-outline-danger" data-remove-draft-index="${index}" title="Xóa">
+                <i class="icon-base bx bx-trash"></i>
+              </button>
+            </td>
+          `;
+          allocationDraftBody.appendChild(row);
+        });
+
+        allocationDraftCount.textContent = draftAllocations.length;
+        allocationDraftTotal.textContent = formatDisplayNumber(total);
+        rebuildDraftInputs();
+      }
+
+      function addCurrentRowsToDraft() {
+        const rowsByKey = new Map(selectedRows().map(item => [allocationKey(item), item]));
+        let addedCount = 0;
+        let errorMessage = '';
+        const unitId = selectedUnitId();
+
+        setAllocationAlert('');
+
+        if (!unitId) {
+          setAllocationAlert('Vui lòng chọn đơn vị may.');
+          return;
+        }
+
+        allocationBody.querySelectorAll('.allocation-quantity-input').forEach(function(input) {
+          if (errorMessage) {
+            return;
+          }
+
+          const key = input.dataset.allocationKey || '';
+          const item = rowsByKey.get(key);
+          const quantity = Number(normalizeNumber(input.value) || 0);
+
+          if (!item || quantity <= 0) {
+            return;
+          }
+
+          const currentQuantity = currentDraftQuantity(key);
+          const available = Number(item.remaining || 0);
+          const remaining = Math.max(0, available - currentQuantity);
+
+          if (quantity - remaining > 0.000001) {
+            errorMessage = `Số lượng ${productLabel(item)} / ${item.ten_mau || '-'} / ${item.ten_size || '-'} vượt số lượng còn lại ${formatDisplayNumber(remaining)}.`;
+            return;
+          }
+
+          addOrUpdateDraft(item, unitId, quantity);
+          addedCount += 1;
+        });
+
+        if (errorMessage) {
+          setAllocationAlert(errorMessage);
+          return;
+        }
+
+        if (addedCount === 0) {
+          setAllocationAlert('Vui lòng nhập ít nhất một số lượng giao may.');
+          return;
+        }
+
+        setAllocationAlert(`Đã thêm ${addedCount} dòng vào danh sách phân bổ.`, 'success');
+        renderDraftList();
+        renderTable();
       }
 
       function refreshAll() {
@@ -614,8 +838,28 @@
 
       sizeList.addEventListener('change', renderTable);
 
+      addAllocationsButton.addEventListener('click', addCurrentRowsToDraft);
+
+      allocationDraftBody.addEventListener('click', function(event) {
+        const button = event.target.closest('[data-remove-draft-index]');
+
+        if (!button) {
+          return;
+        }
+
+        draftAllocations.splice(Number(button.dataset.removeDraftIndex), 1);
+        renderDraftList();
+        renderTable();
+      });
+
       if (form) {
-        form.addEventListener('submit', function() {
+        form.addEventListener('submit', function(event) {
+          if (draftAllocations.length === 0) {
+            event.preventDefault();
+            setAllocationAlert('Vui lòng thêm ít nhất một dòng vào danh sách phân bổ.');
+            return;
+          }
+
           form.querySelectorAll('.js-number-format').forEach(function(input) {
             input.value = normalizeNumber(input.value);
           });
@@ -657,6 +901,25 @@
         });
       }
 
+      if (Array.isArray(initialState.allocations)) {
+        initialState.allocations.forEach(function(allocation) {
+          const key = [
+            allocation.don_hang_chi_tiet_id || 'plain',
+            allocation.mat_hang_id || '',
+            allocation.mau_id || '',
+            allocation.size_id || '',
+            allocation.don_vi_may_id || '',
+          ].join(':');
+          const option = findOptionByKey(key);
+          const quantity = Number(normalizeNumber(allocation.so_luong_giao) || 0);
+
+          if (option && allocation.don_vi_may_id && quantity > 0) {
+            addOrUpdateDraft(option, allocation.don_vi_may_id, quantity);
+          }
+        });
+      }
+
+      renderDraftList();
       renderTable();
     });
   </script>
@@ -733,7 +996,7 @@
           <div class="col-md-4">
             <label class="form-label" for="don_vi_may_id">Đơn vị may <span class="text-danger">*</span></label>
             <select class="form-select @error('don_vi_may_id') is-invalid @enderror" id="don_vi_may_id"
-              name="don_vi_may_id" required>
+              name="don_vi_may_id">
               <option value="">-- Chọn đơn vị may --</option>
               @foreach ($donViMays as $donViMay)
                 <option value="{{ $donViMay->id }}" @selected(old('don_vi_may_id') == $donViMay->id)>
@@ -774,6 +1037,42 @@
                 <tbody id="allocation-body"></tbody>
               </table>
             </div>
+            <div class="d-flex justify-content-end mt-3">
+              <button type="button" class="btn btn-outline-primary" id="add-allocations-button">
+                <i class="icon-base bx bx-plus me-1"></i> Thêm phân bổ
+              </button>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <div class="alert alert-danger py-2 d-none" id="allocation-alert"></div>
+            <div class="d-flex flex-column flex-md-row gap-2 justify-content-between align-items-md-center mb-2">
+              <h6 class="mb-0">Danh sách phân bổ sẽ lưu</h6>
+              <div class="text-muted small">
+                <span id="allocation-draft-count">0</span> dòng, tổng SL giao <span id="allocation-draft-total">0</span>
+              </div>
+            </div>
+            <div class="allocation-draft-empty" id="allocation-draft-empty">
+              Chưa có dòng phân bổ nào.
+            </div>
+            <div class="table-responsive d-none" id="allocation-draft-wrapper">
+              <table class="table align-middle allocation-draft-table">
+                <thead>
+                  <tr>
+                    <th>Mã đơn</th>
+                    <th>Mã hàng</th>
+                    <th>Màu</th>
+                    <th>Size</th>
+                    <th>Đơn vị may</th>
+                    <th class="text-end">Còn lại</th>
+                    <th class="text-end">SL giao</th>
+                    <th class="text-end allocation-draft-action-cell"></th>
+                  </tr>
+                </thead>
+                <tbody id="allocation-draft-body"></tbody>
+              </table>
+            </div>
+            <div id="allocation-draft-inputs"></div>
           </div>
 
           <div class="col-12">

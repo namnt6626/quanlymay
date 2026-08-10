@@ -35,6 +35,7 @@ class StorePhanBoMayRequest extends FormRequest
                 $allocation['mat_hang_id'] = $this->normalizeNullableInteger($allocation['mat_hang_id'] ?? null);
                 $allocation['mau_id'] = $this->normalizeNullableInteger($allocation['mau_id'] ?? null);
                 $allocation['size_id'] = $this->normalizeNullableInteger($allocation['size_id'] ?? null);
+                $allocation['don_vi_may_id'] = $this->normalizeNullableInteger($allocation['don_vi_may_id'] ?? null);
                 $allocation['so_luong_giao'] = $this->normalizeNumberInput($allocation['so_luong_giao'] ?? null);
 
                 return $allocation;
@@ -66,8 +67,8 @@ class StorePhanBoMayRequest extends FormRequest
             'mode' => ['nullable', Rule::in(['by_product', 'by_size'])],
             'allocation_mode' => ['nullable', Rule::in(['by_product', 'by_size'])],
             'don_hang_id' => ['nullable', 'integer', Rule::exists('don_hangs', 'id')->whereNull('deleted_at')],
-            'mat_hang_id' => [$isGroupedForm ? 'required' : 'nullable', 'integer', Rule::exists('dm_mat_hang', 'id')->whereNull('deleted_at')],
-            'size_ids' => [$isGroupedForm && $isBySizeMode ? 'required' : 'nullable', 'array'],
+            'mat_hang_id' => [$isGroupedForm && ! $hasAllocations ? 'required' : 'nullable', 'integer', Rule::exists('dm_mat_hang', 'id')->whereNull('deleted_at')],
+            'size_ids' => [$isGroupedForm && $isBySizeMode && ! $hasAllocations ? 'required' : 'nullable', 'array'],
             'size_ids.*' => ['integer', Rule::exists('dm_size', 'id')->whereNull('deleted_at')],
             'allocations' => [$isGroupedForm ? 'required' : 'nullable', 'array'],
             'allocations.*.group_key' => ['nullable', 'string'],
@@ -75,6 +76,7 @@ class StorePhanBoMayRequest extends FormRequest
             'allocations.*.mat_hang_id' => ['nullable', 'integer', Rule::exists('dm_mat_hang', 'id')->whereNull('deleted_at')],
             'allocations.*.mau_id' => ['nullable', 'integer', Rule::exists('dm_mau', 'id')->whereNull('deleted_at')],
             'allocations.*.size_id' => ['nullable', 'integer', Rule::exists('dm_size', 'id')->whereNull('deleted_at')],
+            'allocations.*.don_vi_may_id' => ['nullable', 'integer', Rule::exists('dm_don_vi_may', 'id')->whereNull('deleted_at')],
             'allocations.*.so_luong_giao' => ['nullable', 'numeric', 'min:0'],
             'cat_id' => [
                 $isGroupedForm ? 'nullable' : 'required',
@@ -83,7 +85,7 @@ class StorePhanBoMayRequest extends FormRequest
             ],
             'ngay_phan_bo' => ['required', 'date'],
             'don_vi_may_id' => [
-                'required',
+                $isGroupedForm ? 'nullable' : 'required',
                 'integer',
                 Rule::exists('dm_don_vi_may', 'id')->whereNull('deleted_at'),
             ],
@@ -123,6 +125,10 @@ class StorePhanBoMayRequest extends FormRequest
 
                 if (empty($allocation['size_id'])) {
                     $validator->errors()->add("allocations.{$index}.size_id", 'Dòng phân bổ thiếu size.');
+                }
+
+                if (empty($allocation['don_vi_may_id'])) {
+                    $validator->errors()->add("allocations.{$index}.don_vi_may_id", 'Dòng phân bổ thiếu đơn vị may.');
                 }
             });
         });
