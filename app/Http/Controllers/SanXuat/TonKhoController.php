@@ -8,14 +8,96 @@ use App\Models\DonHang;
 use App\Models\DonHangChiTiet;
 use App\Models\MatHang;
 use App\Models\Mau;
+use App\Services\Excel\SimpleXlsxWriter;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class TonKhoController extends Controller
 {
     public function index(Request $request): View
+    {
+        $keyword = trim((string) $request->input('q'));
+        $maDon = trim((string) $request->input('ma_don'));
+        $maKh = trim((string) $request->input('ma_kh'));
+        $matHangId = $request->integer('mat_hang_id') ?: null;
+        $mauId = $request->integer('mau_id') ?: null;
+        $sizeId = $request->integer('size_id') ?: null;
+        $trangThai = trim((string) $request->input('trang_thai'));
+
+        $tonKhos = $this->stockQuery($request)
+            ->paginate(paginationPerPage())
+            ->withQueryString();
+
+        return view('content.san-xuat.ton-kho.index', [
+            'tonKhos' => $tonKhos,
+            'keyword' => $keyword,
+            'maDon' => $maDon,
+            'maKh' => $maKh,
+            'matHangId' => $matHangId,
+            'mauId' => $mauId,
+            'sizeId' => $sizeId,
+            'trangThai' => $trangThai,
+            'matHangs' => MatHang::query()->orderBy('ten_hang')->get(),
+            'maus' => Mau::query()->orderBy('ten_mau')->get(),
+            'sizes' => DmSize::query()->orderBy('ten_size')->get(),
+        ]);
+    }
+
+    public function export(Request $request, SimpleXlsxWriter $writer): BinaryFileResponse
+    {
+        $rows = $this->stockQuery($request)
+            ->get()
+            ->map(fn (object $tonKho): array => [
+                $tonKho->ma_don ?? '',
+                $tonKho->ma_kh ?? '',
+                $tonKho->ma_hang ?? '',
+                $tonKho->ten_hang ?? '',
+                $tonKho->ten_mau ?? '',
+                $tonKho->ten_size ?? '',
+                $tonKho->so_luong_dat !== null ? (float) $tonKho->so_luong_dat : '',
+                (float) $tonKho->da_cat,
+                (float) $tonKho->qc_dat,
+                (float) $tonKho->qc_loi,
+                (float) $tonKho->qc_hong,
+                (float) $tonKho->ton_dat,
+                (float) $tonKho->ton_loi,
+                (float) $tonKho->ton_hong,
+                (float) $tonKho->da_xuat,
+                (float) $tonKho->ton_co_the_xuat,
+                (float) $tonKho->tong_ton_vat_ly,
+                $this->stockStatus((float) $tonKho->ton_co_the_xuat),
+            ]);
+
+        $path = $writer->write('Ton kho', [
+            'Mã đơn',
+            'Mã KH',
+            'Mã hàng',
+            'Tên hàng',
+            'Màu',
+            'Size',
+            'SL đặt',
+            'Đã cắt',
+            'QC đạt',
+            'QC lỗi',
+            'QC hỏng',
+            'Tồn đạt',
+            'Tồn lỗi',
+            'Tồn hỏng',
+            'Đã xuất',
+            'Tồn có thể xuất',
+            'Tồn tổng',
+            'Trạng thái',
+        ], $rows);
+
+        return response()
+            ->download($path, 'ton-kho-'.now()->format('Ymd-His').'.xlsx')
+            ->deleteFileAfterSend();
+    }
+
+    private function stockQuery(Request $request): Builder
     {
         $donHangTable = (new DonHang)->getTable();
         $donHangChiTietTable = (new DonHangChiTiet)->getTable();
@@ -31,7 +113,7 @@ class TonKhoController extends Controller
         $orderRows = $this->buildOrderRows($donHangTable, $donHangChiTietTable);
         $noOrderRows = $this->buildNoOrderRows($donHangChiTietTable);
 
-        $tonKhos = DB::query()
+        return DB::query()
             ->fromSub($orderRows->unionAll($noOrderRows), 'ton_kho_rows')
             ->when($keyword !== '', function (Builder $query) use ($keyword) {
                 $query->where(function (Builder $query) use ($keyword) {
@@ -67,23 +149,20 @@ class TonKhoController extends Controller
             ->when($trangThai === 'am-kho', function (Builder $query) {
                 $query->whereRaw('ton_kho < 0');
             })
-            ->orderByRaw('CASE WHEN ma_don IS NULL THEN 1 ELSE 0 END, COALESCE(ma_don, ""), ma_hang, ten_mau, ten_size')
-            ->paginate(paginationPerPage())
-            ->withQueryString();
+            ->orderByRaw('CASE WHEN ma_don IS NULL THEN 1 ELSE 0 END, COALESCE(ma_don, ""), ma_hang, ten_mau, ten_size');
+    }
 
-        return view('content.san-xuat.ton-kho.index', [
-            'tonKhos' => $tonKhos,
-            'keyword' => $keyword,
-            'maDon' => $maDon,
-            'maKh' => $maKh,
-            'matHangId' => $matHangId,
-            'mauId' => $mauId,
-            'sizeId' => $sizeId,
-            'trangThai' => $trangThai,
-            'matHangs' => MatHang::query()->orderBy('ten_hang')->get(),
-            'maus' => Mau::query()->orderBy('ten_mau')->get(),
-            'sizes' => DmSize::query()->orderBy('ten_size')->get(),
-        ]);
+    private function stockStatus(float $quantity): string
+    {
+        if ($quantity > 0) {
+            return 'Còn hàng';
+        }
+
+        if ($quantity < 0) {
+            return 'Âm kho';
+        }
+
+        return 'Hết hàng';
     }
 
     private function buildOrderRows(string $donHangTable, string $donHangChiTietTable): Builder

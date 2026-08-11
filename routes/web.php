@@ -260,9 +260,15 @@ Route::get('don-hangs/{don_hang}', [DonHangController::class, 'show'])
 $registerIndexRoute('ton-kho', TonKhoController::class, [
   'view' => 'TON_KHO_VIEW',
 ]);
+Route::get('ton-kho/export', [TonKhoController::class, 'export'])
+  ->middleware(['auth', 'permission:TON_KHO_VIEW'])
+  ->name('ton-kho.export');
 $registerIndexRoute('ton-kho-online', TonKhoOnlineController::class, [
   'view' => 'DON_HANG_HOAN_THANH_VIEW',
 ]);
+Route::get('ton-kho-online/export', [TonKhoOnlineController::class, 'export'])
+  ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_VIEW'])
+  ->name('ton-kho-online.export');
 Route::post('ton-kho-online/product-groups', [TonKhoOnlineController::class, 'storeProductGroup'])
   ->middleware(['auth', 'permission:DON_HANG_HOAN_THANH_VIEW'])
   ->name('ton-kho-online.product-groups.store');

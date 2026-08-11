@@ -9,84 +9,50 @@ use App\Models\NhapHangOnlineChiTiet;
 use App\Models\OnlineColorAlias;
 use App\Models\OnlineProductAlias;
 use App\Models\OnlineSizeAlias;
+use App\Services\Excel\SimpleXlsxWriter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class TonKhoOnlineController extends Controller
 {
     public function index(Request $request): View
     {
-        $filters = [
-            'ten_san_pham' => trim((string) $request->input('ten_san_pham')),
-            'mau' => trim((string) $request->input('mau')),
-            'size' => trim((string) $request->input('size')),
-        ];
-
-        $imports = NhapHangOnlineChiTiet::query()
-            ->selectRaw("ten_san_pham, COALESCE(mau, '') as mau_key, COALESCE(size, '') as size_key, SUM(so_luong) as so_luong_nhap, SUM(thanh_tien) as tien_nhap")
-            ->groupBy('ten_san_pham', DB::raw("COALESCE(mau, '')"), DB::raw("COALESCE(size, '')"))
-            ->get();
-
-        $exports = DonHangHoanThanhChiTiet::query()
-            ->join('don_hang_hoan_thanh', 'don_hang_hoan_thanh.id', '=', 'don_hang_hoan_thanh_chi_tiet.don_hang_hoan_thanh_id')
-            ->whereNull('don_hang_hoan_thanh.deleted_at')
-            ->selectRaw("don_hang_hoan_thanh.ten_san_pham, COALESCE(don_hang_hoan_thanh_chi_tiet.mau, '') as mau_key, COALESCE(don_hang_hoan_thanh_chi_tiet.size, '') as size_key, SUM(don_hang_hoan_thanh_chi_tiet.so_luong) as so_luong_xuat, SUM(don_hang_hoan_thanh_chi_tiet.thanh_tien) as tien_xuat")
-            ->groupBy('don_hang_hoan_thanh.ten_san_pham', DB::raw("COALESCE(don_hang_hoan_thanh_chi_tiet.mau, '')"), DB::raw("COALESCE(don_hang_hoan_thanh_chi_tiet.size, '')"))
-            ->get();
-
-        $returns = HangHoanOnlineChiTiet::query()
-            ->where('cong_ton', true)
-            ->selectRaw("ten_san_pham, COALESCE(mau, '') as mau_key, COALESCE(size, '') as size_key, SUM(so_luong_hoan) as so_luong_hoan")
-            ->groupBy('ten_san_pham', DB::raw("COALESCE(mau, '')"), DB::raw("COALESCE(size, '')"))
-            ->get();
-
         $productAliasRows = OnlineProductAlias::query()->get(['original_name', 'group_name']);
         $colorAliasRows = OnlineColorAlias::query()->get(['original_name', 'group_name']);
         $sizeAliasRows = OnlineSizeAlias::query()->get(['original_name', 'group_name']);
         $productAliases = $this->aliasLookup($productAliasRows);
         $colorAliases = $this->aliasLookup($colorAliasRows);
         $sizeAliases = $this->aliasLookup($sizeAliasRows);
-
-        $rows = $this->mergeRows(
-            $this->normalizeStockRows($imports, 'import', $productAliases, $colorAliases, $sizeAliases),
-            $this->normalizeStockRows($exports, 'export', $productAliases, $colorAliases, $sizeAliases),
-            $this->normalizeStockRows($returns, 'return', $productAliases, $colorAliases, $sizeAliases)
-        )
-            ->filter(function (array $row) use ($filters): bool {
-                if ($filters['ten_san_pham'] !== '') {
-                    $productName = (string) $row['ten_san_pham'];
-                    $keyword = $filters['ten_san_pham'];
-
-                    if (
-                        ! str_contains($this->normalizeText($productName), $this->normalizeText($keyword))
-                        && ! str_contains($this->normalizeCompactText($productName), $this->normalizeCompactText($keyword))
-                    ) {
-                        return false;
-                    }
-                }
-                if ($filters['mau'] !== '' && $this->normalizeText((string) $row['mau']) !== $this->normalizeText($filters['mau'])) {
-                    return false;
-                }
-                if ($filters['size'] !== '' && $this->normalizeSize((string) $row['size']) !== $this->normalizeSize($filters['size'])) {
-                    return false;
-                }
-                return true;
-            })
-            ->sortBy([['ten_san_pham', 'asc'], ['mau', 'asc'], ['size', 'asc']])
-            ->values();
+        $filters = $this->filters($request);
+        $stockRows = $this->stockRows($request, $productAliases, $colorAliases, $sizeAliases);
 
         $totals = [
-            'so_luong_nhap' => $rows->sum('so_luong_nhap'),
-            'so_luong_hoan' => $rows->sum('so_luong_hoan'),
-            'so_luong_xuat' => $rows->sum('so_luong_xuat'),
-            'so_luong_ton' => $rows->sum('so_luong_ton'),
-            'tien_nhap' => $rows->sum('tien_nhap'),
-            'tien_xuat' => $rows->sum('tien_xuat'),
-            'chenh_lech_tien' => $rows->sum('chenh_lech_tien'),
+            'so_luong_nhap' => $stockRows->sum('so_luong_nhap'),
+            'so_luong_hoan' => $stockRows->sum('so_luong_hoan'),
+            'so_luong_xuat' => $stockRows->sum('so_luong_xuat'),
+            'so_luong_ton' => $stockRows->sum('so_luong_ton'),
+            'tien_nhap' => $stockRows->sum('tien_nhap'),
+            'tien_xuat' => $stockRows->sum('tien_xuat'),
+            'chenh_lech_tien' => $stockRows->sum('chenh_lech_tien'),
         ];
+
+        $perPage = paginationPerPage();
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $rows = new LengthAwarePaginator(
+            $stockRows->forPage($page, $perPage)->values(),
+            $stockRows->count(),
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
 
         $filterOptions = $this->filterOptions();
         $productAliasGroupNames = $this->matchedAliasGroupNames($filterOptions['sourceProducts'], $productAliases);
@@ -111,6 +77,66 @@ class TonKhoOnlineController extends Controller
             ->groupBy('group_name');
 
         return view('content.don-hang-online.ton-kho.index', compact('rows', 'filters', 'totals', 'filterOptions', 'productGroups', 'colorGroups', 'sizeGroups', 'productAliasGroupNames', 'colorAliasGroupNames', 'sizeAliasGroupNames'));
+    }
+
+    public function export(Request $request, SimpleXlsxWriter $writer): BinaryFileResponse
+    {
+        $productAliases = $this->aliasLookup(OnlineProductAlias::query()->get(['original_name', 'group_name']));
+        $colorAliases = $this->aliasLookup(OnlineColorAlias::query()->get(['original_name', 'group_name']));
+        $sizeAliases = $this->aliasLookup(OnlineSizeAlias::query()->get(['original_name', 'group_name']));
+        $stockRows = $this->stockRows($request, $productAliases, $colorAliases, $sizeAliases);
+        $totals = [
+            'so_luong_nhap' => $stockRows->sum('so_luong_nhap'),
+            'so_luong_hoan' => $stockRows->sum('so_luong_hoan'),
+            'so_luong_xuat' => $stockRows->sum('so_luong_xuat'),
+            'so_luong_ton' => $stockRows->sum('so_luong_ton'),
+            'tien_nhap' => $stockRows->sum('tien_nhap'),
+            'tien_xuat' => $stockRows->sum('tien_xuat'),
+            'chenh_lech_tien' => $stockRows->sum('chenh_lech_tien'),
+        ];
+
+        $rows = $stockRows
+            ->map(fn (array $row): array => [
+                $row['ten_san_pham'],
+                $row['mau'] ?: '',
+                $row['size'] ?: '',
+                (float) $row['so_luong_nhap'],
+                (float) $row['so_luong_hoan'],
+                (float) $row['so_luong_xuat'],
+                (float) $row['so_luong_ton'],
+                (float) $row['tien_nhap'],
+                (float) $row['tien_xuat'],
+                (float) $row['chenh_lech_tien'],
+            ])
+            ->push([
+                'Tổng',
+                '',
+                '',
+                (float) $totals['so_luong_nhap'],
+                (float) $totals['so_luong_hoan'],
+                (float) $totals['so_luong_xuat'],
+                (float) $totals['so_luong_ton'],
+                (float) $totals['tien_nhap'],
+                (float) $totals['tien_xuat'],
+                (float) $totals['chenh_lech_tien'],
+            ]);
+
+        $path = $writer->write('Ton kho online', [
+            'Tên sản phẩm',
+            'Màu',
+            'Size',
+            'SL nhập mới',
+            'SL hàng hoàn',
+            'SL xuất',
+            'Tồn',
+            'Tiền nhập',
+            'Tiền xuất',
+            'Tiền xuất - nhập',
+        ], $rows);
+
+        return response()
+            ->download($path, 'ton-kho-online-'.now()->format('Ymd-His').'.xlsx')
+            ->deleteFileAfterSend();
     }
 
     public function storeProductGroup(Request $request): RedirectResponse
@@ -270,6 +296,72 @@ class TonKhoOnlineController extends Controller
         return redirect()
             ->route('ton-kho-online.index', $request->query())
             ->with('success', 'Đã bỏ gộp size "'.$data['group_name'].'".');
+    }
+
+    /**
+     * @return array{ten_san_pham: string, mau: string, size: string}
+     */
+    private function filters(Request $request): array
+    {
+        return [
+            'ten_san_pham' => trim((string) $request->input('ten_san_pham')),
+            'mau' => trim((string) $request->input('mau')),
+            'size' => trim((string) $request->input('size')),
+        ];
+    }
+
+    private function stockRows(Request $request, Collection $productAliases, Collection $colorAliases, Collection $sizeAliases): Collection
+    {
+        $filters = $this->filters($request);
+
+        $imports = NhapHangOnlineChiTiet::query()
+            ->selectRaw("ten_san_pham, COALESCE(mau, '') as mau_key, COALESCE(size, '') as size_key, SUM(so_luong) as so_luong_nhap, SUM(thanh_tien) as tien_nhap")
+            ->groupBy('ten_san_pham', DB::raw("COALESCE(mau, '')"), DB::raw("COALESCE(size, '')"))
+            ->get();
+
+        $exports = DonHangHoanThanhChiTiet::query()
+            ->join('don_hang_hoan_thanh', 'don_hang_hoan_thanh.id', '=', 'don_hang_hoan_thanh_chi_tiet.don_hang_hoan_thanh_id')
+            ->whereNull('don_hang_hoan_thanh.deleted_at')
+            ->selectRaw("don_hang_hoan_thanh.ten_san_pham, COALESCE(don_hang_hoan_thanh_chi_tiet.mau, '') as mau_key, COALESCE(don_hang_hoan_thanh_chi_tiet.size, '') as size_key, SUM(don_hang_hoan_thanh_chi_tiet.so_luong) as so_luong_xuat, SUM(don_hang_hoan_thanh_chi_tiet.thanh_tien) as tien_xuat")
+            ->groupBy('don_hang_hoan_thanh.ten_san_pham', DB::raw("COALESCE(don_hang_hoan_thanh_chi_tiet.mau, '')"), DB::raw("COALESCE(don_hang_hoan_thanh_chi_tiet.size, '')"))
+            ->get();
+
+        $returns = HangHoanOnlineChiTiet::query()
+            ->where('cong_ton', true)
+            ->selectRaw("ten_san_pham, COALESCE(mau, '') as mau_key, COALESCE(size, '') as size_key, SUM(so_luong_hoan) as so_luong_hoan")
+            ->groupBy('ten_san_pham', DB::raw("COALESCE(mau, '')"), DB::raw("COALESCE(size, '')"))
+            ->get();
+
+        return $this->mergeRows(
+            $this->normalizeStockRows($imports, 'import', $productAliases, $colorAliases, $sizeAliases),
+            $this->normalizeStockRows($exports, 'export', $productAliases, $colorAliases, $sizeAliases),
+            $this->normalizeStockRows($returns, 'return', $productAliases, $colorAliases, $sizeAliases)
+        )
+            ->filter(function (array $row) use ($filters): bool {
+                if ($filters['ten_san_pham'] !== '') {
+                    $productName = (string) $row['ten_san_pham'];
+                    $keyword = $filters['ten_san_pham'];
+
+                    if (
+                        ! str_contains($this->normalizeText($productName), $this->normalizeText($keyword))
+                        && ! str_contains($this->normalizeCompactText($productName), $this->normalizeCompactText($keyword))
+                    ) {
+                        return false;
+                    }
+                }
+
+                if ($filters['mau'] !== '' && $this->normalizeText((string) $row['mau']) !== $this->normalizeText($filters['mau'])) {
+                    return false;
+                }
+
+                if ($filters['size'] !== '' && $this->normalizeSize((string) $row['size']) !== $this->normalizeSize($filters['size'])) {
+                    return false;
+                }
+
+                return true;
+            })
+            ->sortBy([['ten_san_pham', 'asc'], ['mau', 'asc'], ['size', 'asc']])
+            ->values();
     }
 
     private function mergeRows(Collection $imports, Collection $exports, Collection $returns): Collection

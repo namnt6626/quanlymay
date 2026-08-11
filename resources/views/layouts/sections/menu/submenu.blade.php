@@ -14,26 +14,25 @@
         $activeClass = null;
         $active = 'active open';
         $currentRouteName = Route::currentRouteName();
+        $routeMatchesSlug = function (?string $routeName, mixed $slug): bool {
+            if (! is_string($slug) || $routeName === null) {
+                return false;
+            }
 
-        if (
-            $currentRouteName === $submenu->slug ||
-            ($currentRouteName &&
-                str_contains($currentRouteName, $submenu->slug) &&
-                strpos($currentRouteName, $submenu->slug) === 0)
-        ) {
+            return $routeName === $slug || str_starts_with($routeName, $slug . '.');
+        };
+
+        if ($routeMatchesSlug($currentRouteName, $submenu->slug)) {
             $activeClass = 'active';
         } elseif (isset($submenu->submenu)) {
             if (gettype($submenu->slug) === 'array') {
                 foreach ($submenu->slug as $slug) {
-                    if (str_contains($currentRouteName, $slug) and strpos($currentRouteName, $slug) === 0) {
+                    if ($routeMatchesSlug($currentRouteName, $slug)) {
                         $activeClass = $active;
                     }
                 }
             } else {
-                if (
-                    str_contains($currentRouteName, $submenu->slug) and
-                    strpos($currentRouteName, $submenu->slug) === 0
-                ) {
+                if ($routeMatchesSlug($currentRouteName, $submenu->slug)) {
                     $activeClass = $active;
                 }
             }

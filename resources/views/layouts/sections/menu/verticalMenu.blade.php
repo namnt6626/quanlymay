@@ -31,10 +31,15 @@
           @php
             $activeClass = null;
             $currentRouteName = Route::currentRouteName();
+            $routeMatchesSlug = function (?string $routeName, mixed $slug): bool {
+                if (! is_string($slug) || $routeName === null) {
+                    return false;
+                }
 
-            if ($currentRouteName === $menu->slug) {
-                $activeClass = 'active';
-            } elseif (is_string($menu->slug) && $currentRouteName && str_starts_with($currentRouteName, $menu->slug)) {
+                return $routeName === $slug || str_starts_with($routeName, $slug . '.');
+            };
+
+            if ($routeMatchesSlug($currentRouteName, $menu->slug)) {
                 $activeClass = 'active';
             } elseif (isset($menu->submenu)) {
                 $slugs = gettype($menu->slug) === 'array' ? $menu->slug : [$menu->slug];
@@ -44,10 +49,7 @@
                     }
                 }
                 foreach ($slugs as $slug) {
-                    if (
-                        $currentRouteName && str_contains($currentRouteName, $slug) and
-                        strpos($currentRouteName, $slug) === 0
-                    ) {
+                    if ($routeMatchesSlug($currentRouteName, $slug)) {
                         $activeClass = 'active open';
                     }
                 }

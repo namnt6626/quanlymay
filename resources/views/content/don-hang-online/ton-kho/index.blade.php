@@ -4,11 +4,13 @@
 @include('content.san-xuat._filter-style')
 <style>
   .online-stock-scroll {
-    overflow: visible;
+    overflow-x: auto;
+    overflow-y: visible;
     scrollbar-gutter: stable;
   }
   .online-stock-table {
     margin-bottom: 0;
+    min-width: 1280px;
   }
   .online-stock-table thead th {
     background: var(--bs-gray-100);
@@ -72,6 +74,9 @@
   <div class="card-header d-flex flex-wrap gap-2 align-items-center justify-content-between">
     <h5 class="mb-0">Tồn kho online</h5>
     <div class="d-flex flex-wrap gap-2">
+      <a href="{{ route('ton-kho-online.export', request()->except(['page', 'per_page'])) }}" class="btn btn-outline-success">
+        <i class="icon-base bx bx-download me-1"></i>Xuất Excel
+      </a>
       <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#productGroupModal">
         <i class="icon-base bx bx-git-merge me-1"></i>Gộp sản phẩm
       </button>
@@ -97,7 +102,8 @@
       </div>
       <div class="col-md-2"><label class="form-label">Màu</label><select class="form-select" name="mau"><option value="">Tất cả</option>@foreach($filterOptions['colors'] as $color)<option value="{{ $color }}" @selected($filters['mau'] === $color)>{{ $color }}</option>@endforeach</select></div>
       <div class="col-md-2"><label class="form-label">Size</label><select class="form-select" name="size"><option value="">Tất cả</option>@foreach($filterOptions['sizes'] as $size)<option value="{{ $size }}" @selected($filters['size'] === $size)>{{ $size }}</option>@endforeach</select></div>
-      <div class="col-md-4 d-flex gap-2"><button class="btn btn-primary"><i class="icon-base bx bx-search me-1"></i>Tìm</button><a href="{{ route('ton-kho-online.index') }}" class="btn btn-outline-secondary">Mới</a></div>
+      @include('content.shared._per-page-select', ['perPageColumnClass' => 'col-md-2'])
+      <div class="col-md-2 d-flex gap-2"><button class="btn btn-primary"><i class="icon-base bx bx-search me-1"></i>Tìm</button><a href="{{ route('ton-kho-online.index') }}" class="btn btn-outline-secondary">Mới</a></div>
     </form>
   </div>
   <div class="online-stock-scroll">
@@ -126,6 +132,11 @@
       </tbody>
     </table>
   </div>
+  @if ($rows->hasPages())
+    <div class="card-footer">
+      {{ $rows->links() }}
+    </div>
+  @endif
 </div>
 
 <div class="modal fade" id="productGroupModal" tabindex="-1" aria-labelledby="productGroupModalLabel" aria-hidden="true">

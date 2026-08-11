@@ -50,6 +50,9 @@
   <div class="card">
     <div class="card-header d-flex flex-column flex-md-row gap-3 justify-content-between align-items-md-center">
       <h5 class="mb-0">Báo cáo tồn kho</h5>
+      <a href="{{ route('ton-kho.export', request()->except(['page', 'per_page'])) }}" class="btn btn-outline-success">
+        <i class="icon-base bx bx-download me-1"></i> Xuất Excel
+      </a>
     </div>
 
     <div class="card-body">
