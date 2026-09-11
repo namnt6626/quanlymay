@@ -72,6 +72,14 @@
           <input type="text" class="form-control" id="ma_kh" name="ma_kh" value="{{ $maKh }}"
             placeholder="Mã KH">
         </div>
+        <div class="col-6 col-lg-2 filter-span-2">
+          <label class="form-label" for="tu_ngay">Từ ngày</label>
+          <input type="date" class="form-control" id="tu_ngay" name="tu_ngay" value="{{ $tuNgay }}">
+        </div>
+        <div class="col-6 col-lg-2 filter-span-2">
+          <label class="form-label" for="den_ngay">Đến ngày</label>
+          <input type="date" class="form-control" id="den_ngay" name="den_ngay" value="{{ $denNgay }}">
+        </div>
         <div class="col-12 col-lg-4 filter-span-4">
           <label class="form-label" for="mat_hang_id">Mã hàng</label>
           <select class="form-select" id="mat_hang_id" name="mat_hang_id">

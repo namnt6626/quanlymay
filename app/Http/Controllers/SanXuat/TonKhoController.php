@@ -26,6 +26,8 @@ class TonKhoController extends Controller
         $mauId = $request->integer('mau_id') ?: null;
         $sizeId = $request->integer('size_id') ?: null;
         $trangThai = trim((string) $request->input('trang_thai'));
+        $tuNgay = trim((string) $request->input('tu_ngay'));
+        $denNgay = trim((string) $request->input('den_ngay'));
 
         $tonKhos = $this->stockQuery($request)
             ->paginate(paginationPerPage())
@@ -40,6 +42,8 @@ class TonKhoController extends Controller
             'mauId' => $mauId,
             'sizeId' => $sizeId,
             'trangThai' => $trangThai,
+            'tuNgay' => $tuNgay,
+            'denNgay' => $denNgay,
             'matHangs' => MatHang::query()->orderBy('ten_hang')->get(),
             'maus' => Mau::query()->orderBy('ten_mau')->get(),
             'sizes' => DmSize::query()->orderBy('ten_size')->get(),
@@ -109,9 +113,11 @@ class TonKhoController extends Controller
         $mauId = $request->integer('mau_id') ?: null;
         $sizeId = $request->integer('size_id') ?: null;
         $trangThai = trim((string) $request->input('trang_thai'));
+        $tuNgay = trim((string) $request->input('tu_ngay'));
+        $denNgay = trim((string) $request->input('den_ngay'));
 
-        $orderRows = $this->buildOrderRows($donHangTable, $donHangChiTietTable);
-        $noOrderRows = $this->buildNoOrderRows($donHangChiTietTable);
+        $orderRows = $this->buildOrderRows($donHangTable, $donHangChiTietTable, $tuNgay, $denNgay);
+        $noOrderRows = $this->buildNoOrderRows($donHangChiTietTable, $tuNgay, $denNgay);
 
         return DB::query()
             ->fromSub($orderRows->unionAll($noOrderRows), 'ton_kho_rows')
@@ -165,26 +171,26 @@ class TonKhoController extends Controller
         return 'Hết hàng';
     }
 
-    private function buildOrderRows(string $donHangTable, string $donHangChiTietTable): Builder
+    private function buildOrderRows(string $donHangTable, string $donHangChiTietTable, string $tuNgay, string $denNgay): Builder
     {
-        $orderKeys = DB::table('cat')
+        $orderKeys = $this->applyDateRange(DB::table('cat')
             ->selectRaw('cat.don_hang_chi_tiet_id as don_hang_chi_tiet_id')
             ->whereNotNull('cat.don_hang_chi_tiet_id')
-            ->whereNull('cat.deleted_at');
+            ->whereNull('cat.deleted_at'), 'cat.ngay_cat', $tuNgay, $denNgay);
 
         $orderKeys = $orderKeys->unionAll(
-            DB::table('qc')
+            $this->applyDateRange(DB::table('qc')
                 ->join('phan_bo_may', 'phan_bo_may.id', '=', 'qc.phan_bo_may_id')
                 ->join('cat', 'cat.id', '=', 'phan_bo_may.cat_id')
                 ->selectRaw('COALESCE(qc.don_hang_chi_tiet_id, cat.don_hang_chi_tiet_id) as don_hang_chi_tiet_id')
                 ->whereRaw('COALESCE(qc.don_hang_chi_tiet_id, cat.don_hang_chi_tiet_id) is not null')
                 ->whereNull('qc.deleted_at')
                 ->whereNull('phan_bo_may.deleted_at')
-                ->whereNull('cat.deleted_at')
+                ->whereNull('cat.deleted_at'), 'qc.ngay_qc', $tuNgay, $denNgay)
         );
 
         $orderKeys = $orderKeys->unionAll(
-            DB::table('nhap_kho')
+            $this->applyDateRange(DB::table('nhap_kho')
                 ->join('qc', 'qc.id', '=', 'nhap_kho.qc_id')
                 ->join('phan_bo_may', 'phan_bo_may.id', '=', 'qc.phan_bo_may_id')
                 ->join('cat', 'cat.id', '=', 'phan_bo_may.cat_id')
@@ -193,11 +199,11 @@ class TonKhoController extends Controller
                 ->whereNull('nhap_kho.deleted_at')
                 ->whereNull('qc.deleted_at')
                 ->whereNull('phan_bo_may.deleted_at')
-                ->whereNull('cat.deleted_at')
+                ->whereNull('cat.deleted_at'), 'nhap_kho.ngay_nhap', $tuNgay, $denNgay)
         );
 
         $orderKeys = $orderKeys->unionAll(
-            DB::table('phieu_xuat_kho_chi_tiet')
+            $this->applyDateRange(DB::table('phieu_xuat_kho_chi_tiet')
                 ->join('phieu_xuat_kho', 'phieu_xuat_kho.id', '=', 'phieu_xuat_kho_chi_tiet.phieu_xuat_kho_id')
                 ->join('nhap_kho', 'nhap_kho.id', '=', 'phieu_xuat_kho_chi_tiet.nhap_kho_id')
                 ->join('qc', 'qc.id', '=', 'nhap_kho.qc_id')
@@ -210,7 +216,7 @@ class TonKhoController extends Controller
                 ->whereNull('nhap_kho.deleted_at')
                 ->whereNull('qc.deleted_at')
                 ->whereNull('phan_bo_may.deleted_at')
-                ->whereNull('cat.deleted_at')
+                ->whereNull('cat.deleted_at'), 'phieu_xuat_kho.ngay_xuat', $tuNgay, $denNgay)
         );
 
         $orderKeys = DB::query()
@@ -218,13 +224,13 @@ class TonKhoController extends Controller
             ->select('don_hang_chi_tiet_id')
             ->distinct();
 
-        $catTotals = DB::table('cat')
+        $catTotals = $this->applyDateRange(DB::table('cat')
             ->selectRaw('cat.don_hang_chi_tiet_id as don_hang_chi_tiet_id, COALESCE(SUM(cat.so_luong_cat), 0) as da_cat')
             ->whereNotNull('cat.don_hang_chi_tiet_id')
-            ->whereNull('cat.deleted_at')
+            ->whereNull('cat.deleted_at'), 'cat.ngay_cat', $tuNgay, $denNgay)
             ->groupBy('cat.don_hang_chi_tiet_id');
 
-        $qcTotals = DB::table('qc')
+        $qcTotals = $this->applyDateRange(DB::table('qc')
             ->join('phan_bo_may', 'phan_bo_may.id', '=', 'qc.phan_bo_may_id')
             ->join('cat', 'cat.id', '=', 'phan_bo_may.cat_id')
             ->selectRaw('
@@ -236,10 +242,10 @@ class TonKhoController extends Controller
             ->whereRaw('COALESCE(qc.don_hang_chi_tiet_id, cat.don_hang_chi_tiet_id) is not null')
             ->whereNull('qc.deleted_at')
             ->whereNull('phan_bo_may.deleted_at')
-            ->whereNull('cat.deleted_at')
+            ->whereNull('cat.deleted_at'), 'qc.ngay_qc', $tuNgay, $denNgay)
             ->groupByRaw('COALESCE(qc.don_hang_chi_tiet_id, cat.don_hang_chi_tiet_id)');
 
-        $nhapTotals = DB::table('nhap_kho')
+        $nhapTotals = $this->applyDateRange(DB::table('nhap_kho')
             ->join('qc', 'qc.id', '=', 'nhap_kho.qc_id')
             ->join('phan_bo_may', 'phan_bo_may.id', '=', 'qc.phan_bo_may_id')
             ->join('cat', 'cat.id', '=', 'phan_bo_may.cat_id')
@@ -254,10 +260,10 @@ class TonKhoController extends Controller
             ->whereNull('nhap_kho.deleted_at')
             ->whereNull('qc.deleted_at')
             ->whereNull('phan_bo_may.deleted_at')
-            ->whereNull('cat.deleted_at')
+            ->whereNull('cat.deleted_at'), 'nhap_kho.ngay_nhap', $tuNgay, $denNgay)
             ->groupByRaw('COALESCE(nhap_kho.don_hang_chi_tiet_id, qc.don_hang_chi_tiet_id, cat.don_hang_chi_tiet_id)');
 
-        $xuatTotals = DB::table('phieu_xuat_kho_chi_tiet')
+        $xuatTotals = $this->applyDateRange(DB::table('phieu_xuat_kho_chi_tiet')
             ->join('phieu_xuat_kho', 'phieu_xuat_kho.id', '=', 'phieu_xuat_kho_chi_tiet.phieu_xuat_kho_id')
             ->join('nhap_kho', 'nhap_kho.id', '=', 'phieu_xuat_kho_chi_tiet.nhap_kho_id')
             ->join('qc', 'qc.id', '=', 'nhap_kho.qc_id')
@@ -271,7 +277,7 @@ class TonKhoController extends Controller
             ->whereNull('nhap_kho.deleted_at')
             ->whereNull('qc.deleted_at')
             ->whereNull('phan_bo_may.deleted_at')
-            ->whereNull('cat.deleted_at')
+            ->whereNull('cat.deleted_at'), 'phieu_xuat_kho.ngay_xuat', $tuNgay, $denNgay)
             ->groupByRaw('COALESCE(phieu_xuat_kho_chi_tiet.don_hang_chi_tiet_id, nhap_kho.don_hang_chi_tiet_id, qc.don_hang_chi_tiet_id, cat.don_hang_chi_tiet_id)');
 
         return DB::query()
@@ -328,15 +334,15 @@ class TonKhoController extends Controller
             ->whereNull('sz.deleted_at');
     }
 
-    private function buildNoOrderRows(string $donHangChiTietTable): Builder
+    private function buildNoOrderRows(string $donHangChiTietTable, string $tuNgay, string $denNgay): Builder
     {
-        $noOrderKeys = DB::table('cat')
+        $noOrderKeys = $this->applyDateRange(DB::table('cat')
             ->selectRaw('cat.mat_hang_id, cat.mau_id, cat.size_id')
             ->whereNull('cat.don_hang_chi_tiet_id')
-            ->whereNull('cat.deleted_at');
+            ->whereNull('cat.deleted_at'), 'cat.ngay_cat', $tuNgay, $denNgay);
 
         $noOrderKeys = $noOrderKeys->unionAll(
-            DB::table('qc')
+            $this->applyDateRange(DB::table('qc')
                 ->leftJoin('phan_bo_may', 'phan_bo_may.id', '=', 'qc.phan_bo_may_id')
                 ->leftJoin('cat', 'cat.id', '=', 'phan_bo_may.cat_id')
                 ->selectRaw('COALESCE(cat.mat_hang_id, qc.mat_hang_id) as mat_hang_id, COALESCE(cat.mau_id, qc.mau_id) as mau_id, COALESCE(cat.size_id, qc.size_id) as size_id')
@@ -350,11 +356,11 @@ class TonKhoController extends Controller
                 })
                 ->where(function (Builder $query) {
                     $query->whereNull('cat.id')->orWhereNull('cat.deleted_at');
-                })
+                }), 'qc.ngay_qc', $tuNgay, $denNgay)
         );
 
         $noOrderKeys = $noOrderKeys->unionAll(
-            DB::table('nhap_kho')
+            $this->applyDateRange(DB::table('nhap_kho')
                 ->join('qc', 'qc.id', '=', 'nhap_kho.qc_id')
                 ->leftJoin('phan_bo_may', 'phan_bo_may.id', '=', 'qc.phan_bo_may_id')
                 ->leftJoin('cat', 'cat.id', '=', 'phan_bo_may.cat_id')
@@ -370,11 +376,11 @@ class TonKhoController extends Controller
                 })
                 ->where(function (Builder $query) {
                     $query->whereNull('cat.id')->orWhereNull('cat.deleted_at');
-                })
+                }), 'nhap_kho.ngay_nhap', $tuNgay, $denNgay)
         );
 
         $noOrderKeys = $noOrderKeys->unionAll(
-            DB::table('phieu_xuat_kho_chi_tiet')
+            $this->applyDateRange(DB::table('phieu_xuat_kho_chi_tiet')
                 ->join('phieu_xuat_kho', 'phieu_xuat_kho.id', '=', 'phieu_xuat_kho_chi_tiet.phieu_xuat_kho_id')
                 ->join('nhap_kho', 'nhap_kho.id', '=', 'phieu_xuat_kho_chi_tiet.nhap_kho_id')
                 ->join('qc', 'qc.id', '=', 'nhap_kho.qc_id')
@@ -395,7 +401,7 @@ class TonKhoController extends Controller
                 })
                 ->where(function (Builder $query) {
                     $query->whereNull('cat.id')->orWhereNull('cat.deleted_at');
-                })
+                }), 'phieu_xuat_kho.ngay_xuat', $tuNgay, $denNgay)
         );
 
         $noOrderKeys = DB::query()
@@ -403,13 +409,13 @@ class TonKhoController extends Controller
             ->select('mat_hang_id', 'mau_id', 'size_id')
             ->distinct();
 
-        $catTotals = DB::table('cat')
+        $catTotals = $this->applyDateRange(DB::table('cat')
             ->selectRaw('cat.mat_hang_id, cat.mau_id, cat.size_id, COALESCE(SUM(cat.so_luong_cat), 0) as da_cat')
             ->whereNull('cat.don_hang_chi_tiet_id')
-            ->whereNull('cat.deleted_at')
+            ->whereNull('cat.deleted_at'), 'cat.ngay_cat', $tuNgay, $denNgay)
             ->groupBy('cat.mat_hang_id', 'cat.mau_id', 'cat.size_id');
 
-        $qcTotals = DB::table('qc')
+        $qcTotals = $this->applyDateRange(DB::table('qc')
             ->leftJoin('phan_bo_may', 'phan_bo_may.id', '=', 'qc.phan_bo_may_id')
             ->leftJoin('cat', 'cat.id', '=', 'phan_bo_may.cat_id')
             ->selectRaw('
@@ -430,10 +436,10 @@ class TonKhoController extends Controller
             })
             ->where(function (Builder $query) {
                 $query->whereNull('cat.id')->orWhereNull('cat.deleted_at');
-            })
+            }), 'qc.ngay_qc', $tuNgay, $denNgay)
             ->groupByRaw('COALESCE(cat.mat_hang_id, qc.mat_hang_id), COALESCE(cat.mau_id, qc.mau_id), COALESCE(cat.size_id, qc.size_id)');
 
-        $nhapTotals = DB::table('nhap_kho')
+        $nhapTotals = $this->applyDateRange(DB::table('nhap_kho')
             ->join('qc', 'qc.id', '=', 'nhap_kho.qc_id')
             ->leftJoin('phan_bo_may', 'phan_bo_may.id', '=', 'qc.phan_bo_may_id')
             ->leftJoin('cat', 'cat.id', '=', 'phan_bo_may.cat_id')
@@ -457,10 +463,10 @@ class TonKhoController extends Controller
             })
             ->where(function (Builder $query) {
                 $query->whereNull('cat.id')->orWhereNull('cat.deleted_at');
-            })
+            }), 'nhap_kho.ngay_nhap', $tuNgay, $denNgay)
             ->groupByRaw('COALESCE(cat.mat_hang_id, qc.mat_hang_id), COALESCE(cat.mau_id, qc.mau_id), COALESCE(cat.size_id, qc.size_id)');
 
-        $xuatTotals = DB::table('phieu_xuat_kho_chi_tiet')
+        $xuatTotals = $this->applyDateRange(DB::table('phieu_xuat_kho_chi_tiet')
             ->join('phieu_xuat_kho', 'phieu_xuat_kho.id', '=', 'phieu_xuat_kho_chi_tiet.phieu_xuat_kho_id')
             ->join('nhap_kho', 'nhap_kho.id', '=', 'phieu_xuat_kho_chi_tiet.nhap_kho_id')
             ->join('qc', 'qc.id', '=', 'nhap_kho.qc_id')
@@ -481,7 +487,7 @@ class TonKhoController extends Controller
             })
             ->where(function (Builder $query) {
                 $query->whereNull('cat.id')->orWhereNull('cat.deleted_at');
-            })
+            }), 'phieu_xuat_kho.ngay_xuat', $tuNgay, $denNgay)
             ->groupByRaw('COALESCE(cat.mat_hang_id, qc.mat_hang_id), COALESCE(cat.mau_id, qc.mau_id), COALESCE(cat.size_id, qc.size_id)');
 
         return DB::query()
@@ -540,5 +546,12 @@ class TonKhoController extends Controller
             ->whereNull('mh.deleted_at')
             ->whereNull('mau.deleted_at')
             ->whereNull('sz.deleted_at');
+    }
+
+    private function applyDateRange(Builder $query, string $column, string $tuNgay, string $denNgay): Builder
+    {
+        return $query
+            ->when($tuNgay !== '', fn (Builder $query) => $query->whereDate($column, '>=', $tuNgay))
+            ->when($denNgay !== '', fn (Builder $query) => $query->whereDate($column, '<=', $denNgay));
     }
 }

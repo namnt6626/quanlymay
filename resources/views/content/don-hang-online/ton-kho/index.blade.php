@@ -95,11 +95,13 @@
       </div>
     @endif
     <form method="GET" class="row g-3 align-items-end">
-      <div class="col-md-4">
+      <div class="col-md-3">
         <label class="form-label">Sản phẩm</label>
         <input class="form-control" name="ten_san_pham" value="{{ $filters['ten_san_pham'] }}" list="ton-kho-products" placeholder="Gõ hoặc chọn sản phẩm">
         <datalist id="ton-kho-products">@foreach($filterOptions['products'] as $product)<option value="{{ $product }}"></option>@endforeach</datalist>
       </div>
+      <div class="col-md-2"><label class="form-label">Từ ngày</label><input type="date" class="form-control" name="tu_ngay" value="{{ $filters['tu_ngay'] }}"></div>
+      <div class="col-md-2"><label class="form-label">Đến ngày</label><input type="date" class="form-control" name="den_ngay" value="{{ $filters['den_ngay'] }}"></div>
       <div class="col-md-2"><label class="form-label">Màu</label><select class="form-select" name="mau"><option value="">Tất cả</option>@foreach($filterOptions['colors'] as $color)<option value="{{ $color }}" @selected($filters['mau'] === $color)>{{ $color }}</option>@endforeach</select></div>
       <div class="col-md-2"><label class="form-label">Size</label><select class="form-select" name="size"><option value="">Tất cả</option>@foreach($filterOptions['sizes'] as $size)<option value="{{ $size }}" @selected($filters['size'] === $size)>{{ $size }}</option>@endforeach</select></div>
       @include('content.shared._per-page-select', ['perPageColumnClass' => 'col-md-2'])

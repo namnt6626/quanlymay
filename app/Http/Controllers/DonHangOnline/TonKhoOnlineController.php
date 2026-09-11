@@ -299,7 +299,7 @@ class TonKhoOnlineController extends Controller
     }
 
     /**
-     * @return array{ten_san_pham: string, mau: string, size: string}
+     * @return array{ten_san_pham: string, mau: string, size: string, tu_ngay: string, den_ngay: string}
      */
     private function filters(Request $request): array
     {
@@ -307,6 +307,8 @@ class TonKhoOnlineController extends Controller
             'ten_san_pham' => trim((string) $request->input('ten_san_pham')),
             'mau' => trim((string) $request->input('mau')),
             'size' => trim((string) $request->input('size')),
+            'tu_ngay' => trim((string) $request->input('tu_ngay')),
+            'den_ngay' => trim((string) $request->input('den_ngay')),
         ];
     }
 
@@ -315,21 +317,31 @@ class TonKhoOnlineController extends Controller
         $filters = $this->filters($request);
 
         $imports = NhapHangOnlineChiTiet::query()
-            ->selectRaw("ten_san_pham, COALESCE(mau, '') as mau_key, COALESCE(size, '') as size_key, SUM(so_luong) as so_luong_nhap, SUM(thanh_tien) as tien_nhap")
-            ->groupBy('ten_san_pham', DB::raw("COALESCE(mau, '')"), DB::raw("COALESCE(size, '')"))
+            ->join('nhap_hang_online', 'nhap_hang_online.id', '=', 'nhap_hang_online_chi_tiet.nhap_hang_online_id')
+            ->whereNull('nhap_hang_online.deleted_at')
+            ->when($filters['tu_ngay'] !== '', fn ($query) => $query->whereDate('nhap_hang_online.ngay_nhap', '>=', $filters['tu_ngay']))
+            ->when($filters['den_ngay'] !== '', fn ($query) => $query->whereDate('nhap_hang_online.ngay_nhap', '<=', $filters['den_ngay']))
+            ->selectRaw("nhap_hang_online_chi_tiet.ten_san_pham, COALESCE(nhap_hang_online_chi_tiet.mau, '') as mau_key, COALESCE(nhap_hang_online_chi_tiet.size, '') as size_key, SUM(nhap_hang_online_chi_tiet.so_luong) as so_luong_nhap, SUM(nhap_hang_online_chi_tiet.thanh_tien) as tien_nhap")
+            ->groupBy('nhap_hang_online_chi_tiet.ten_san_pham', DB::raw("COALESCE(nhap_hang_online_chi_tiet.mau, '')"), DB::raw("COALESCE(nhap_hang_online_chi_tiet.size, '')"))
             ->get();
 
         $exports = DonHangHoanThanhChiTiet::query()
             ->join('don_hang_hoan_thanh', 'don_hang_hoan_thanh.id', '=', 'don_hang_hoan_thanh_chi_tiet.don_hang_hoan_thanh_id')
             ->whereNull('don_hang_hoan_thanh.deleted_at')
+            ->when($filters['tu_ngay'] !== '', fn ($query) => $query->whereDate('don_hang_hoan_thanh.ngay_hoan_thanh', '>=', $filters['tu_ngay']))
+            ->when($filters['den_ngay'] !== '', fn ($query) => $query->whereDate('don_hang_hoan_thanh.ngay_hoan_thanh', '<=', $filters['den_ngay']))
             ->selectRaw("don_hang_hoan_thanh.ten_san_pham, COALESCE(don_hang_hoan_thanh_chi_tiet.mau, '') as mau_key, COALESCE(don_hang_hoan_thanh_chi_tiet.size, '') as size_key, SUM(don_hang_hoan_thanh_chi_tiet.so_luong) as so_luong_xuat, SUM(don_hang_hoan_thanh_chi_tiet.thanh_tien) as tien_xuat")
             ->groupBy('don_hang_hoan_thanh.ten_san_pham', DB::raw("COALESCE(don_hang_hoan_thanh_chi_tiet.mau, '')"), DB::raw("COALESCE(don_hang_hoan_thanh_chi_tiet.size, '')"))
             ->get();
 
         $returns = HangHoanOnlineChiTiet::query()
+            ->join('hang_hoan_online', 'hang_hoan_online.id', '=', 'hang_hoan_online_chi_tiet.hang_hoan_online_id')
+            ->whereNull('hang_hoan_online.deleted_at')
             ->where('cong_ton', true)
-            ->selectRaw("ten_san_pham, COALESCE(mau, '') as mau_key, COALESCE(size, '') as size_key, SUM(so_luong_hoan) as so_luong_hoan")
-            ->groupBy('ten_san_pham', DB::raw("COALESCE(mau, '')"), DB::raw("COALESCE(size, '')"))
+            ->when($filters['tu_ngay'] !== '', fn ($query) => $query->whereDate('hang_hoan_online.ngay_hoan', '>=', $filters['tu_ngay']))
+            ->when($filters['den_ngay'] !== '', fn ($query) => $query->whereDate('hang_hoan_online.ngay_hoan', '<=', $filters['den_ngay']))
+            ->selectRaw("hang_hoan_online_chi_tiet.ten_san_pham, COALESCE(hang_hoan_online_chi_tiet.mau, '') as mau_key, COALESCE(hang_hoan_online_chi_tiet.size, '') as size_key, SUM(hang_hoan_online_chi_tiet.so_luong_hoan) as so_luong_hoan")
+            ->groupBy('hang_hoan_online_chi_tiet.ten_san_pham', DB::raw("COALESCE(hang_hoan_online_chi_tiet.mau, '')"), DB::raw("COALESCE(hang_hoan_online_chi_tiet.size, '')"))
             ->get();
 
         return $this->mergeRows(
