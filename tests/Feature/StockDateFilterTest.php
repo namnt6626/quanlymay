@@ -8,6 +8,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\ViewErrorBag;
 use Tests\TestCase;
 
 class StockDateFilterTest extends TestCase
@@ -27,6 +29,7 @@ class StockDateFilterTest extends TestCase
         Schema::connection('sqlite')->defaultStringLength(191);
 
         $this->createSchema();
+        View::share('errors', new ViewErrorBag);
     }
 
     public function test_online_stock_uses_selected_date_range_for_all_movements(): void
@@ -57,6 +60,43 @@ class StockDateFilterTest extends TestCase
         $this->assertSame(2.0, (float) $row['so_luong_ton']);
         $this->assertSame(30.0, (float) $data['totals']['tien_nhap']);
         $this->assertSame(40.0, (float) $data['totals']['tien_xuat']);
+    }
+
+    public function test_online_stock_product_summary_groups_detail_rows_by_product(): void
+    {
+        // Catches replacing the detail tab instead of adding a separate product summary tab.
+        $this->insertOnlineImport('2026-02-05', 3, 30, 'AO POLO', 'Do', 'M');
+        $this->insertOnlineImport('2026-02-05', 2, 50, 'AO POLO', 'Xanh', 'L');
+        $this->insertOnlineReturn('2026-02-06', 1, 'AO POLO', 'Do', 'M');
+        $this->insertOnlineReturn('2026-02-06', 4, 'AO POLO', 'Xanh', 'L');
+        $this->insertOnlineSale('2026-02-07', 2, 40, 'AO POLO', 'Do', 'M');
+        $this->insertOnlineSale('2026-02-07', 1, 20, 'AO POLO', 'Xanh', 'L');
+        $this->insertOnlineImport('2026-02-05', 7, 140, 'AO THUN', 'Den', 'S');
+
+        $view = (new TonKhoOnlineController)->index($this->request('/ton-kho-online', [
+            'tu_ngay' => '2026-02-01',
+            'den_ngay' => '2026-02-28',
+        ]));
+
+        $data = $view->getData();
+        $detailRows = collect($data['rows']->items());
+
+        $this->assertCount(3, $detailRows);
+        $this->assertArrayHasKey('productSummaryRows', $data);
+
+        $summaryRows = collect($data['productSummaryRows']);
+        $poloSummary = $summaryRows->firstWhere('ten_san_pham', 'AO POLO');
+
+        $this->assertCount(2, $summaryRows);
+        $this->assertNotNull($poloSummary);
+        $this->assertSame(5.0, (float) $poloSummary['so_luong_nhap']);
+        $this->assertSame(5.0, (float) $poloSummary['so_luong_hoan']);
+        $this->assertSame(3.0, (float) $poloSummary['so_luong_xuat']);
+        $this->assertSame(7.0, (float) $poloSummary['so_luong_ton']);
+        $this->assertSame(80.0, (float) $poloSummary['tien_nhap']);
+        $this->assertSame(60.0, (float) $poloSummary['tien_xuat']);
+        $this->assertSame(-20.0, (float) $poloSummary['chenh_lech_tien']);
+        $this->assertStringContainsString('Tổng theo mã hàng', $view->render());
     }
 
     public function test_production_stock_uses_selected_date_range_for_all_movements(): void
@@ -285,45 +325,45 @@ class StockDateFilterTest extends TestCase
         });
     }
 
-    private function insertOnlineImport(string $date, int $quantity, int $amount): void
+    private function insertOnlineImport(string $date, int $quantity, int $amount, string $product = 'AO POLO', string $color = 'Do', string $size = 'M'): void
     {
         $id = DB::table('nhap_hang_online')->insertGetId(['ngay_nhap' => $date]);
 
         DB::table('nhap_hang_online_chi_tiet')->insert([
             'nhap_hang_online_id' => $id,
-            'ten_san_pham' => 'AO POLO',
-            'mau' => 'Do',
-            'size' => 'M',
+            'ten_san_pham' => $product,
+            'mau' => $color,
+            'size' => $size,
             'so_luong' => $quantity,
             'thanh_tien' => $amount,
         ]);
     }
 
-    private function insertOnlineReturn(string $date, int $quantity): void
+    private function insertOnlineReturn(string $date, int $quantity, string $product = 'AO POLO', string $color = 'Do', string $size = 'M'): void
     {
         $id = DB::table('hang_hoan_online')->insertGetId(['ngay_hoan' => $date]);
 
         DB::table('hang_hoan_online_chi_tiet')->insert([
             'hang_hoan_online_id' => $id,
-            'ten_san_pham' => 'AO POLO',
-            'mau' => 'Do',
-            'size' => 'M',
+            'ten_san_pham' => $product,
+            'mau' => $color,
+            'size' => $size,
             'so_luong_hoan' => $quantity,
             'cong_ton' => true,
         ]);
     }
 
-    private function insertOnlineSale(string $date, int $quantity, int $amount): void
+    private function insertOnlineSale(string $date, int $quantity, int $amount, string $product = 'AO POLO', string $color = 'Do', string $size = 'M'): void
     {
         $id = DB::table('don_hang_hoan_thanh')->insertGetId([
             'ngay_hoan_thanh' => $date,
-            'ten_san_pham' => 'AO POLO',
+            'ten_san_pham' => $product,
         ]);
 
         DB::table('don_hang_hoan_thanh_chi_tiet')->insert([
             'don_hang_hoan_thanh_id' => $id,
-            'mau' => 'Do',
-            'size' => 'M',
+            'mau' => $color,
+            'size' => $size,
             'so_luong' => $quantity,
             'thanh_tien' => $amount,
         ]);

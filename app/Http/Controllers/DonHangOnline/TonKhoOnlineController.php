@@ -30,6 +30,7 @@ class TonKhoOnlineController extends Controller
         $sizeAliases = $this->aliasLookup($sizeAliasRows);
         $filters = $this->filters($request);
         $stockRows = $this->stockRows($request, $productAliases, $colorAliases, $sizeAliases);
+        $productSummaryRows = $this->productSummaryRows($stockRows);
 
         $totals = [
             'so_luong_nhap' => $stockRows->sum('so_luong_nhap'),
@@ -76,7 +77,7 @@ class TonKhoOnlineController extends Controller
             ->get()
             ->groupBy('group_name');
 
-        return view('content.don-hang-online.ton-kho.index', compact('rows', 'filters', 'totals', 'filterOptions', 'productGroups', 'colorGroups', 'sizeGroups', 'productAliasGroupNames', 'colorAliasGroupNames', 'sizeAliasGroupNames'));
+        return view('content.don-hang-online.ton-kho.index', compact('rows', 'productSummaryRows', 'filters', 'totals', 'filterOptions', 'productGroups', 'colorGroups', 'sizeGroups', 'productAliasGroupNames', 'colorAliasGroupNames', 'sizeAliasGroupNames'));
     }
 
     public function export(Request $request, SimpleXlsxWriter $writer): BinaryFileResponse
@@ -401,6 +402,24 @@ class TonKhoOnlineController extends Controller
                 'chenh_lech_tien' => $moneyOut - $moneyIn,
             ];
         });
+    }
+
+    private function productSummaryRows(Collection $stockRows): Collection
+    {
+        return $stockRows
+            ->groupBy('ten_san_pham')
+            ->map(fn (Collection $rows, string $productName): array => [
+                'ten_san_pham' => $productName,
+                'so_luong_nhap' => (float) $rows->sum('so_luong_nhap'),
+                'so_luong_hoan' => (float) $rows->sum('so_luong_hoan'),
+                'so_luong_xuat' => (float) $rows->sum('so_luong_xuat'),
+                'so_luong_ton' => (float) $rows->sum('so_luong_ton'),
+                'tien_nhap' => (float) $rows->sum('tien_nhap'),
+                'tien_xuat' => (float) $rows->sum('tien_xuat'),
+                'chenh_lech_tien' => (float) $rows->sum('chenh_lech_tien'),
+            ])
+            ->sortBy('ten_san_pham')
+            ->values();
     }
 
     private function normalizeStockRows(Collection $rows, string $type, Collection $productAliases, Collection $colorAliases, Collection $sizeAliases): Collection

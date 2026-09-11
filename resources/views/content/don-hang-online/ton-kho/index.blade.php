@@ -108,37 +108,81 @@
       <div class="col-md-2 d-flex gap-2"><button class="btn btn-primary"><i class="icon-base bx bx-search me-1"></i>Tìm</button><a href="{{ route('ton-kho-online.index') }}" class="btn btn-outline-secondary">Mới</a></div>
     </form>
   </div>
-  <div class="online-stock-scroll">
-    <table class="table online-stock-table">
-      <thead>
-        <tr><th>Tên sản phẩm</th><th>Màu</th><th>Size</th><th class="text-end">SL nhập mới</th><th class="text-end">SL hàng hoàn</th><th class="text-end">SL xuất</th><th class="text-end">Tồn</th><th class="text-end">Tiền nhập</th><th class="text-end">Tiền xuất</th><th class="text-end">Tiền xuất - nhập</th></tr>
-        <tr class="stock-total-row"><th colspan="3" class="text-end">Tổng</th><th class="text-end">{{ number_format($totals['so_luong_nhap'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['so_luong_hoan'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['so_luong_xuat'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['so_luong_ton'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['tien_nhap'], 0, ',', '.') }} ₫</th><th class="text-end">{{ number_format($totals['tien_xuat'], 0, ',', '.') }} ₫</th><th class="text-end">{{ number_format($totals['chenh_lech_tien'], 0, ',', '.') }} ₫</th></tr>
-      </thead>
-      <tbody>
-      @forelse($rows as $row)
-        <tr>
-          <td class="fw-semibold">{{ $row['ten_san_pham'] }}</td>
-          <td>{{ $row['mau'] ?: '-' }}</td>
-          <td>{{ $row['size'] ?: '-' }}</td>
-          <td class="text-end">{{ number_format($row['so_luong_nhap'], 0, ',', '.') }}</td>
-          <td class="text-end text-success">{{ number_format($row['so_luong_hoan'], 0, ',', '.') }}</td>
-          <td class="text-end">{{ number_format($row['so_luong_xuat'], 0, ',', '.') }}</td>
-          <td class="text-end fw-semibold {{ $row['so_luong_ton'] < 0 ? 'text-danger' : '' }}">{{ number_format($row['so_luong_ton'], 0, ',', '.') }}</td>
-          <td class="text-end">{{ number_format($row['tien_nhap'], 0, ',', '.') }} ₫</td>
-          <td class="text-end">{{ number_format($row['tien_xuat'], 0, ',', '.') }} ₫</td>
-          <td class="text-end fw-semibold {{ $row['chenh_lech_tien'] < 0 ? 'text-danger' : 'text-success' }}">{{ number_format($row['chenh_lech_tien'], 0, ',', '.') }} ₫</td>
-        </tr>
-      @empty
-        <tr><td colspan="10" class="text-center py-4">Chưa có dữ liệu.</td></tr>
-      @endforelse
-      </tbody>
-    </table>
-  </div>
-  @if ($rows->hasPages())
-    <div class="card-footer">
-      {{ $rows->links() }}
+  <ul class="nav nav-tabs px-4" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#online-stock-detail-tab" aria-controls="online-stock-detail-tab" aria-selected="true">
+        Chi tiết màu/size
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#online-stock-product-summary-tab" aria-controls="online-stock-product-summary-tab" aria-selected="false">
+        Tổng theo mã hàng
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content p-0">
+    <div class="tab-pane fade show active" id="online-stock-detail-tab" role="tabpanel">
+      <div class="online-stock-scroll">
+        <table class="table online-stock-table">
+          <thead>
+            <tr><th>Tên sản phẩm</th><th>Màu</th><th>Size</th><th class="text-end">SL nhập mới</th><th class="text-end">SL hàng hoàn</th><th class="text-end">SL xuất</th><th class="text-end">Tồn</th><th class="text-end">Tiền nhập</th><th class="text-end">Tiền xuất</th><th class="text-end">Tiền xuất - nhập</th></tr>
+            <tr class="stock-total-row"><th colspan="3" class="text-end">Tổng</th><th class="text-end">{{ number_format($totals['so_luong_nhap'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['so_luong_hoan'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['so_luong_xuat'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['so_luong_ton'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['tien_nhap'], 0, ',', '.') }} ₫</th><th class="text-end">{{ number_format($totals['tien_xuat'], 0, ',', '.') }} ₫</th><th class="text-end">{{ number_format($totals['chenh_lech_tien'], 0, ',', '.') }} ₫</th></tr>
+          </thead>
+          <tbody>
+          @forelse($rows as $row)
+            <tr>
+              <td class="fw-semibold">{{ $row['ten_san_pham'] }}</td>
+              <td>{{ $row['mau'] ?: '-' }}</td>
+              <td>{{ $row['size'] ?: '-' }}</td>
+              <td class="text-end">{{ number_format($row['so_luong_nhap'], 0, ',', '.') }}</td>
+              <td class="text-end text-success">{{ number_format($row['so_luong_hoan'], 0, ',', '.') }}</td>
+              <td class="text-end">{{ number_format($row['so_luong_xuat'], 0, ',', '.') }}</td>
+              <td class="text-end fw-semibold {{ $row['so_luong_ton'] < 0 ? 'text-danger' : '' }}">{{ number_format($row['so_luong_ton'], 0, ',', '.') }}</td>
+              <td class="text-end">{{ number_format($row['tien_nhap'], 0, ',', '.') }} ₫</td>
+              <td class="text-end">{{ number_format($row['tien_xuat'], 0, ',', '.') }} ₫</td>
+              <td class="text-end fw-semibold {{ $row['chenh_lech_tien'] < 0 ? 'text-danger' : 'text-success' }}">{{ number_format($row['chenh_lech_tien'], 0, ',', '.') }} ₫</td>
+            </tr>
+          @empty
+            <tr><td colspan="10" class="text-center py-4">Chưa có dữ liệu.</td></tr>
+          @endforelse
+          </tbody>
+        </table>
+      </div>
+      @if ($rows->hasPages())
+        <div class="card-footer">
+          {{ $rows->links() }}
+        </div>
+      @endif
     </div>
-  @endif
+
+    <div class="tab-pane fade" id="online-stock-product-summary-tab" role="tabpanel">
+      <div class="online-stock-scroll">
+        <table class="table online-stock-table">
+          <thead>
+            <tr><th>Mã hàng</th><th class="text-end">SL nhập mới</th><th class="text-end">SL hàng hoàn</th><th class="text-end">SL xuất</th><th class="text-end">Tồn</th><th class="text-end">Tiền nhập</th><th class="text-end">Tiền xuất</th><th class="text-end">Tiền xuất - nhập</th></tr>
+            <tr class="stock-total-row"><th class="text-end">Tổng</th><th class="text-end">{{ number_format($totals['so_luong_nhap'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['so_luong_hoan'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['so_luong_xuat'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['so_luong_ton'], 0, ',', '.') }}</th><th class="text-end">{{ number_format($totals['tien_nhap'], 0, ',', '.') }} ₫</th><th class="text-end">{{ number_format($totals['tien_xuat'], 0, ',', '.') }} ₫</th><th class="text-end">{{ number_format($totals['chenh_lech_tien'], 0, ',', '.') }} ₫</th></tr>
+          </thead>
+          <tbody>
+          @forelse($productSummaryRows as $row)
+            <tr>
+              <td class="fw-semibold">{{ $row['ten_san_pham'] }}</td>
+              <td class="text-end">{{ number_format($row['so_luong_nhap'], 0, ',', '.') }}</td>
+              <td class="text-end text-success">{{ number_format($row['so_luong_hoan'], 0, ',', '.') }}</td>
+              <td class="text-end">{{ number_format($row['so_luong_xuat'], 0, ',', '.') }}</td>
+              <td class="text-end fw-semibold {{ $row['so_luong_ton'] < 0 ? 'text-danger' : '' }}">{{ number_format($row['so_luong_ton'], 0, ',', '.') }}</td>
+              <td class="text-end">{{ number_format($row['tien_nhap'], 0, ',', '.') }} ₫</td>
+              <td class="text-end">{{ number_format($row['tien_xuat'], 0, ',', '.') }} ₫</td>
+              <td class="text-end fw-semibold {{ $row['chenh_lech_tien'] < 0 ? 'text-danger' : 'text-success' }}">{{ number_format($row['chenh_lech_tien'], 0, ',', '.') }} ₫</td>
+            </tr>
+          @empty
+            <tr><td colspan="8" class="text-center py-4">Chưa có dữ liệu.</td></tr>
+          @endforelse
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="modal fade" id="productGroupModal" tabindex="-1" aria-labelledby="productGroupModalLabel" aria-hidden="true">
