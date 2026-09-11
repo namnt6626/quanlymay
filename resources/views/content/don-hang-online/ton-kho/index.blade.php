@@ -70,6 +70,9 @@
 </style>
 @endsection
 @section('content')
+@php
+  $activeStockTab = $filters['active_tab'] ?? 'detail';
+@endphp
 <div class="card">
   <div class="card-header d-flex flex-wrap gap-2 align-items-center justify-content-between">
     <h5 class="mb-0">Tồn kho online</h5>
@@ -95,6 +98,7 @@
       </div>
     @endif
     <form method="GET" class="row g-3 align-items-end">
+      <input type="hidden" id="online_stock_active_tab" name="active_tab" value="{{ $activeStockTab }}">
       <div class="col-md-3">
         <label class="form-label">Sản phẩm</label>
         <input class="form-control" name="ten_san_pham" value="{{ $filters['ten_san_pham'] }}" list="ton-kho-products" placeholder="Gõ hoặc chọn sản phẩm">
@@ -110,19 +114,19 @@
   </div>
   <ul class="nav nav-tabs px-4" role="tablist">
     <li class="nav-item" role="presentation">
-      <button class="nav-link active" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#online-stock-detail-tab" aria-controls="online-stock-detail-tab" aria-selected="true">
+      <button @class(['nav-link', 'active' => $activeStockTab === 'detail']) type="button" role="tab" data-bs-toggle="tab" data-bs-target="#online-stock-detail-tab" data-online-stock-tab="detail" aria-controls="online-stock-detail-tab" aria-selected="{{ $activeStockTab === 'detail' ? 'true' : 'false' }}">
         Chi tiết màu/size
       </button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#online-stock-product-summary-tab" aria-controls="online-stock-product-summary-tab" aria-selected="false">
+      <button @class(['nav-link', 'active' => $activeStockTab === 'product_summary']) type="button" role="tab" data-bs-toggle="tab" data-bs-target="#online-stock-product-summary-tab" data-online-stock-tab="product_summary" aria-controls="online-stock-product-summary-tab" aria-selected="{{ $activeStockTab === 'product_summary' ? 'true' : 'false' }}">
         Tổng theo mã hàng
       </button>
     </li>
   </ul>
 
   <div class="tab-content p-0">
-    <div class="tab-pane fade show active" id="online-stock-detail-tab" role="tabpanel">
+    <div @class(['tab-pane fade', 'show active' => $activeStockTab === 'detail']) id="online-stock-detail-tab" role="tabpanel">
       <div class="online-stock-scroll">
         <table class="table online-stock-table">
           <thead>
@@ -156,7 +160,7 @@
       @endif
     </div>
 
-    <div class="tab-pane fade" id="online-stock-product-summary-tab" role="tabpanel">
+    <div @class(['tab-pane fade', 'show active' => $activeStockTab === 'product_summary']) id="online-stock-product-summary-tab" role="tabpanel">
       <div class="online-stock-scroll">
         <table class="table online-stock-table">
           <thead>
@@ -428,6 +432,15 @@
 @section('page-script')
 <script>
   document.addEventListener('DOMContentLoaded', function() {
+    const activeStockTabInput = document.getElementById('online_stock_active_tab');
+    if (activeStockTabInput) {
+      document.querySelectorAll('[data-online-stock-tab]').forEach((button) => {
+        button.addEventListener('shown.bs.tab', function(event) {
+          activeStockTabInput.value = event.target.dataset.onlineStockTab || 'detail';
+        });
+      });
+    }
+
     function bindAliasModal(config) {
       const modal = document.getElementById(config.modalId);
       if (!modal) return;

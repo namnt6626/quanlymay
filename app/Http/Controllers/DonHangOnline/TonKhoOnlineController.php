@@ -299,17 +299,17 @@ class TonKhoOnlineController extends Controller
             ->with('success', 'Đã bỏ gộp size "'.$data['group_name'].'".');
     }
 
-    /**
-     * @return array{ten_san_pham: string, mau: string, size: string, tu_ngay: string, den_ngay: string}
-     */
     private function filters(Request $request): array
     {
+        $activeTab = trim((string) $request->input('active_tab'));
+
         return [
             'ten_san_pham' => trim((string) $request->input('ten_san_pham')),
             'mau' => trim((string) $request->input('mau')),
             'size' => trim((string) $request->input('size')),
             'tu_ngay' => trim((string) $request->input('tu_ngay')),
             'den_ngay' => trim((string) $request->input('den_ngay')),
+            'active_tab' => in_array($activeTab, ['detail', 'product_summary'], true) ? $activeTab : 'detail',
         ];
     }
 

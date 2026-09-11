@@ -99,6 +99,26 @@ class StockDateFilterTest extends TestCase
         $this->assertStringContainsString('Tổng theo mã hàng', $view->render());
     }
 
+    public function test_online_stock_keeps_requested_product_summary_tab_active_after_search(): void
+    {
+        // Catches dropping the active tab from GET filters, which makes search from the summary tab reload into detail.
+        $this->insertOnlineImport('2026-02-05', 3, 30);
+
+        $view = (new TonKhoOnlineController)->index($this->request('/ton-kho-online', [
+            'active_tab' => 'product_summary',
+            'ten_san_pham' => 'AO POLO',
+        ]));
+
+        $data = $view->getData();
+        $html = $view->render();
+
+        $this->assertArrayHasKey('active_tab', $data['filters']);
+        $this->assertSame('product_summary', $data['filters']['active_tab']);
+        $this->assertStringContainsString('id="online_stock_active_tab" name="active_tab" value="product_summary"', $html);
+        $this->assertMatchesRegularExpression('/<button[^>]*class="nav-link active"[^>]*data-bs-target="#online-stock-product-summary-tab"[^>]*aria-selected="true"/s', $html);
+        $this->assertMatchesRegularExpression('/<div[^>]*class="tab-pane fade show active"[^>]*id="online-stock-product-summary-tab"/s', $html);
+    }
+
     public function test_production_stock_uses_selected_date_range_for_all_movements(): void
     {
         // Catches missing date filters on any of: cut, QC, warehouse import, or warehouse export movements.
