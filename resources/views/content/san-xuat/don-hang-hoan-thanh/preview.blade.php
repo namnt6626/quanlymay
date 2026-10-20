@@ -43,7 +43,13 @@
     <td>{{ $row['dong_excel'] }}<input type="hidden" name="rows[{{ $index }}][dong_excel]" value="{{ $row['dong_excel'] }}"></td>
     <td><input type="date" class="form-control form-control-sm" name="rows[{{ $index }}][ngay_hoan_thanh]" value="{{ $row['ngay_hoan_thanh'] }}" required><input type="hidden" name="rows[{{ $index }}][thoi_gian_tao_goc]" value="{{ $row['thoi_gian_tao_goc'] }}"></td>
     <td><input class="form-control form-control-sm" name="rows[{{ $index }}][ten_san_pham]" value="{{ $row['ten_san_pham'] }}" required><input type="hidden" name="rows[{{ $index }}][kenh_ban]" value="{{ $row['kenh_ban'] }}"></td>
-    <td><div class="small excel-preview-original">{{ $row['phan_loai_goc'] ?: '-' }}</div><input type="hidden" name="rows[{{ $index }}][phan_loai_goc]" value="{{ $row['phan_loai_goc'] }}"></td>
+    <td>
+      <div class="small excel-preview-original">{{ $row['phan_loai_goc'] ?: '-' }}</div>
+      @if(($row['combo_count'] ?? 1) > 1)
+        <span class="badge bg-label-primary mt-1">Combo {{ $row['combo_count'] }}</span>
+      @endif
+      <input type="hidden" name="rows[{{ $index }}][phan_loai_goc]" value="{{ $row['phan_loai_goc'] }}">
+    </td>
     <td><input class="form-control form-control-sm" name="rows[{{ $index }}][mau]" value="{{ $row['mau'] }}"></td>
     <td><input class="form-control form-control-sm" name="rows[{{ $index }}][size]" value="{{ $row['size'] }}"></td>
     <td><input type="number" step="0.0001" min="0.0001" class="form-control form-control-sm" name="rows[{{ $index }}][so_luong]" value="{{ $row['so_luong'] }}" required></td>

@@ -10,6 +10,7 @@ use App\Http\Requests\DonHangHoanThanh\UpdateDonHangHoanThanhRequest;
 use App\Models\DmKenhBan;
 use App\Models\DonHangHoanThanh;
 use App\Models\DonHangHoanThanhChiTiet;
+use App\Services\DonHangHoanThanh\ComboRowExpander;
 use App\Services\DonHangHoanThanh\DonHangHoanThanhService;
 use App\Services\DonHangHoanThanh\PhanLoaiParser;
 use App\Services\DonHangHoanThanh\XlsxReader;
@@ -75,12 +76,14 @@ class DonHangHoanThanhController extends Controller
     public function store(StoreDonHangHoanThanhRequest $request): RedirectResponse
     {
         $this->service->saveManual($request->validated());
+
         return redirect()->route('don-hang-hoan-thanh.index')->with('success', 'Thêm xuất hàng thành công.');
     }
 
     public function edit(DonHangHoanThanh $donHangHoanThanh): View
     {
         $donHangHoanThanh->load('chiTiets');
+
         return view('content.san-xuat.don-hang-hoan-thanh.edit', [
             'order' => $donHangHoanThanh,
             'kenhBans' => DmKenhBan::activeNames(),
@@ -90,12 +93,14 @@ class DonHangHoanThanhController extends Controller
     public function update(UpdateDonHangHoanThanhRequest $request, DonHangHoanThanh $donHangHoanThanh): RedirectResponse
     {
         $this->service->saveManual($request->validated(), $donHangHoanThanh);
+
         return redirect()->route('don-hang-hoan-thanh.index')->with('success', 'Cập nhật xuất hàng thành công.');
     }
 
     public function destroy(DonHangHoanThanh $donHangHoanThanh): RedirectResponse
     {
         $donHangHoanThanh->delete();
+
         return back()->with('success', 'Xóa xuất hàng thành công.');
     }
 
@@ -125,24 +130,30 @@ class DonHangHoanThanhController extends Controller
         ]);
     }
 
-    public function preview(PreviewImportRequest $request, XlsxReader $reader, PhanLoaiParser $parser): View
+    public function preview(PreviewImportRequest $request, XlsxReader $reader, PhanLoaiParser $parser, ComboRowExpander $comboRowExpander): View
     {
         $channel = $request->validated('kenh_ban');
         $sheetRows = $reader->rows($request->file('file_excel')->getRealPath());
 
         $productInfoHeaderIndex = $this->findHeaderIndex($sheetRows, fn (array $values) => $this->isProductInfoHeader($values));
         if ($productInfoHeaderIndex !== false) {
-            [$rows, $ignored] = $this->parseProductInfoRows($sheetRows, $productInfoHeaderIndex, $parser, $channel);
+            [$rows, $ignored] = $this->parseProductInfoRows($sheetRows, $productInfoHeaderIndex, $parser, $comboRowExpander, $channel);
 
-            if ($rows === []) return back()->withErrors(['file_excel' => 'File không có dòng dữ liệu hợp lệ.']);
+            if ($rows === []) {
+                return back()->withErrors(['file_excel' => 'File không có dòng dữ liệu hợp lệ.']);
+            }
+
             return view('content.san-xuat.don-hang-hoan-thanh.preview', compact('rows', 'ignored'));
         }
 
         $vietnameseShopeeHeaderIndex = $this->findHeaderIndex($sheetRows, fn (array $values) => $this->isVietnameseShopeeHeader($values));
         if ($vietnameseShopeeHeaderIndex !== false) {
-            [$rows, $ignored] = $this->parseVietnameseShopeeRows($sheetRows, $vietnameseShopeeHeaderIndex, $parser, $channel);
+            [$rows, $ignored] = $this->parseVietnameseShopeeRows($sheetRows, $vietnameseShopeeHeaderIndex, $parser, $comboRowExpander, $channel);
 
-            if ($rows === []) return back()->withErrors(['file_excel' => 'File không có dòng dữ liệu hợp lệ.']);
+            if ($rows === []) {
+                return back()->withErrors(['file_excel' => 'File không có dòng dữ liệu hợp lệ.']);
+            }
+
             return view('content.san-xuat.don-hang-hoan-thanh.preview', compact('rows', 'ignored'));
         }
 
@@ -163,15 +174,18 @@ class DonHangHoanThanhController extends Controller
             $product = trim((string) ($values[$columns['product']] ?? ''));
             $quantity = trim((string) ($values[$columns['quantity']] ?? ''));
             $dateText = trim((string) ($values[$columns['created']] ?? ''));
-            if ($product === '' && $quantity === '' && $dateText === '') continue;
+            if ($product === '' && $quantity === '' && $dateText === '') {
+                continue;
+            }
             $date = $this->parseDate($dateText);
             if ($product === '' || ! is_numeric($quantity) || (float) $quantity <= 0 || ! $date) {
                 $ignored[] = $sheetRow['row'];
+
                 continue;
             }
             $variation = trim((string) ($values[$columns['variation']] ?? ''));
             $split = $parser->parse($variation);
-            $rows[] = [
+            $row = [
                 'dong_excel' => $sheetRow['row'],
                 'ngay_hoan_thanh' => $date->toDateString(),
                 'thoi_gian_tao_goc' => $date->format('Y-m-d H:i:s'),
@@ -182,15 +196,20 @@ class DonHangHoanThanhController extends Controller
                 'so_luong' => (float) $quantity,
                 'thanh_tien' => (float) ($values[$columns['subtotal']] ?? 0),
             ];
+            array_push($rows, ...$comboRowExpander->expand($row, $split['colors']));
         }
 
-        if ($rows === []) return back()->withErrors(['file_excel' => 'File không có dòng dữ liệu hợp lệ.']);
+        if ($rows === []) {
+            return back()->withErrors(['file_excel' => 'File không có dòng dữ liệu hợp lệ.']);
+        }
+
         return view('content.san-xuat.don-hang-hoan-thanh.preview', compact('rows', 'ignored'));
     }
 
     public function commit(CommitImportRequest $request): RedirectResponse
     {
         $count = $this->service->import($request->validated('rows'));
+
         return redirect()->route('don-hang-hoan-thanh.index')->with('success', "Đã nhập thành công {$count} dòng từ Excel.");
     }
 
@@ -223,7 +242,7 @@ class DonHangHoanThanhController extends Controller
             && in_array('số lượng', $normalized, true);
     }
 
-    private function parseVietnameseShopeeRows(array $sheetRows, int $headerIndex, PhanLoaiParser $parser, string $channel): array
+    private function parseVietnameseShopeeRows(array $sheetRows, int $headerIndex, PhanLoaiParser $parser, ComboRowExpander $comboRowExpander, string $channel): array
     {
         $header = $sheetRows[$headerIndex]['values'] ?? [];
         $columns = $this->mapVietnameseShopeeColumns($header);
@@ -238,16 +257,19 @@ class DonHangHoanThanhController extends Controller
             $quantity = trim((string) ($values[$columns['quantity']] ?? ''));
             $subtotal = trim((string) ($values[$columns['subtotal']] ?? ''));
 
-            if ($dateText === '' && $product === '' && $variation === '' && $quantity === '' && $subtotal === '') continue;
+            if ($dateText === '' && $product === '' && $variation === '' && $quantity === '' && $subtotal === '') {
+                continue;
+            }
 
             $date = $this->parseDate($dateText);
             if (! $date || $variation === '' || ! is_numeric($quantity) || (float) $quantity <= 0) {
                 $ignored[] = $sheetRow['row'];
+
                 continue;
             }
 
             $split = $parser->parse($variation);
-            $rows[] = [
+            $row = [
                 'dong_excel' => $sheetRow['row'],
                 'ngay_hoan_thanh' => $date->toDateString(),
                 'thoi_gian_tao_goc' => $date->format('Y-m-d H:i:s'),
@@ -259,6 +281,7 @@ class DonHangHoanThanhController extends Controller
                 'so_luong' => (float) $quantity,
                 'thanh_tien' => $subtotal !== '' ? $this->parseLocalizedNumber($subtotal) : '',
             ];
+            array_push($rows, ...$comboRowExpander->expand($row, $split['colors']));
         }
 
         return [$rows, $ignored];
@@ -279,15 +302,20 @@ class DonHangHoanThanhController extends Controller
             $column = false;
             foreach ($labels as $label) {
                 $column = array_search($label, $normalized, true);
-                if ($column !== false) break;
+                if ($column !== false) {
+                    break;
+                }
             }
-            if ($column === false) throw new \RuntimeException('Thiếu cột '.implode(' hoặc ', $labels).' trong file Excel.');
+            if ($column === false) {
+                throw new \RuntimeException('Thiếu cột '.implode(' hoặc ', $labels).' trong file Excel.');
+            }
             $mapped[$key] = $column;
         }
+
         return $mapped;
     }
 
-    private function parseProductInfoRows(array $sheetRows, int $headerIndex, PhanLoaiParser $parser, string $channel): array
+    private function parseProductInfoRows(array $sheetRows, int $headerIndex, PhanLoaiParser $parser, ComboRowExpander $comboRowExpander, string $channel): array
     {
         $rows = [];
         $ignored = [];
@@ -298,7 +326,9 @@ class DonHangHoanThanhController extends Controller
 
         foreach (array_slice($sheetRows, $headerIndex + 1) as $sheetRow) {
             $text = trim((string) ($sheetRow['values'][$productInfoColumn] ?? ''));
-            if ($text === '') continue;
+            if ($text === '') {
+                continue;
+            }
 
             $items = $this->splitProductInfoItems($text);
             $accepted = 0;
@@ -314,7 +344,7 @@ class DonHangHoanThanhController extends Controller
 
                 $split = $parser->parse($variation);
 
-                $rows[] = [
+                $row = [
                     'dong_excel' => $sheetRow['row'],
                     'ngay_hoan_thanh' => $date->toDateString(),
                     'thoi_gian_tao_goc' => $date->format('Y-m-d H:i:s'),
@@ -326,10 +356,14 @@ class DonHangHoanThanhController extends Controller
                     'so_luong' => $quantity,
                     'thanh_tien' => '',
                 ];
-                $accepted++;
+                $expandedRows = $comboRowExpander->expand($row, $split['colors']);
+                array_push($rows, ...$expandedRows);
+                $accepted += count($expandedRows);
             }
 
-            if ($accepted === 0) $ignored[] = $sheetRow['row'];
+            if ($accepted === 0) {
+                $ignored[] = $sheetRow['row'];
+            }
         }
 
         return [$rows, $ignored];
@@ -337,7 +371,7 @@ class DonHangHoanThanhController extends Controller
 
     private function splitProductInfoItems(string $text): array
     {
-        $text = str_replace(["_x000D_", "\r"], "\n", $text);
+        $text = str_replace(['_x000D_', "\r"], "\n", $text);
 
         return array_values(array_filter(array_map('trim', preg_split('/(?:^|\n)\s*\[\d+\]\s*/u', $text) ?: [])));
     }
@@ -346,13 +380,17 @@ class DonHangHoanThanhController extends Controller
     {
         foreach (['Parent SKU Reference No.', 'SKU Reference No.'] as $label) {
             $value = $this->productInfoField($item, $label);
-            if ($value !== '') return $value;
+            if ($value !== '') {
+                return $value;
+            }
         }
 
         $productName = $this->productInfoField($item, 'Product Name');
         if (preg_match('/\(([^()]*)\)\s*$/u', $productName, $matches)) {
             $code = trim($matches[1]);
-            if ($code !== '') return $code;
+            if ($code !== '') {
+                return $code;
+            }
         }
 
         return $productName;
@@ -372,7 +410,9 @@ class DonHangHoanThanhController extends Controller
     private function parseLocalizedNumber(string $value): float
     {
         $value = preg_replace('/[^\d,.\-]/u', '', trim($value)) ?? '';
-        if ($value === '') return 0;
+        if ($value === '') {
+            return 0;
+        }
 
         $hasComma = str_contains($value, ',');
         $hasDot = str_contains($value, '.');
@@ -403,11 +443,16 @@ class DonHangHoanThanhController extends Controller
             $column = false;
             foreach ($labels as $label) {
                 $column = array_search($label, $normalized, true);
-                if ($column !== false) break;
+                if ($column !== false) {
+                    break;
+                }
             }
-            if ($column === false) throw new \RuntimeException('Thiếu cột '.implode(' hoặc ', $labels).' trong file Excel.');
+            if ($column === false) {
+                throw new \RuntimeException('Thiếu cột '.implode(' hoặc ', $labels).' trong file Excel.');
+            }
             $mapped[$key] = $column;
         }
+
         return $mapped;
     }
 
@@ -425,9 +470,13 @@ class DonHangHoanThanhController extends Controller
         foreach (['d/m/Y H:i:s', 'd/m/Y H:i', 'd/m/Y', 'Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d'] as $format) {
             try {
                 $date = Carbon::createFromFormat($format, $value);
-                if ($date && $date->format($format) === $value) return $date;
-            } catch (\Throwable) {}
+                if ($date && $date->format($format) === $value) {
+                    return $date;
+                }
+            } catch (\Throwable) {
+            }
         }
+
         return null;
     }
 
